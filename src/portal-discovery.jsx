@@ -24,7 +24,7 @@ function DiscoveryStepper({ step }) {
               <span style={{
                 width: 26, height: 26, borderRadius:"50%",
                 background: isActive ? "var(--yellow-500)" : isDone ? "var(--green-500)" : "transparent",
-                color: isActive ? "var(--neutral-900)" : isDone ? "#fff" : "var(--c-faint)",
+                color: isActive ? "var(--c-ink)" : isDone ? "#fff" : "var(--c-faint)",
                 border: isActive || isDone ? "none" : "1.5px solid var(--c-line-2)",
                 display:"inline-flex", alignItems:"center", justifyContent:"center",
                 fontFamily:"var(--font-mono)", fontSize:11, fontWeight:600,
@@ -162,7 +162,7 @@ function DiscoveryStep2Results({ onConfirm }) {
     <div style={{maxWidth: 1080, margin:"24px auto 0"}}>
       <Reveal>
         <div style={{
-          background:"#fff", border:"1px solid var(--c-line)", borderRadius: 14,
+          background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius: 14,
           padding: "22px 26px",
           display:"grid", gridTemplateColumns:"1fr auto", gap: 20, alignItems:"center", marginBottom: 18,
         }}>
@@ -506,6 +506,9 @@ function BioViewer({ go, bioScore = 91 }) {
         </div>
         <div style={{display:"flex", flexDirection:"column", gap: 10, alignItems:"flex-end"}}>
           <button className="btn btn--primary">Edit BIO <Icon name="edit" size={14} /></button>
+          <button className="btn btn--ghost btn--sm" onClick={() => go("discovery")}>
+            <Icon name="refresh" size={14} /> Re-run discovery
+          </button>
           <button className="btn btn--ghost btn--sm">Ask Brandolph about the BIO →</button>
         </div>
       </div>
@@ -669,7 +672,7 @@ function BioSources() {
             <div style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", marginTop: 2, letterSpacing:"0.04em"}}>{s.date}</div>
           </div>
           <span className="pill">{s.n} signals</span>
-          <button className="btn btn--link" style={{fontSize: 12}}>Re-extract</button>
+          <button className="btn btn--link" style={{fontSize: 12}} onClick={() => go("discovery")}>Re-extract</button>
         </div>
       ))}
     </div>

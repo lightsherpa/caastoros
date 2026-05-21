@@ -1,276 +1,112 @@
 /* ──────────────────────────────────────────────────────────────────
-   CAASTOR — Colors & Typography tokens
-   Sourced from /Design-system/Foundations in the Caastor AI Optimize
-   Figma. Brand wordmark/headlines use ABC Favorit Compressed + ABC
-   Favorit Mono; digital product UI uses IBM Plex Sans Condensed as
-   the sanctioned web alternative. Warm-black #303030, yellow primary,
-   purple secondary, pink danger, green success, mint accent.
+   CAASTOR — legacy → v2 token BRIDGE
+   The portal's components reference legacy token names (--c-bg,
+   --yellow-500, --c-ink, …). This file re-points every one of them at
+   the v2 design system (ds-tokens.css): citrus palette, Apple-quiet
+   elevation, light + dark surfaces. Must load AFTER ds-tokens.css and
+   portal.css so these aliases win the cascade.
    ─────────────────────────────────────────────────────────────────── */
 
-/* -------------------------------------------------------------------
-   FONTS — web alternates (Google Fonts). Brand files are ABC Favorit
-   (paid). See README for substitution notes.
-   ------------------------------------------------------------------- */
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap");
-
 :root {
-  /* ─── Color primitives ─── */
-  /* Neutrals — anchored on warm #303030 */
-  --neutral-0:    #FFFFFF;
-  --neutral-50:   #F0F0F0;
-  --neutral-100:  #E6E6E6;
-  --neutral-200:  #D4D4D4;
-  --neutral-300:  #B8B8B8;
-  --neutral-400:  #999999;
-  --neutral-500:  #777777;
-  --neutral-600:  #5A5A5A;
-  --neutral-700:  #474747;
-  --neutral-800:  #3A3A3A;
-  --neutral-900:  #303030;   /* warm black */
+  /* ── Brand (legacy yellow scale → citrus --brand) ── */
+  --yellow-50:  var(--brand-soft);
+  --yellow-100: var(--brand-soft);
+  --yellow-200: rgba(var(--brand-glow), 0.30);
+  --yellow-300: rgba(var(--brand-glow), 0.45);
+  --yellow-400: var(--brand);
+  --yellow-500: var(--brand);
+  --yellow-600: var(--brand-strong);
+  --yellow-700: var(--brand-strong);
+  --yellow-800: var(--brand-strong);
+  --yellow-900: var(--brand-strong);
+
+  /* ── Secondary (legacy purple scale → --accent / indigo) ── */
+  --purple-50:  var(--accent-soft);
+  --purple-100: var(--accent-soft);
+  --purple-200: rgba(var(--accent-glow), 0.30);
+  --purple-300: rgba(var(--accent-glow), 0.45);
+  --purple-400: var(--accent);
+  --purple-500: var(--accent);
+  --purple-600: var(--accent-strong);
+  --purple-700: var(--accent-strong);
+  --purple-800: var(--accent-strong);
+  --purple-900: var(--accent-strong);
+
+  /* ── Status: success (green + mint) ── */
+  --green-50:  var(--status-success-soft);
+  --green-100: var(--status-success-soft);
+  --green-200: rgba(16, 185, 129, 0.25);
+  --green-300: rgba(16, 185, 129, 0.40);
+  --green-400: var(--status-success);
+  --green-500: var(--status-success);
+  --green-600: var(--status-success);
+  --green-700: var(--status-success);
+  --green-800: var(--status-success);
+  --green-900: var(--status-success);
+  --mint-300:  var(--status-success-soft);
+  --mint-500:  var(--status-success);
+  --mint-600:  var(--status-success);
+
+  /* ── Status: danger (pink) ── */
+  --pink-50:  var(--status-danger-soft);
+  --pink-100: var(--status-danger-soft);
+  --pink-200: rgba(239, 68, 68, 0.30);
+  --pink-300: var(--status-danger);
+  --pink-400: var(--status-danger);
+  --pink-500: var(--status-danger);
+  --pink-600: var(--status-danger);
+  --pink-700: var(--status-danger);
+  --pink-800: var(--status-danger);
+  --pink-900: var(--status-danger);
+
+  /* ── Status: warning (orange) ── */
+  --orange-100: var(--status-warning-soft);
+  --orange-500: var(--status-warning);
+  --orange-600: var(--status-warning);
+
+  /* ── Status: info (blue) ── */
+  --blue-50:  var(--status-info-soft);
+  --blue-100: var(--status-info-soft);
+  --blue-500: var(--status-info);
+  --blue-600: var(--status-info);
+  --blue-700: var(--status-info);
+
+  /* ── Neutrals → v2 text / surface scale (theme-aware) ── */
+  --neutral-0:    var(--bg-canvas);
+  --neutral-50:   var(--bg-muted);
+  --neutral-100:  var(--bg-muted);
+  --neutral-200:  var(--border-default);
+  --neutral-300:  var(--border-strong);
+  --neutral-400:  var(--text-quaternary);
+  --neutral-500:  var(--text-tertiary);
+  --neutral-600:  var(--text-tertiary);
+  --neutral-700:  var(--text-secondary);
+  /* 800 / 900 back dark chips, avatar squares, dark buttons — keep them
+     dark in BOTH themes so white foreground text stays legible. */
+  --neutral-800:  #2c2c2e;
+  --neutral-900:  #1d1d1f;
   --neutral-1000: #000000;
 
-  /* Yellow — PRIMARY (brand) */
-  --yellow-50:  #FFF8E6;
-  --yellow-100: #FFEFC0;
-  --yellow-200: #FDE49A;
-  --yellow-300: #FDDA74;
-  --yellow-400: #FECC54;
-  --yellow-500: #F8C036;   /* brand yellow */
-  --yellow-600: #E0A91E;
-  --yellow-700: #B88814;
-  --yellow-800: #8A6710;
-  --yellow-900: #5C450B;
+  /* ── Legacy convenience surfaces → v2 surfaces / text / borders ── */
+  --c-bg:      var(--bg-app);
+  --c-card:    var(--bg-canvas);
+  --c-line:    var(--border-default);
+  --c-line-2:  var(--border-strong);
+  --c-ink:     var(--text-primary);
+  --c-dim:     var(--text-secondary);
+  --c-faint:   var(--text-tertiary);
+  --c-yellow-tint: var(--brand-soft);
+  --c-purple-tint: var(--accent-soft);
+  --c-mint-tint:   var(--status-success-soft);
+  --c-pink-tint:   var(--status-danger-soft);
 
-  /* Purple — SECONDARY */
-  --purple-50:  #F5EDFF;
-  --purple-100: #E6D3FF;
-  --purple-200: #D0AEFF;
-  --purple-300: #BC8BFE;
-  --purple-400: #9E56E4;
-  --purple-500: #8436C0;   /* brand purple */
-  --purple-600: #7239EA;
-  --purple-700: #6A2A9B;
-  --purple-800: #501F75;
-  --purple-900: #361450;
-
-  /* Pink — DANGER */
-  --pink-50:  #FDECF0;
-  --pink-100: #FACCD6;
-  --pink-200: #F6A3B5;
-  --pink-300: #F47A94;
-  --pink-400: #F26080;
-  --pink-500: #F0486C;   /* brand pink */
-  --pink-600: #D83E5F;
-  --pink-700: #C03054;
-  --pink-800: #90243F;
-  --pink-900: #60182A;
-
-  /* Green — SUCCESS */
-  --green-50:  #E8FBF2;
-  --green-100: #C8F5DF;
-  --green-200: #A0EDC7;
-  --green-300: #6CF4B4;
-  --green-400: #4DD69A;
-  --green-500: #30B478;   /* brand green */
-  --green-600: #279660;
-  --green-700: #1E784C;
-  --green-800: #165A39;
-  --green-900: #0E3C26;
-
-  /* Mint — ACCENT (highlight / marketing) */
-  --mint-300:  #8BF8C3;
-  --mint-500:  #6CF4B4;   /* brand mint — used on banners */
-  --mint-600:  #3DD699;
-
-  /* Blue — INFO */
-  --blue-50:   #EFF6FF;
-  --blue-100:  #DBEAFE;
-  --blue-500:  #1B84FF;
-  --blue-600:  #1266D4;
-  --blue-700:  #0E4FA5;
-
-  /* Orange — WARNING */
-  --orange-100: #FFF1DB;
-  --orange-500: #F6B100;
-  --orange-600: #D19700;
-
-  /* ─── Semantic colors ─── */
-
-  /* Background */
-  --color-bg-primary:        var(--neutral-0);
-  --color-bg-secondary:      #F9F9F9;     /* page bg (most screens) */
-  --color-bg-tertiary:       var(--neutral-50);
-  --color-bg-inverse:        var(--neutral-900);
-  --color-bg-brand:          var(--yellow-500);
-  --color-bg-brand-subtle:   var(--yellow-50);
-  --color-bg-success:        var(--green-500);
-  --color-bg-success-subtle: var(--green-50);
-  --color-bg-danger:         var(--pink-500);
-  --color-bg-danger-subtle:  var(--pink-50);
-  --color-bg-warning:        var(--orange-500);
-  --color-bg-warning-subtle: var(--orange-100);
-  --color-bg-info:           var(--blue-500);
-  --color-bg-info-subtle:    var(--blue-50);
-  --color-bg-disabled:       var(--neutral-100);
-  --color-bg-overlay:        rgba(0,0,0,0.48);
-
-  /* Text */
-  --color-text-primary:    #071437;              /* navy-black used on labels */
-  --color-text-secondary:  #4B5675;              /* dark slate */
-  --color-text-tertiary:   #78829D;              /* mid slate */
-  --color-text-disabled:   var(--neutral-300);
-  --color-text-inverse:    var(--neutral-0);
-  --color-text-brand:      var(--purple-500);    /* purple is "active" accent in product */
-  --color-text-on-brand:   var(--neutral-900);   /* black on yellow */
-  --color-text-success:    var(--green-600);
-  --color-text-danger:     var(--pink-500);
-  --color-text-warning:    var(--orange-600);
-  --color-text-info:       var(--blue-600);
-  --color-text-link:       var(--purple-500);
-  --color-text-link-hover: var(--purple-600);
-
-  /* Border */
-  --color-border-default: #F1F1F4;
-  --color-border-subtle:  #DBDFE9;
-  --color-border-strong:  var(--neutral-300);
-  --color-border-inverse: var(--neutral-900);
-  --color-border-focus:   var(--purple-500);
-  --color-border-brand:   var(--yellow-500);
-  --color-border-success: var(--green-500);
-  --color-border-danger:  var(--pink-500);
-  --color-border-warning: var(--orange-500);
-  --color-border-info:    var(--blue-500);
-
-  /* Action */
-  --color-action-primary-default:   var(--yellow-500);
-  --color-action-primary-hover:     var(--yellow-600);
-  --color-action-primary-pressed:   var(--yellow-700);
-  --color-action-primary-disabled:  var(--neutral-200);
-  --color-action-secondary-default: var(--neutral-900);
-  --color-action-secondary-hover:   var(--neutral-800);
-  --color-action-secondary-pressed: var(--neutral-1000);
-  --color-action-danger-default:    var(--pink-500);
-  --color-action-danger-hover:      var(--pink-600);
-  --color-action-danger-pressed:    var(--pink-700);
-
-  /* ─── Fonts ─── */
-  /* Brand (display / headlines). "ABC Favorit Compressed" is the paid
-     brand typeface; IBM Plex Sans Condensed is the sanctioned web fallback. */
-  --font-display: "ABC Favorit Compressed", "IBM Plex Sans Condensed", "Inter", system-ui, sans-serif;
-  --font-sans:    "IBM Plex Sans Condensed", "IBM Plex Sans", "Inter", system-ui, sans-serif;
-  --font-body:    "IBM Plex Sans", "Inter", system-ui, sans-serif;
-  --font-mono:    "ABC Favorit Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-
-  /* ─── Type scale ─── */
-  --text-display-lg: 60px;   --lh-display-lg: 68px;
-  --text-display-md: 48px;   --lh-display-md: 56px;
-  --text-display-sm: 36px;   --lh-display-sm: 44px;
-  --text-h1:         30px;   --lh-h1:         38px;
-  --text-h2:         24px;   --lh-h2:         32px;
-  --text-h3:         20px;   --lh-h3:         28px;
-  --text-h4:         18px;   --lh-h4:         26px;
-  --text-h5:         16px;   --lh-h5:         24px;
-  --text-h6:         14px;   --lh-h6:         20px;
-  --text-body-lg:    16px;   --lh-body-lg:    24px;
-  --text-body-md:    14px;   --lh-body-md:    20px;
-  --text-body-sm:    12px;   --lh-body-sm:    18px;
-  --text-label-lg:   14px;   --lh-label-lg:   20px;
-  --text-label-md:   12px;   --lh-label-md:   16px;
-  --text-label-sm:   10px;   --lh-label-sm:   14px;
-  --text-caption-md: 12px;   --lh-caption-md: 16px;
-  --text-caption-sm: 10px;   --lh-caption-sm: 14px;
-  --text-overline:   11px;   --lh-overline:   16px;
-  --text-code-md:    14px;   --lh-code-md:    20px;
-  --text-code-sm:    12px;   --lh-code-sm:    18px;
-
-  /* ─── Spacing (primitive, 4-based) ─── */
-  --space-1:  2px;
-  --space-2:  4px;
-  --space-3:  8px;
-  --space-4:  12px;
-  --space-5:  16px;
-  --space-6:  20px;
-  --space-7:  24px;
-  --space-8:  32px;
-  --space-9:  40px;
-  --space-10: 48px;
-  --space-11: 56px;
-  --space-12: 64px;
-  --space-13: 80px;
-  --space-14: 96px;
-  --space-15: 128px;
-
-  /* Semantic spacing */
-  --space-inset-sm:  8px;
-  --space-inset-md:  16px;
-  --space-inset-lg:  24px;
-  --space-inset-xl:  32px;
-  --space-inset-2xl: 48px;
-  --space-stack-sm:  8px;
-  --space-stack-md:  16px;
-  --space-stack-lg:  24px;
-  --space-stack-xl:  32px;
-  --space-stack-2xl: 48px;
-  --space-inline-sm: 8px;
-  --space-inline-md: 16px;
-  --space-inline-lg: 24px;
-  --space-inline-xl: 32px;
-
-  /* ─── Radii ─── */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
-  --radius-pill: 9999px;
-
-  /* ─── Shadows (from Figma Foundations) ─── */
-  --shadow-sm:  0px 3px 4px 0px rgba(0,0,0,0.03);
-  --shadow-md:  0px 4px 12px 0px rgba(0,0,0,0.06);
-  --shadow-lg:  0px 8px 24px 0px rgba(0,0,0,0.08);
-  --shadow-xl:  0px 16px 40px 0px rgba(0,0,0,0.10);
-  --shadow-2xl: 0px 24px 64px 0px rgba(0,0,0,0.14);
-  --shadow-focus-ring:        0 0 0 3px rgba(132,54,192,0.28);
-  --shadow-focus-ring-danger: 0 0 0 3px rgba(240,72,108,0.28);
-  --shadow-inset: inset 0 2px 4px rgba(0,0,0,0.06);
+  /* Inverse surface for dark chips/buttons (stays dark in both themes) */
+  --c-inverse: #1d1d1f;
 }
 
-/* -------------------------------------------------------------------
-   SEMANTIC type utility classes — consume these, not primitives.
-   Matches Figma SpecDisplay* / Heading / Body / Label / Caption rows.
-   ------------------------------------------------------------------- */
-.text-display-lg { font-family: var(--font-display); font-weight: 700; font-size: var(--text-display-lg); line-height: var(--lh-display-lg); letter-spacing: -0.02em; }
-.text-display-md { font-family: var(--font-display); font-weight: 700; font-size: var(--text-display-md); line-height: var(--lh-display-md); letter-spacing: -0.02em; }
-.text-display-sm { font-family: var(--font-display); font-weight: 700; font-size: var(--text-display-sm); line-height: var(--lh-display-sm); letter-spacing: -0.015em; }
-
-.text-h1 { font-family: var(--font-sans); font-weight: 700; font-size: var(--text-h1); line-height: var(--lh-h1); letter-spacing: -0.01em; color: var(--color-text-primary); }
-.text-h2 { font-family: var(--font-sans); font-weight: 700; font-size: var(--text-h2); line-height: var(--lh-h2); letter-spacing: -0.01em; color: var(--color-text-primary); }
-.text-h3 { font-family: var(--font-sans); font-weight: 600; font-size: var(--text-h3); line-height: var(--lh-h3); color: var(--color-text-primary); }
-.text-h4 { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-h4); line-height: var(--lh-h4); color: var(--color-text-primary); }
-.text-h5 { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-h5); line-height: var(--lh-h5); color: var(--color-text-primary); }
-.text-h6 { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-h6); line-height: var(--lh-h6); color: var(--color-text-primary); }
-
-.text-body-lg { font-family: var(--font-sans); font-size: var(--text-body-lg); line-height: var(--lh-body-lg); color: var(--color-text-secondary); }
-.text-body-md { font-family: var(--font-sans); font-size: var(--text-body-md); line-height: var(--lh-body-md); color: var(--color-text-secondary); }
-.text-body-sm { font-family: var(--font-sans); font-size: var(--text-body-sm); line-height: var(--lh-body-sm); color: var(--color-text-tertiary); }
-
-.text-label-lg { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-label-lg); line-height: var(--lh-label-lg); color: var(--color-text-secondary); }
-.text-label-md { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-label-md); line-height: var(--lh-label-md); color: var(--color-text-tertiary); }
-.text-label-sm { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-label-sm); line-height: var(--lh-label-sm); color: var(--color-text-tertiary); letter-spacing: 0.02em; }
-
-.text-caption-md { font-family: var(--font-sans); font-size: var(--text-caption-md); line-height: var(--lh-caption-md); color: var(--color-text-tertiary); }
-.text-caption-sm { font-family: var(--font-sans); font-size: var(--text-caption-sm); line-height: var(--lh-caption-sm); color: var(--color-text-tertiary); }
-.text-overline   { font-family: var(--font-sans); font-weight: 600; font-size: var(--text-overline); line-height: var(--lh-overline); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-tertiary); }
-
-.text-code-md { font-family: var(--font-mono); font-size: var(--text-code-md); line-height: var(--lh-code-md); }
-.text-code-sm { font-family: var(--font-mono); font-size: var(--text-code-sm); line-height: var(--lh-code-sm); }
-
-/* HTML tag defaults (applied when this stylesheet is included) */
-h1 { font-family: var(--font-sans); font-weight: 700; font-size: var(--text-h1); line-height: var(--lh-h1); letter-spacing: -0.01em; color: var(--color-text-primary); margin: 0; }
-h2 { font-family: var(--font-sans); font-weight: 700; font-size: var(--text-h2); line-height: var(--lh-h2); letter-spacing: -0.01em; color: var(--color-text-primary); margin: 0; }
-h3 { font-family: var(--font-sans); font-weight: 600; font-size: var(--text-h3); line-height: var(--lh-h3); color: var(--color-text-primary); margin: 0; }
-h4 { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-h4); line-height: var(--lh-h4); color: var(--color-text-primary); margin: 0; }
-h5 { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-h5); line-height: var(--lh-h5); color: var(--color-text-primary); margin: 0; }
-h6 { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-h6); line-height: var(--lh-h6); color: var(--color-text-primary); margin: 0; }
-p  { font-family: var(--font-sans); font-size: var(--text-body-md); line-height: var(--lh-body-md); color: var(--color-text-secondary); margin: 0; }
-code, kbd, samp, pre { font-family: var(--font-mono); font-size: var(--text-code-md); line-height: var(--lh-code-md); }
+/* In dark mode, lift the dark-chip neutrals slightly above the app bg. */
+[data-theme="dark"] {
+  --neutral-800: #34343a;
+  --neutral-900: #26262c;
+  --c-inverse:   #26262c;
+}

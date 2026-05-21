@@ -1,0 +1,292 @@
+/* ──────────────────────────────────────────────────────────────────
+   CAASTOR v2 — refreshed design tokens
+   - Apple-inspired: tighter radii (10–12px), refined elevation,
+     restrained materials, system-feeling motion easings
+   - Vivid color palettes (no pastels) selectable at runtime
+   - Light + Dark themes
+   - IBM Plex Sans Condensed still available; default switches to
+     Inter Tight as the SF-substitute display/UI face
+   ────────────────────────────────────────────────────────────────── */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Geist:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap");
+
+/* =================================================================
+   ROOT — fonts, scale, motion, radii (palette-agnostic)
+   ================================================================= */
+:root {
+  /* Fonts */
+  --font-sans:    "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-display: "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-body:    "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:    "Geist Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-serif:   "Instrument Serif", "Times New Roman", serif;
+
+  /* Type scale — slightly tighter, Apple-feel */
+  --text-display-lg: 72px;  --lh-display-lg: 76px;
+  --text-display-md: 56px;  --lh-display-md: 60px;
+  --text-display-sm: 40px;  --lh-display-sm: 44px;
+  --text-h1: 32px;          --lh-h1: 38px;
+  --text-h2: 24px;          --lh-h2: 30px;
+  --text-h3: 20px;          --lh-h3: 26px;
+  --text-h4: 17px;          --lh-h4: 24px;
+  --text-h5: 15px;          --lh-h5: 22px;
+  --text-h6: 13px;          --lh-h6: 18px;
+  --text-body-lg: 17px;     --lh-body-lg: 26px;
+  --text-body-md: 14px;     --lh-body-md: 21px;
+  --text-body-sm: 12px;     --lh-body-sm: 18px;
+  --text-label-lg: 13px;    --lh-label-lg: 18px;
+  --text-label-md: 12px;    --lh-label-md: 16px;
+  --text-label-sm: 11px;    --lh-label-sm: 14px;
+  --text-caption-md: 12px;  --lh-caption-md: 16px;
+  --text-caption-sm: 11px;  --lh-caption-sm: 14px;
+  --text-overline: 11px;    --lh-overline: 14px;
+  --text-code-md: 13px;     --lh-code-md: 20px;
+  --text-code-sm: 11px;     --lh-code-sm: 16px;
+
+  /* Tighter Apple radii */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 22px;
+  --radius-pill: 9999px;
+
+  /* Spacing (kept compatible with old tokens) */
+  --space-1: 2px;  --space-2: 4px;   --space-3: 8px;   --space-4: 12px;
+  --space-5: 16px; --space-6: 20px;  --space-7: 24px;  --space-8: 32px;
+  --space-9: 40px; --space-10: 48px; --space-11: 56px; --space-12: 64px;
+  --space-13: 80px;--space-14: 96px; --space-15: 128px;
+
+  /* Motion — Apple-feel easings */
+  --ease-out:    cubic-bezier(0.22, 0.61, 0.36, 1);   /* macOS standard */
+  --ease-in-out: cubic-bezier(0.65, 0.05, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);   /* gentle overshoot */
+  --ease-snap:   cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-instant: 80ms;
+  --dur-fast:    150ms;
+  --dur-base:    220ms;
+  --dur-slow:    360ms;
+  --dur-slower:  600ms;
+}
+
+/* =================================================================
+   PALETTES — switched via [data-palette="..."] on <html>
+   Each palette defines: --brand, --brand-strong, --brand-soft,
+   --accent, --accent-strong, --accent-soft. Vivid, no pastel.
+   ================================================================= */
+
+/* CITRUS — refined Caastor: vivid amber + electric indigo */
+[data-palette="citrus"] {
+  --brand:        #F5B400;
+  --brand-strong: #C68B00;
+  --brand-soft:   #FFF4D1;
+  --brand-glow:   254 180 0;
+  --accent:       #4F46E5;   /* electric indigo */
+  --accent-strong:#3730A3;
+  --accent-soft:  #E6E4FF;
+  --accent-glow:  79 70 229;
+}
+
+/* AURORA — violet + acid lime */
+[data-palette="aurora"] {
+  --brand:        #7C3AED;
+  --brand-strong: #5B21B6;
+  --brand-soft:   #EFE7FF;
+  --brand-glow:   124 58 237;
+  --accent:       #84CC16;
+  --accent-strong:#4D7C0F;
+  --accent-soft:  #ECFCCB;
+  --accent-glow:  132 204 22;
+}
+
+/* COBALT — electric blue + hot magenta */
+[data-palette="cobalt"] {
+  --brand:        #0066FF;
+  --brand-strong: #0047B3;
+  --brand-soft:   #DCEBFF;
+  --brand-glow:   0 102 255;
+  --accent:       #FF2D87;
+  --accent-strong:#C40063;
+  --accent-soft:  #FFE0EF;
+  --accent-glow:  255 45 135;
+}
+
+/* EMBER — orange-red + deep teal */
+[data-palette="ember"] {
+  --brand:        #FF5436;
+  --brand-strong: #C33A21;
+  --brand-soft:   #FFE3DB;
+  --brand-glow:   255 84 54;
+  --accent:       #0F766E;
+  --accent-strong:#134E4A;
+  --accent-soft:  #CFFAFE;
+  --accent-glow:  15 118 110;
+}
+
+/* MIDNIGHT — original Caastor tones, kept for nostalgia / dark default */
+[data-palette="caastor"] {
+  --brand:        #F8C036;
+  --brand-strong: #B88814;
+  --brand-soft:   #FFF8E6;
+  --brand-glow:   248 192 54;
+  --accent:       #8436C0;
+  --accent-strong:#501F75;
+  --accent-soft:  #F5EDFF;
+  --accent-glow:  132 54 192;
+}
+
+/* =================================================================
+   LIGHT MODE — white / light-gray surfaces, vivid brand
+   ================================================================= */
+:root, [data-theme="light"] {
+  --bg-app:       #F5F5F7;        /* macOS-style off-white */
+  --bg-canvas:    #FFFFFF;
+  --bg-elevated:  #FFFFFF;
+  --bg-sunken:    #FAFAFB;
+  --bg-muted:     #F2F2F4;
+  --bg-overlay:   rgba(20, 20, 24, 0.48);
+
+  --bg-inverse:   #0B0B0F;
+
+  /* glass */
+  --glass-bg:     rgba(255, 255, 255, 0.62);
+  --glass-stroke: rgba(255, 255, 255, 0.85);
+  --glass-shadow: 0 10px 40px rgba(20, 20, 30, 0.08), 0 1px 0 rgba(255,255,255,0.6) inset;
+
+  --text-primary:   #0B0B0F;
+  --text-secondary: #3A3A42;
+  --text-tertiary:  #6A6A75;
+  --text-quaternary:#9A9AA5;
+  --text-disabled:  #C5C5CE;
+  --text-inverse:   #FFFFFF;
+  --text-link:      var(--accent);
+  --text-on-brand:  #0B0B0F;
+  --text-on-accent: #FFFFFF;
+
+  --border-default: rgba(15, 15, 20, 0.08);
+  --border-subtle:  rgba(15, 15, 20, 0.04);
+  --border-strong:  rgba(15, 15, 20, 0.16);
+  --border-focus:   var(--accent);
+
+  /* status — vivid */
+  --status-success:        #10B981;
+  --status-success-soft:   #D1FAE5;
+  --status-warning:        #F59E0B;
+  --status-warning-soft:   #FEF3C7;
+  --status-danger:         #EF4444;
+  --status-danger-soft:    #FEE2E2;
+  --status-info:           #0EA5E9;
+  --status-info-soft:      #DBEAFE;
+
+  /* shadows — Apple-quiet */
+  --shadow-xs:  0 1px 1px rgba(15, 15, 25, 0.04);
+  --shadow-sm:  0 2px 4px rgba(15, 15, 25, 0.05), 0 1px 1px rgba(15, 15, 25, 0.04);
+  --shadow-md:  0 6px 16px rgba(15, 15, 25, 0.07), 0 1px 2px rgba(15, 15, 25, 0.05);
+  --shadow-lg:  0 12px 32px rgba(15, 15, 25, 0.10), 0 2px 6px rgba(15, 15, 25, 0.05);
+  --shadow-xl:  0 24px 60px rgba(15, 15, 25, 0.14), 0 4px 12px rgba(15, 15, 25, 0.06);
+  --shadow-focus: 0 0 0 4px rgba(var(--accent-glow), 0.22);
+  --shadow-brand: 0 12px 32px rgba(var(--brand-glow), 0.28);
+  --shadow-accent: 0 12px 32px rgba(var(--accent-glow), 0.28);
+
+  color-scheme: light;
+}
+
+/* =================================================================
+   DARK MODE — warm Caastor tones referenced; deep neutrals
+   ================================================================= */
+[data-theme="dark"] {
+  --bg-app:       #0A0A0C;
+  --bg-canvas:    #131316;
+  --bg-elevated:  #1A1A1F;
+  --bg-sunken:    #0E0E11;
+  --bg-muted:     #1F1F25;
+  --bg-overlay:   rgba(0, 0, 0, 0.6);
+  --bg-inverse:   #FFFFFF;
+
+  --glass-bg:     rgba(28, 28, 34, 0.62);
+  --glass-stroke: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255,255,255,0.05) inset;
+
+  --text-primary:   #F5F5F7;
+  --text-secondary: #C4C4CC;
+  --text-tertiary:  #8E8E97;
+  --text-quaternary:#5E5E68;
+  --text-disabled:  #3A3A42;
+  --text-inverse:   #0B0B0F;
+  --text-link:      var(--accent);
+  --text-on-brand:  #0B0B0F;
+  --text-on-accent: #FFFFFF;
+
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-subtle:  rgba(255, 255, 255, 0.04);
+  --border-strong:  rgba(255, 255, 255, 0.18);
+  --border-focus:   var(--accent);
+
+  --status-success:      #34D399;
+  --status-success-soft: rgba(52, 211, 153, 0.15);
+  --status-warning:      #FBBF24;
+  --status-warning-soft: rgba(251, 191, 36, 0.15);
+  --status-danger:       #F87171;
+  --status-danger-soft:  rgba(248, 113, 113, 0.15);
+  --status-info:         #38BDF8;
+  --status-info-soft:    rgba(56, 189, 248, 0.15);
+
+  --shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm:  0 2px 6px rgba(0, 0, 0, 0.35), 0 1px 1px rgba(0, 0, 0, 0.3);
+  --shadow-md:  0 6px 18px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lg:  0 12px 36px rgba(0, 0, 0, 0.5);
+  --shadow-xl:  0 24px 64px rgba(0, 0, 0, 0.55);
+  --shadow-focus: 0 0 0 4px rgba(var(--accent-glow), 0.32);
+  --shadow-brand: 0 12px 32px rgba(var(--brand-glow), 0.4);
+  --shadow-accent: 0 12px 32px rgba(var(--accent-glow), 0.4);
+
+  color-scheme: dark;
+}
+
+/* =================================================================
+   BASE
+   ================================================================= */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-body-md);
+  line-height: var(--lh-body-md);
+  color: var(--text-primary);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out);
+}
+
+::selection { background: rgba(var(--accent-glow), 0.28); }
+
+/* Type utilities */
+.t-display-lg { font-family: var(--font-display); font-weight: 700; font-size: var(--text-display-lg); line-height: var(--lh-display-lg); letter-spacing: -0.035em; color: var(--text-primary); }
+.t-display-md { font-family: var(--font-display); font-weight: 700; font-size: var(--text-display-md); line-height: var(--lh-display-md); letter-spacing: -0.03em; color: var(--text-primary); }
+.t-display-sm { font-family: var(--font-display); font-weight: 700; font-size: var(--text-display-sm); line-height: var(--lh-display-sm); letter-spacing: -0.025em; color: var(--text-primary); }
+.t-h1 { font-weight: 700; font-size: var(--text-h1); line-height: var(--lh-h1); letter-spacing: -0.02em; color: var(--text-primary); }
+.t-h2 { font-weight: 700; font-size: var(--text-h2); line-height: var(--lh-h2); letter-spacing: -0.015em; color: var(--text-primary); }
+.t-h3 { font-weight: 600; font-size: var(--text-h3); line-height: var(--lh-h3); letter-spacing: -0.01em; color: var(--text-primary); }
+.t-h4 { font-weight: 600; font-size: var(--text-h4); line-height: var(--lh-h4); color: var(--text-primary); }
+.t-body-lg { font-size: var(--text-body-lg); line-height: var(--lh-body-lg); color: var(--text-secondary); }
+.t-body-md { font-size: var(--text-body-md); line-height: var(--lh-body-md); color: var(--text-secondary); }
+.t-body-sm { font-size: var(--text-body-sm); line-height: var(--lh-body-sm); color: var(--text-tertiary); }
+.t-overline { font-size: 11px; line-height: 14px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; color: var(--text-tertiary); }
+.t-mono { font-family: var(--font-mono); font-size: 12px; letter-spacing: -0.01em; }
+.t-serif-italic { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
+
+h1, h2, h3, h4, h5, h6 { margin: 0; font-family: var(--font-sans); color: var(--text-primary); }
+p { margin: 0; font-family: var(--font-body); }
+
+/* Font preset overrides (Tweaks-driven) */
+[data-font="inter"] { --font-sans: "Inter Tight", system-ui, sans-serif; --font-display: "Inter Tight", system-ui, sans-serif; --font-body: "Inter Tight", system-ui, sans-serif; }
+[data-font="geist"] { --font-sans: "Geist", system-ui, sans-serif; --font-display: "Geist", system-ui, sans-serif; --font-body: "Geist", system-ui, sans-serif; }
+[data-font="plex"]  { --font-sans: "IBM Plex Sans Condensed", system-ui, sans-serif; --font-display: "IBM Plex Sans Condensed", system-ui, sans-serif; --font-body: "IBM Plex Sans Condensed", system-ui, sans-serif; }
+[data-font="serif-mix"] { --font-display: "Instrument Serif", serif; --font-sans: "Inter Tight", system-ui, sans-serif; --font-body: "Inter Tight", system-ui, sans-serif; }
+
+/* Density */
+[data-density="comfortable"] { --row-h: 56px; --control-h: 40px; --pad-card: 24px; }
+[data-density="cozy"]        { --row-h: 48px; --control-h: 36px; --pad-card: 20px; }
+[data-density="compact"]     { --row-h: 40px; --control-h: 32px; --pad-card: 16px; }

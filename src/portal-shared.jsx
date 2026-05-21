@@ -126,7 +126,7 @@ function AgentCard({ agentId, compact = false, onClick }) {
       className="agent-card"
       onClick={onClick}
       style={{
-        background:"#fff",
+        background:"var(--c-card)",
         border:"1px solid var(--c-line)",
         borderLeft: `3px solid ${accent}`,
         borderRadius: 10,
@@ -171,7 +171,7 @@ function OutputCard({ output }) {
   const isTeam = useIsTeam();
   return (
     <div style={{
-      background:"#fff", border:"1px solid var(--c-line)",
+      background:"var(--c-card)", border:"1px solid var(--c-line)",
       borderRadius: 12, padding: 18, display:"flex", flexDirection:"column", gap: 10,
     }}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
@@ -254,7 +254,7 @@ function Drawer({ open, onClose, title, eyebrow, children, footer, width = 520 }
         <div className="scroll" style={{flex:1, overflowY:"auto", padding:"18px 22px"}}>{children}</div>
         {footer && <footer style={{
           padding:"14px 22px", borderTop:"1px solid var(--c-line)",
-          display:"flex", justifyContent:"flex-end", gap: 10, background:"#fff",
+          display:"flex", justifyContent:"flex-end", gap: 10, background:"var(--c-card)",
         }}>{footer}</footer>}
       </aside>
     </>

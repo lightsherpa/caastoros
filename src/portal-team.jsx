@@ -97,7 +97,7 @@ function TeamQueue({ go }) {
       </section>
 
       {/* Right rail */}
-      <aside className="tqueue-right scroll" style={{borderLeft:"1px solid var(--c-line)", background:"#fff", overflowY:"auto"}}>
+      <aside className="tqueue-right scroll" style={{borderLeft:"1px solid var(--c-line)", background:"var(--c-card)", overflowY:"auto"}}>
         <div style={{padding: "20px"}}>
           <div className="eyebrow" style={{marginBottom: 12}}>Your capacity</div>
           <div className="card" style={{padding: 16, marginBottom: 18}}>
@@ -161,7 +161,7 @@ function TeamJob({ id, go }) {
   return (
     <div className="tjob">
       {/* Left rail · CONTEXT */}
-      <aside className="tjob-left scroll" style={{borderRight: "1px solid var(--c-line)", overflowY:"auto", background:"#fff"}}>
+      <aside className="tjob-left scroll" style={{borderRight: "1px solid var(--c-line)", overflowY:"auto", background:"var(--c-card)"}}>
         <div style={{padding: 22, borderBottom: "1px solid var(--c-line)"}}>
           <button onClick={() => go("team")} className="btn btn--link" style={{fontSize: 12, marginBottom: 12}}>
             <Icon name="arrowLeft" size={13} /> Job queue
@@ -250,7 +250,7 @@ function TeamJob({ id, go }) {
         {/* Action bar */}
         <div style={{
           padding:"14px 28px", borderBottom: "1px solid var(--c-line)",
-          background:"#fff", display:"flex", alignItems:"center", justifyContent:"space-between", gap: 14,
+          background:"var(--c-card)", display:"flex", alignItems:"center", justifyContent:"space-between", gap: 14,
         }}>
           <div style={{display:"flex", alignItems:"center", gap: 14}}>
             <select className="input" style={{height: 34, width: 160, fontSize: 13}} defaultValue="in-progress">
@@ -269,7 +269,7 @@ function TeamJob({ id, go }) {
         </div>
 
         {/* Tabs */}
-        <div className="tabs" style={{paddingLeft: 28, paddingRight: 28, background:"#fff"}}>
+        <div className="tabs" style={{paddingLeft: 28, paddingRight: 28, background:"var(--c-card)"}}>
           <button className={"tab" + (tab === "files" ? " tab--active" : "")} onClick={() => setTab("files")}>Files</button>
           <button className={"tab" + (tab === "direction" ? " tab--active" : "")} onClick={() => setTab("direction")}>Direction</button>
           <button className={"tab" + (tab === "history" ? " tab--active" : "")} onClick={() => setTab("history")}>Version history</button>
@@ -291,7 +291,7 @@ function TeamJob({ id, go }) {
                   <div key={i} style={{
                     display:"flex", alignItems:"center", gap: 14, padding: 12,
                     border:"1px solid var(--c-line)", borderRadius: 10,
-                    background: f.state === "current" ? "var(--yellow-50)" : "#fff",
+                    background: f.state === "current" ? "var(--yellow-50)" : "var(--c-card)",
                   }}>
                     <div style={{
                       width: 60, height: 60, borderRadius: 6,
@@ -365,7 +365,7 @@ function TeamJob({ id, go }) {
       </main>
 
       {/* Right rail · COMMS */}
-      <aside className="tjob-right scroll" style={{borderLeft: "1px solid var(--c-line)", background:"#fff", overflowY:"auto", display:"flex", flexDirection:"column"}}>
+      <aside className="tjob-right scroll" style={{borderLeft: "1px solid var(--c-line)", background:"var(--c-card)", overflowY:"auto", display:"flex", flexDirection:"column"}}>
         <div style={{padding: 20, borderBottom:"1px solid var(--c-line)"}}>
           <div className="eyebrow" style={{marginBottom: 8}}>Comms · with Marina</div>
           <div style={{display:"flex", alignItems:"center", gap: 8, fontSize: 12, color:"var(--c-dim)"}}>

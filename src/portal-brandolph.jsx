@@ -142,7 +142,7 @@ function AssemblyPanel({ assembly, runState = "proposing", onRun }) {
               borderRadius: 8,
               border:"1px solid var(--c-line)",
               borderLeft: `3px solid ${accent}`,
-              background: state === "running" ? "var(--yellow-50)" : "#fff",
+              background: state === "running" ? "var(--yellow-50)" : "var(--c-card)",
               transition: "background 200ms ease",
             }}>
               <span style={{
@@ -228,7 +228,7 @@ function QuickPrompts({ onPrompt }) {
       {items.map((it, i) => (
         <button key={i} className="card" onClick={() => onPrompt(it.label)} style={{
           textAlign:"left", padding:"12px 14px", cursor:"pointer", border:"1px solid var(--c-line)",
-          background:"#fff", transition:"border-color 140ms ease",
+          background:"var(--c-card)", transition:"border-color 140ms ease",
         }}
           onMouseEnter={e => e.currentTarget.style.borderColor = "var(--purple-300)"}
           onMouseLeave={e => e.currentTarget.style.borderColor = "var(--c-line)"}
@@ -245,7 +245,7 @@ function QuickPrompts({ onPrompt }) {
 function Composer({ value, onChange, onSend, placeholder }) {
   return (
     <div style={{
-      background:"#fff", border:"1.5px solid var(--c-line-2)",
+      background:"var(--c-card)", border:"1.5px solid var(--c-line-2)",
       borderRadius: 14, padding: 12,
       transition:"border-color 160ms ease, box-shadow 160ms ease",
     }}
@@ -379,7 +379,7 @@ function HomeConsole({ tweaks }) {
       </section>
 
       {/* Right rail — assembly */}
-      <aside className="bcon-right scroll" style={{borderLeft:"1px solid var(--c-line)", background:"#fff", overflowY:"auto"}}>
+      <aside className="bcon-right scroll" style={{borderLeft:"1px solid var(--c-line)", background:"var(--c-card)", overflowY:"auto"}}>
         <AssemblyPanel assembly={assembly} runState={runState} onRun={() => { setRunState("running"); setTimeout(() => setRunState("done"), 3500); }} />
       </aside>
     </div>
@@ -486,7 +486,7 @@ function HomeDesk({ tweaks }) {
     <div style={{padding:"28px 36px", display:"flex", flexDirection:"column", gap: 22}}>
       <Reveal>
         <div style={{
-          background:"#fff", border:"1px solid var(--c-line)", borderRadius: 14, padding: "22px 26px",
+          background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius: 14, padding: "22px 26px",
           display:"grid", gridTemplateColumns: "auto 1fr auto", gap: 20, alignItems:"flex-start",
         }}>
           <BrandolphAvatar size={48} />
@@ -568,7 +568,7 @@ function HomeDesk({ tweaks }) {
               {assembly.agents.map(a => {
                 const accent = window.CI_DEPT_COLORS[a.dept] || "var(--neutral-300)";
                 return (
-                  <div key={a.id} style={{display:"flex", alignItems:"center", gap:10, padding:"10px 12px", border:"1px solid var(--c-line)", borderRadius: 8, borderLeft:`3px solid ${accent}`, background:"#fff"}}>
+                  <div key={a.id} style={{display:"flex", alignItems:"center", gap:10, padding:"10px 12px", border:"1px solid var(--c-line)", borderRadius: 8, borderLeft:`3px solid ${accent}`, background:"var(--c-card)"}}>
                     <span style={{fontFamily:"var(--font-mono)", fontSize:9, color:"var(--c-faint)"}}>{a.code}</span>
                     <div style={{flex:1, minWidth: 0}}>
                       <div style={{fontSize: 12.5, fontWeight: 500, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</div>
@@ -657,7 +657,7 @@ function HomeCreate({ tweaks }) {
 
             {/* Composer */}
             <div style={{
-              marginTop: 24, background:"#fff",
+              marginTop: 24, background:"var(--c-card)",
               border: "1.5px solid var(--c-line-2)", borderRadius: 16,
               padding: 18, textAlign:"left",
               boxShadow: "var(--shadow-md)",
@@ -694,7 +694,7 @@ function HomeCreate({ tweaks }) {
                       style={{
                         height: 30, padding:"0 12px",
                         background: mode === m.k ? "var(--yellow-500)" : "transparent",
-                        color: mode === m.k ? "var(--neutral-900)" : "var(--c-dim)",
+                        color: mode === m.k ? "var(--c-ink)" : "var(--c-dim)",
                         border: mode === m.k ? "1px solid var(--yellow-500)" : "1px solid var(--c-line)",
                         borderRadius: 8, fontSize: 12, fontFamily:"inherit",
                         cursor:"pointer", display:"inline-flex", alignItems:"center", gap: 6,
@@ -784,7 +784,7 @@ function HomeCreate({ tweaks }) {
             {tryPrompts.map((p, i) => (
               <button key={i} onClick={() => setInput(p.text)} className="card" style={{
                 padding: 16, textAlign:"left", cursor:"pointer", border:"1px solid var(--c-line)",
-                background:"#fff", display:"flex", flexDirection:"column", gap: 8,
+                background:"var(--c-card)", display:"flex", flexDirection:"column", gap: 8,
                 transition:"border-color 140ms ease",
               }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = "var(--yellow-500)"}
@@ -804,7 +804,7 @@ function HomeCreate({ tweaks }) {
         {/* WHAT BRANDOLPH IS WATCHING — operator strip (light) */}
         <Reveal>
           <div style={{
-            background:"#fff", border:"1px solid var(--c-line)", borderRadius: 16,
+            background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius: 16,
             padding: "20px 24px", display:"flex", gap: 22, alignItems:"flex-start",
           }}>
             <BrandolphAvatar size={44} />

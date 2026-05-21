@@ -37,7 +37,7 @@ function CraftMarketplace({ go, tier }) {
         {window.CI_CRAFT.map((c, i) => (
           <button key={i} onClick={() => setPack(c)} className="card" style={{
             padding: 18, textAlign:"left", cursor:"pointer", border:"1px solid var(--c-line)",
-            background:"#fff", transition:"border-color 140ms ease, transform 120ms ease",
+            background:"var(--c-card)", transition:"border-color 140ms ease, transform 120ms ease",
             display:"flex", flexDirection:"column", gap: 8,
           }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--mint-500)"; }}
@@ -119,7 +119,7 @@ function CraftModal({ pack, onClose }) {
 
       <div className="eyebrow" style={{marginBottom: 8}}>What to finish</div>
       <div className="card card--inset" style={{padding: 16, marginBottom: 20, display:"flex", flexDirection:"column", gap: 8}}>
-        <div style={{padding: 12, border:"1px solid var(--c-line)", borderRadius: 8, background:"#fff", display:"flex", alignItems:"center", gap: 10}}>
+        <div style={{padding: 12, border:"1px solid var(--c-line)", borderRadius: 8, background:"var(--c-card)", display:"flex", alignItems:"center", gap: 10}}>
           <ModelChip modelKey="gpt5" />
           <span style={{flex:1, fontSize: 13}}>Pricing page hero · draft v3</span>
           <button className="btn btn--icon btn--ghost" aria-label="Remove" style={{height: 26, width: 26}}><Icon name="close" size={12} /></button>

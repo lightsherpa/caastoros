@@ -16,23 +16,27 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 /* Routes ---------------------------------------------------------- */
+/* Grouped by `section` so the sidebar reads as a hierarchy: the daily
+   brief→ship loop first (Workspace), the brand canon next (Brand), the
+   "how it works" proof surfaces (Intelligence), then account (Account).
+   `discovery` is intentionally NOT a top-level item — it's the one-time
+   intake reached from inside Brand Intelligence; the route still works. */
 const CLIENT_ROUTES = [
-  { id:"home",        label:"Brandolph",       icon:"sparkles" },
-  { id:"discovery",   label:"Discovery",       icon:"spark" },
-  { id:"bio",         label:"Brand Intelligence", icon:"bio" },
-  { id:"briefs",      label:"Briefs",          icon:"brief" },
-  { id:"specialists", label:"Specialists",     icon:"team" },
-  { id:"canvas",      label:"Canvas",          icon:"canvas" },
-  { id:"craft",       label:"Human craft",     icon:"craft" },
-  { id:"credits",     label:"Credits",         icon:"credit" },
-  { id:"settings",    label:"Settings",        icon:"settings" },
+  { id:"home",        label:"Create",             icon:"sparkles", section:"Workspace" },
+  { id:"briefs",      label:"Briefs",             icon:"brief",    section:"Workspace" },
+  { id:"bio",         label:"Brand Intelligence", icon:"bio",      section:"Brand" },
+  { id:"specialists", label:"Specialists",        icon:"team",     section:"Intelligence" },
+  { id:"canvas",      label:"Canvas",             icon:"canvas",   section:"Intelligence" },
+  { id:"craft",       label:"Human craft",        icon:"craft",    section:"Intelligence" },
+  { id:"credits",     label:"Credits",            icon:"credit",   section:"Account" },
+  { id:"settings",    label:"Settings",           icon:"settings", section:"Account" },
 ];
 
 const TEAM_ROUTES = [
-  { id:"team",          label:"Job queue",     icon:"brief" },
-  { id:"team-capacity", label:"Capacity",      icon:"timer" },
-  { id:"team-clients",  label:"Clients",       icon:"team" },
-  { id:"team-me",       label:"My earnings",   icon:"credit" },
+  { id:"team",          label:"Job queue",     icon:"brief", section:"Team" },
+  { id:"team-capacity", label:"Capacity",      icon:"timer", section:"Team" },
+  { id:"team-clients",  label:"Clients",       icon:"team",  section:"Team" },
+  { id:"team-me",       label:"My earnings",   icon:"credit", section:"Team" },
 ];
 
 /* useTweaks-style hook (copied to keep app self-contained from the panel) */
@@ -44,6 +48,28 @@ function useShellTweaks() {
     window.parent.postMessage({ type: "__edit_mode_set_keys", edits: next }, "*");
   };
   return [tweaks, setTweak];
+}
+
+/* Design-system settings — drive the <html data-*> attributes that the
+   v2 tokens key off. Persisted to localStorage so the look survives
+   reloads. */
+const DS_KEY = "ci_ds";
+const DS_DEFAULTS = { theme: "light", palette: "citrus", font: "inter", density: "cozy" };
+function useDesignSettings() {
+  const [ds, setDs] = useShellState(() => {
+    try { return { ...DS_DEFAULTS, ...JSON.parse(localStorage.getItem(DS_KEY) || "{}") }; }
+    catch (e) { return DS_DEFAULTS; }
+  });
+  useShellEffect(() => {
+    const r = document.documentElement;
+    r.setAttribute("data-theme", ds.theme);
+    r.setAttribute("data-palette", ds.palette);
+    r.setAttribute("data-font", ds.font);
+    r.setAttribute("data-density", ds.density);
+    try { localStorage.setItem(DS_KEY, JSON.stringify(ds)); } catch (e) {}
+  }, [ds.theme, ds.palette, ds.font, ds.density]);
+  const setDsKey = (k, v) => setDs(prev => ({ ...prev, [k]: v }));
+  return [ds, setDsKey];
 }
 
 /* Hash router --------------------------------------------------- */
@@ -128,19 +154,30 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
 
       {/* Nav items */}
       <div className="scroll" style={{flex:1, overflowY:"auto", padding:"12px 12px"}}>
-        <div className="eyebrow" style={{padding:"4px 12px 8px"}}>
-          {isClient ? "Workspace" : "Team"}
-        </div>
         <div style={{display:"flex", flexDirection:"column", gap: 1}}>
-          {routes.map(r => (
-            <button key={r.id} onClick={() => onNav(r.id)}
-              className={"navitem" + (currentRoute === r.id || (r.id === "briefs" && currentRoute === "brief-detail") || (r.id === "team" && currentRoute === "team-job") ? " navitem--active" : "")}
-              style={{border:"none", background: undefined, textAlign:"left", width:"100%"}}>
-              <Icon name={r.icon} size={16} />
-              <span>{r.label}</span>
-              {r.id === "discovery" && currentRoute !== "discovery" && bioScore < 70 && <BrandolphDot />}
-            </button>
-          ))}
+          {routes.map((r, i) => {
+            const showSection = i === 0 || r.section !== routes[i - 1].section;
+            const active = currentRoute === r.id
+              || (r.id === "briefs" && currentRoute === "brief-detail")
+              || (r.id === "bio" && currentRoute === "discovery")
+              || (r.id === "team" && currentRoute === "team-job");
+            return (
+              <React.Fragment key={r.id}>
+                {showSection && (
+                  <div className="eyebrow" style={{padding: i === 0 ? "4px 12px 8px" : "16px 12px 8px"}}>
+                    {r.section}
+                  </div>
+                )}
+                <button onClick={() => onNav(r.id)}
+                  className={"navitem" + (active ? " navitem--active" : "")}
+                  style={{border:"none", background: undefined, textAlign:"left", width:"100%"}}>
+                  <Icon name={r.icon} size={16} />
+                  <span>{r.label}</span>
+                  {r.id === "bio" && currentRoute !== "discovery" && bioScore < 70 && <BrandolphDot />}
+                </button>
+              </React.Fragment>
+            );
+          })}
         </div>
 
         {isClient && (
@@ -214,7 +251,7 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
 function TopBar({ portal, route, brandName }) {
   const isClient = portal === "client";
   const titles = {
-    home:        ["Brandolph",         "Workspace"],
+    home:        ["Create",            "Workspace"],
     discovery:   ["Discovery",         "Brand Intelligence"],
     bio:         ["Brand Intelligence","Workspace"],
     briefs:      ["Briefs",            "Workspace"],
@@ -255,6 +292,7 @@ function App() {
   const [tweaks, setTweak] = useShellTweaks();
   const [route, go] = useRoute();
   const session = useSession();
+  const [ds, setDs] = useDesignSettings();
 
   const onLoginRoute = route.id === "login" || (route.id === "team" && route.param === "login");
   const portal = session ? session.role : "client";
@@ -267,7 +305,7 @@ function App() {
   useShellEffect(() => {
     if (!session) return;
     if (onLoginRoute) { go(session.role === "team" ? "team" : "home"); return; }
-    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home";
+    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery";
     const isTeamRoute = TEAM_ROUTES.some(r => r.id === route.id) || route.id === "team-job";
     if (session.role === "client" && !isClientRoute) go("home");
     if (session.role === "team"   && !isTeamRoute  ) go("team");
@@ -302,7 +340,7 @@ function App() {
       </div>
 
       {/* Tweaks panel (host-toggled) */}
-      <PortalTweaks tweaks={tweaks} setTweak={setTweak} />
+      <PortalTweaks tweaks={tweaks} setTweak={setTweak} ds={ds} setDs={setDs} />
 
       {/* Floating Brandolph mascot — visible on client portal, all screens except /home */}
       <FloatingBrandolph />
@@ -333,9 +371,46 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
 }
 
 /* Tweaks panel ---------------------------------------------------- */
-function PortalTweaks({ tweaks, setTweak }) {
+function PortalTweaks({ tweaks, setTweak, ds, setDs }) {
   return (
     <TweaksPanel title="Tweaks">
+      <TweakSection title="Design system">
+        <TweakRadio label="Theme"
+          value={ds.theme}
+          onChange={v => setDs("theme", v)}
+          options={[
+            { value:"light", label:"Light" },
+            { value:"dark",  label:"Dark" },
+          ]} />
+        <TweakSelect label="Palette"
+          value={ds.palette}
+          onChange={v => setDs("palette", v)}
+          options={[
+            { value:"citrus",  label:"Citrus (amber · indigo)" },
+            { value:"aurora",  label:"Aurora (violet · lime)" },
+            { value:"cobalt",  label:"Cobalt (blue · magenta)" },
+            { value:"ember",   label:"Ember (orange · teal)" },
+            { value:"caastor", label:"Caastor (yellow · purple)" },
+          ]} />
+        <TweakSelect label="Font"
+          value={ds.font}
+          onChange={v => setDs("font", v)}
+          options={[
+            { value:"inter",     label:"Inter Tight (default)" },
+            { value:"geist",     label:"Geist" },
+            { value:"plex",      label:"IBM Plex Condensed" },
+            { value:"serif-mix", label:"Serif display mix" },
+          ]} />
+        <TweakRadio label="Density"
+          value={ds.density}
+          onChange={v => setDs("density", v)}
+          options={[
+            { value:"comfortable", label:"Comfortable" },
+            { value:"cozy",        label:"Cozy" },
+            { value:"compact",     label:"Compact" },
+          ]} />
+      </TweakSection>
+
       <TweakSection title="Brandolph">
         <TweakSelect label="Home layout"
           value={tweaks.homeVariant}

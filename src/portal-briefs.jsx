@@ -134,7 +134,7 @@ function BriefDetail({ id, go }) {
         <p style={{
           fontFamily:"Georgia, serif", fontStyle:"italic",
           fontSize: 30, letterSpacing:"-0.005em", lineHeight: 1.25,
-          margin: 0, color:"var(--neutral-900)", fontWeight: 500,
+          margin: 0, color:"var(--c-ink)", fontWeight: 500,
           maxWidth: 820,
         }}>
           "{brief.smp}"
@@ -629,7 +629,7 @@ function CanvasNode({ node, color, refCb, active, dim, dragging, index, onPointe
       onMouseLeave={onLeave}
       style={{
         position:"absolute", left: node.x, top: node.y, width: node.w,
-        background:"#fff", borderRadius: 8,
+        background:"var(--c-card)", borderRadius: 8,
         borderTop: "1px solid " + (active ? "var(--yellow-500)" : "var(--c-line)"),
         borderRight: "1px solid " + (active ? "var(--yellow-500)" : "var(--c-line)"),
         borderBottom: "1px solid " + (active ? "var(--yellow-500)" : "var(--c-line)"),
