@@ -1,0 +1,294 @@
+import React from "react";
+const { Icon, BrandolphDot, StreamedText } = window;
+/* Caastor Intelligence — Floating Brandolph                          */
+/* The mascot button + chat panel that lives on every client screen.  */
+/* Hidden on team portal and on /home (where chat is already primary).*/
+
+const { useState: useFState, useEffect: useFEffect, useRef: useFRef } = React;
+
+/* The OFFICIAL Caastor / Brandolph mascot — paths lifted from         */
+/* /assets/mascot/yellow.svg. Yellow body, black outline + face.       */
+function MascotIcon({ size = 60, color = "yellow" }) {
+  const fills = {
+    yellow: "#F8C036",
+    green:  "#30B478",
+    red:    "#F0486C",
+    violet: "#8436C0",
+    white:  "#FFFFFF",
+    cream:  "#FFF8E6",
+  };
+  const bodyFill = fills[color] || fills.yellow;
+  const ink = "#1A1F36";
+  const aspect = 984 / 1176;
+  return (
+    <svg width={size} height={size / aspect} viewBox="0 0 984 1176" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{display:"block"}}>
+      {/* Body silhouette w/ two ear bumps */}
+      <path fill={bodyFill} d="M708,216c0-19.9-16.1-36-36-36s-36,16.1-36,36H276c0-19.9-16.1-36-36-36s-36,16.1-36,36c0,19.9,16.1,36,36,36v684h504V216H708z"/>
+      {/* Eyebrows (rotated bars) */}
+      <rect x="414" y="255.4" transform="matrix(0.2873 -0.9578 0.9578 0.2873 -5.2749 628.9104)" width="12" height="125.3" fill={ink}/>
+      <rect x="632.3" y="276" transform="matrix(0.9192 -0.3938 0.3938 0.9192 -56.2662 289.8156)" width="91.4" height="12" fill={ink}/>
+      {/* Nose, mouth, teeth, body inner contour */}
+      <path fill={ink} d="M684,714c-66.4,0-90-54.9-90-102V494.5l58.2-58.2l-8.5-8.5l-56.1,56.1l-67.8-56.5l-7.7,9.2l69.8,58.2V612c0,60.1-37,102-90,102c-55.8,0-90.5-56.5-90.9-57.1l-10.3,6.2c1.5,2.6,38.5,62.9,101.1,62.9c10.6,0,20.6-1.5,30-4.3V846h120V718.2c11.9,5,25.8,7.8,42,7.8V714z M534,717.3c21-9.5,37.6-26.2,48-48.2V834h-48V717.3z M630,834h-36V670.2c7.7,16.8,19.4,31.7,36,41.8V834z"/>
+      {/* Pupils */}
+      <rect x="420" y="360" width="24" height="36" fill={ink}/>
+      <rect x="672" y="360" width="24" height="36" fill={ink}/>
+      {/* Glasses — left rim */}
+      <path fill={ink} d="M456,522c-41.9,0-66-41.6-66-114s24.1-114,66-114s66,41.6,66,114S497.9,522,456,522z M456,306c-34.3,0-54,37.2-54,102s19.7,102,54,102s54-37.2,54-102S490.3,306,456,306z"/>
+      {/* Glasses — right rim */}
+      <path fill={ink} d="M708,522c-41.9,0-66-41.6-66-114s24.1-114,66-114s66,41.6,66,114S749.9,522,708,522z M708,306c-34.3,0-54,37.2-54,102s19.7,102,54,102s54-37.2,54-102S742.3,306,708,306z"/>
+      {/* Left temple bar */}
+      <rect x="252" y="366" width="144" height="12" fill={ink}/>
+      {/* Nose bridge */}
+      <path fill={ink} d="M645.3,377.4C645.1,377.3,622,366,588,366c-46.1,0-69.1,11.3-69.3,11.4l-5.4-10.7c1-0.5,25.8-12.6,74.7-12.6c37,0,61.7,12.1,62.7,12.6L645.3,377.4z"/>
+    </svg>
+  );
+}
+
+/* Contextual greeting Brandolph says when first opened on each route. */
+function getContextLine(routeId) {
+  switch (routeId) {
+    case "home":         return "*Briefing a new flow lives in the launchpad above.* Use this for status, advice, or anything you'd ask a CMO mid-week.";
+    case "discovery":    return "*You're mid-extraction.* I'm reading the site in another tab. Ask me anything while we wait — including 'what should I check first when it lands'.";
+    case "bio":          return "*The BIO is the canon.* I'll quote it back if you ask me about a field. Ask me what's weak.";
+    case "briefs":       return "*Three briefs in flight, four shipped.* Ask me about any one of them, or ask me which one I'd push first this week.";
+    case "brief-detail": return "*You're inside a brief.* I can take you through the SMP, the refusals, or what I'd do differently if we were writing it tomorrow.";
+    case "specialists":  return "*That's your department.* Ask me who I'd assemble for a specific job, and I'll show you the pick + why.";
+    case "canvas":       return "*This is the workspace.* The map gets denser as you ship. Ask me about any node, or ask me what's downstream of the BIO.";
+    case "craft":        return "*Hand work the team should finish.* I'll match a finishing pack to a job if you describe it.";
+    case "credits":      return "*Spend, not budget.* Ask me where the money went, or what would change if you doubled the cycle.";
+    case "settings":     return "*Workspace governance.* Ask me what the forbidden list should be, or whether your auto-approve threshold is loose.";
+    default:             return "*I'm Brandolph.* Ask me what's running, what's stuck, or what to do next. Free to ask — briefs preview cost.";
+  }
+}
+
+/* Mock replies — heuristic match on user input.                       */
+function fakeReply(msg) {
+  const m = msg.toLowerCase();
+  if (/status|going on|in flight|what'?s up|running/.test(m))
+    return "*Two things alive.* Pricing relaunch is in production — Email 2 reads dutiful and needs one more pass before it ships. Honduras essay is with Lia for a finishing pass. Everything else is on you to push.";
+  if (/next|brief.*next|what.*ship|new brief/.test(m))
+    return "*Summer Tuesdays.* You sketched it on Friday. I have two sharpening questions before we assemble: in or out for wholesale, and is this an organic-only push or do we have paid?";
+  if (/bio|read.*me|positioning|brand/.test(m))
+    return "*Vinilo is a coffee for the Tuesday you decide to slow down on purpose.* The writing earns the conviction. The visual system doesn't yet. If you ask me what to do in Q3, it's the brand book — not new campaigns.";
+  if (/block|stuck|wait/.test(m))
+    return "*One thing is actively stuck.* The annual price — 10× or 11.4× — gates five outputs in flight. Until you decide, I'm holding Email 2 and the pricing hero.";
+  if (/cost|credit|spend|budget/.test(m))
+    return "*337 cr spent this cycle. 563 left, 14 days to reset.* The split: 41% AI work, 33% human craft, 8% QA. If you're heavy on craft this cycle it's because the Hero KV and the Honduras essay both landed with Aitana and Lia.";
+  if (/team|aitana|marc|lia|diego/.test(m))
+    return "*The team has two of your jobs.* Aitana on the Hero KV — delivered v3, you commented this morning. Lia on the Honduras essay — finishing pass. Both on track.";
+  if (/refuse|not doing|kill/.test(m))
+    return "*I'd kill the brewing-kit page.* It converts at 0.4% and dilutes the subscription story. Doing that frees a Sonnet pass for the wholesale flow you've been deferring.";
+  if (/who|specialist|agent/.test(m))
+    return "*For your next brief I'd assemble The Sharpener, The Strategist, Conversion Copy, Email Sequence, and Brand Consistency QA.* That's 36 cr and the smallest crew that earns the brief.";
+  return "*Heard.* Give me a beat — I'd rather come back with a brief or a question than an answer. Probably a question.";
+}
+
+/* Streaming-style Brandolph line (italic + yellow voice) -------- */
+function FloaterMessage({ m }) {
+  if (m.role === "user") {
+    return (
+      <div className="bf-msg bf-msg--user">
+        <div className="bf-msg__bubble">{m.text}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="bf-msg bf-msg--brandolph">
+      <span style={{flexShrink: 0, marginTop: 2}}>
+        <MascotIcon size={26} />
+      </span>
+      <div className="bf-msg__bubble">
+        <StreamedText html={m.text} startDelay={300} />
+      </div>
+    </div>
+  );
+}
+
+/* Re-render this component on hash + portal change -------------- */
+function useRouteSubscription() {
+  const [, setTick] = useFState(0);
+  useFEffect(() => {
+    const bump = () => setTick(t => t + 1);
+    window.addEventListener("hashchange", bump);
+    /* Listen to a custom event the App fires after portal flips. */
+    window.addEventListener("__ci_portal_change", bump);
+    return () => {
+      window.removeEventListener("hashchange", bump);
+      window.removeEventListener("__ci_portal_change", bump);
+    };
+  }, []);
+}
+
+/* Floating Brandolph - the mascot + popover chat */
+function FloatingBrandolph() {
+  useRouteSubscription();
+  const [open, setOpen] = useFState(false);
+  const [render, setRender] = useFState(false);   // panel stays mounted through its exit animation
+  const [input, setInput] = useFState("");
+  const [messages, setMessages] = useFState([]);
+  const [thinking, setThinking] = useFState(false);
+  const bodyRef = useFRef(null);
+  const closeTimerRef = useFRef(null);
+
+  /* Keep the panel in the DOM briefly after close so it can animate out. */
+  useFEffect(() => {
+    if (open) {
+      setRender(true);
+      if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+    } else {
+      closeTimerRef.current = setTimeout(() => setRender(false), 200);
+    }
+    return () => { if (closeTimerRef.current) clearTimeout(closeTimerRef.current); };
+  }, [open]);
+
+  const portal = window.__CI_PORTAL || "client";
+  const hash = (window.location.hash || "").replace(/^#\/?/, "") || "home";
+  const [routeId] = hash.split("/");
+  const onHome = routeId === "home";
+
+  /* Auto-scroll body to bottom when messages change */
+  useFEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+  }, [messages, thinking, open]);
+
+  /* Keyboard close */
+  useFEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  if (portal !== "client") return null;
+  /* The floater is reachable on every client screen — including /home,
+     which is now a launchpad (not a chat). Use it to ask status / get
+     advice without committing to a new brief. */
+
+  const prompts = [
+    { eyebrow: "Status",   text: "What's running and what needs me?" },
+    { eyebrow: "Next",     text: "What should I brief next?" },
+    { eyebrow: "Sharpen",  text: "Read my BIO and tell me what's weak." },
+    { eyebrow: "Refuse",   text: "What should I kill this cycle?" },
+  ];
+
+  const send = (textArg) => {
+    const t = (textArg ?? input).trim();
+    if (!t || thinking) return;
+    setMessages(prev => [...prev, { role: "user", text: t }]);
+    setInput("");
+    setThinking(true);
+    setTimeout(() => {
+      setMessages(prev => [...prev, { role: "brandolph", text: fakeReply(t) }]);
+      setThinking(false);
+    }, 1400 + Math.random() * 600);
+  };
+
+  const handleKey = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  };
+
+  return (
+    <React.Fragment>
+      {open && <div className="bf-backdrop" onClick={() => setOpen(false)} />}
+
+      {render && (
+        <aside className={"bf-panel" + (open ? "" : " bf-panel--out")} role="dialog" aria-label="Ask Brandolph">
+          <header className="bf-header">
+            <span className="bf-header__mark">
+              <MascotIcon size={32} />
+            </span>
+            <div style={{display:"flex", flexDirection:"column"}}>
+              <span className="bf-header__title">Brandolph</span>
+              <span className="bf-header__sub">Your CMO · Free to ask</span>
+            </div>
+            <button className="bf-header__close" onClick={() => setOpen(false)} aria-label="Close">
+              <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+            </button>
+          </header>
+
+          <div ref={bodyRef} className="bf-body scroll">
+            {messages.length === 0 ? (
+              <React.Fragment>
+                <FloaterMessage m={{ role: "brandolph", text: getContextLine(routeId) }} />
+                <div className="eyebrow" style={{marginTop: 4, marginBottom: 4}}>Try asking</div>
+                <div style={{display:"flex", flexDirection:"column", gap: 8}}>
+                  {prompts.map((p, i) => (
+                    <button key={i} className="bf-prompt" onClick={() => send(p.text)}>
+                      <div style={{flex: 1, minWidth: 0}}>
+                        <div className="bf-prompt__eyebrow">{p.eyebrow}</div>
+                        <div className="bf-prompt__text">{p.text}</div>
+                      </div>
+                      <Icon name="arrow" size={13} />
+                    </button>
+                  ))}
+                </div>
+              </React.Fragment>
+            ) : (
+              messages.map((m, i) => <FloaterMessage key={i} m={m} />)
+            )}
+            {thinking && (
+              <div className="bf-msg bf-msg--brandolph">
+                <span style={{flexShrink: 0, marginTop: 2}}>
+                  <MascotIcon size={26} />
+                </span>
+                <div className="bf-msg__bubble" style={{display:"flex", alignItems:"center", gap: 4}}>
+                  <BrandolphDot state="thinking" />
+                  <span style={{fontSize: 12, color:"var(--c-faint)", marginLeft: 6}}>Brandolph is reading…</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <footer className="bf-footer">
+            <div className="bf-input">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKey}
+                rows={1}
+                placeholder={"Ask anything — status, next brief, refusals…"}
+              />
+              <button className="btn btn--primary btn--icon" onClick={() => send()} aria-label="Send"
+                style={{width: 32, height: 32, borderRadius: 8, alignSelf:"center"}}>
+                <Icon name="arrow" size={14} />
+              </button>
+            </div>
+            <div className="bf-meta">
+              <span><strong style={{color:"var(--green-700)", fontWeight:600}}>Free</strong> to ask · Briefing a task previews cost first</span>
+              {messages.length > 0 && (
+                <button className="btn btn--link" style={{fontSize: 10, padding: 0}} onClick={() => setMessages([])}>
+                  Clear
+                </button>
+              )}
+            </div>
+            <div style={{marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--c-line-2)", display:"flex", gap: 6}}>
+              <a href="#/home" onClick={() => setOpen(false)} className="btn btn--primary btn--sm" style={{flex: 1, justifyContent:"center"}}>
+                Brief a new task <Icon name="arrow" size={12} />
+              </a>
+              <a href="#/briefs" onClick={() => setOpen(false)} className="btn btn--ghost btn--sm" style={{flex: 1, justifyContent:"center"}}>
+                Add to a flow
+              </a>
+            </div>
+          </footer>
+        </aside>
+      )}
+
+      <button
+        className={"bf-button" + (open ? " bf-button--open" : "")}
+        onClick={() => setOpen(o => !o)}
+        aria-label="Ask Brandolph"
+        aria-expanded={open}
+      >
+        <MascotIcon size={60} />
+        {!open && messages.length === 0 && (
+          <span className="bf-button__ping" aria-hidden="true">1</span>
+        )}
+      </button>
+    </React.Fragment>
+  );
+}
+
+Object.assign(window, { FloatingBrandolph, MascotIcon });
