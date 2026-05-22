@@ -426,9 +426,35 @@ function StreamedText({ html, stream = true, startDelay = 600, lineStep = 420, c
   );
 }
 
+/* Pins — re-render on change; toggle favorite outputs / specialists. */
+function usePins() {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const h = () => force(n => n + 1);
+    window.addEventListener("ci_pins_change", h);
+    return () => window.removeEventListener("ci_pins_change", h);
+  }, []);
+  return window.CI_PINS;
+}
+
+function PinButton({ kind, id, size = 15, style }) {
+  const pins = usePins();
+  const on = pins.has(kind, id);
+  return (
+    <button onClick={(e) => { e.stopPropagation(); pins.toggle(kind, id); }} title={on ? "Unpin" : "Pin"}
+      aria-pressed={on}
+      style={{ border:"none", background:"transparent", cursor:"pointer", padding:2, lineHeight:0,
+        color: on ? "var(--yellow-600)" : "var(--c-faint)", ...style }}>
+      <svg width={size} height={size} viewBox="0 0 20 20" fill={on ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+        <path d="M10 2l2.4 5 5.6.8-4 3.9.9 5.5L10 14.6l-5 2.6.9-5.5-4-3.9 5.6-.8z" />
+      </svg>
+    </button>
+  );
+}
+
 /* Expose to other Babel files ------------------------------------- */
 Object.assign(window, {
   BrandolphDot, BrandolphAvatar, LayerTag, ModelChip, Credit, Confidence,
   AgentCard, OutputCard, StatusPill, Reveal, Drawer, Counter, SlaHeat,
-  PageHeader, Icon, useIsTeam, StreamedText,
+  PageHeader, Icon, useIsTeam, StreamedText, usePins, PinButton,
 });

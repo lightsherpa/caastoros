@@ -250,6 +250,7 @@ function TopBar({ portal, route, brandName, go }) {
     briefs:      ["Briefs",            "Workspace"],
     library:     ["Library",           "Workspace"],
     "brief-detail":["Brief",           "Workspace"],
+    board:       ["Brief",            "Workspace"],
     specialists: ["Specialists · 33 on shift", "Workspace"],
     "specialist-new": ["New specialist", "Capabilities"],
     canvas:      ["Canvas",            "Workspace"],
@@ -292,6 +293,42 @@ function TopBar({ portal, route, brandName, go }) {
   );
 }
 
+/* App-wide menu — a persistent, always-open sidebar with a prominent
+   brand logo at the top. No collapse. */
+function AppDock({ portal, currentRoute, onNav, onLogout }) {
+  const routes = portal === "team" ? TEAM_ROUTES : CLIENT_ROUTES;
+  const isActive = (id) => currentRoute === id
+    || (id === "briefs" && currentRoute === "brief-detail")
+    || (id === "bio" && currentRoute === "discovery")
+    || (id === "specialists" && currentRoute === "specialist-new")
+    || (id === "team" && currentRoute === "team-job");
+  return (
+    <nav className="app-dock" aria-label="Navigation">
+      <div className="app-dock__logo">
+        <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height:30, width:"auto", flexShrink:0}} />
+        <span className="app-dock__os">OS</span>
+      </div>
+      <div className="app-dock__items">
+        {routes.map((r, i) => (
+          <React.Fragment key={r.id}>
+            {(i === 0 || r.section !== routes[i - 1].section) && r.section && (
+              <div className="app-dock__section">{r.section}</div>
+            )}
+            <button className={"app-dock__item" + (isActive(r.id) ? " app-dock__item--active" : "")} onClick={() => onNav(r.id)}>
+              <span className="app-dock__icon"><Icon name={r.icon} size={18} /></span>
+              <span>{r.label}</span>
+            </button>
+          </React.Fragment>
+        ))}
+      </div>
+      <button className="app-dock__item app-dock__logout" onClick={onLogout}>
+        <span className="app-dock__icon"><Icon name="arrowLeft" size={18} /></span>
+        <span>Log out</span>
+      </button>
+    </nav>
+  );
+}
+
 /* ────────────────────────────────────────────────────────────── */
 /* Root App                                                          */
 function App() {
@@ -325,27 +362,9 @@ function App() {
 
   const logout = () => { window.CI_AUTH.signOut(); go("login"); };
 
-  /* Board route — full-bleed canvas workspace (its own floating launcher). */
-  if (portal === "client" && route.id === "board") {
-    return (
-      <>
-        <BriefBoard id={route.param} go={go} />
-        <PortalTweaks tweaks={tweaks} setTweak={setTweak} ds={ds} setDs={setDs} />
-      </>
-    );
-  }
-
   return (
     <div className="app" data-screen-label={portal === "client" ? "Client portal" : "Team portal"}>
-      <Sidebar
-        portal={portal}
-        currentRoute={route.id}
-        onNav={go}
-        onLogout={logout}
-        tweaks={tweaks}
-        brandName={window.CI_BRAND.name}
-        bioScore={tweaks.bioScore || 91}
-      />
+      <AppDock portal={portal} currentRoute={route.id} onNav={go} onLogout={logout} />
       <div style={{display:"flex", flexDirection:"column", minWidth:0}}>
         <TopBar portal={portal} route={route.id} brandName={window.CI_BRAND.name} go={go} />
         <main className="scroll" style={{flex:1, overflowY:"auto"}}>
@@ -372,7 +391,8 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "bio":          return <BioViewer go={go} bioScore={tweaks.bioScore} />;
     case "briefs":       return <BriefsLibrary go={go} />;
     case "library":      return <Library go={go} />;
-    case "brief-detail": return <BriefDetail id={route.param} go={go} />;
+    case "board":        return <BriefBoard id={route.param} go={go} />;
+    case "brief-detail": return <BriefBoard id={route.param} go={go} />;
     case "specialists":  return <SpecialistsDirectory go={go} />;
     case "specialist-new": return <SpecialistAuthor go={go} />;
     case "canvas":       return <CanvasView />;
@@ -471,6 +491,6 @@ function PortalTweaks({ tweaks, setTweak, ds, setDs }) {
   );
 }
 
-Object.assign(window, { App, Sidebar, TopBar, Brandmark });
+Object.assign(window, { App, Sidebar, TopBar, Brandmark, AppDock });
 
 export { App };

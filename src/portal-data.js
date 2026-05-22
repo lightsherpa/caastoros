@@ -126,6 +126,21 @@ window.CI_DEPT_META = {
 /* Subscription tier labels (for "unlocks from" copy). */
 window.CI_TIERS = { "00":"Free", "01":"Studio", "02":"Brandolph", "03":"Suite" };
 
+/* Pins — favorite outputs + preferred specialists, persisted locally. */
+window.CI_PINS = {
+  read() { try { return JSON.parse(localStorage.getItem("ci_pins") || '{"outputs":[],"specialists":[]}'); } catch (e) { return { outputs: [], specialists: [] }; } },
+  has(kind, id) { return (this.read()[kind] || []).includes(id); },
+  list(kind) { return this.read()[kind] || []; },
+  toggle(kind, id) {
+    const p = this.read(); if (!p[kind]) p[kind] = [];
+    const i = p[kind].indexOf(id);
+    if (i < 0) p[kind].push(id); else p[kind].splice(i, 1);
+    try { localStorage.setItem("ci_pins", JSON.stringify(p)); } catch (e) {}
+    window.dispatchEvent(new Event("ci_pins_change"));
+    return i < 0;
+  },
+};
+
 /* Brand workspaces — multi-brand is a higher-plan (Suite) feature. The
    first is the active/seeded one; the rest demonstrate the switcher. */
 window.CI_WORKSPACES = [

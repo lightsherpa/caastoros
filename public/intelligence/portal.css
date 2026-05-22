@@ -200,10 +200,37 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 .app {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 248px 1fr;
+  grid-template-columns: 1fr;
   background: var(--c-bg);
-  min-width: 1100px;
+  min-width: 1000px;
+  padding-left: 248px;          /* content sits beside the persistent sidebar */
 }
+
+/* Persistent menu — always open, prominent logo at the top-left corner. */
+.app-dock {
+  position: fixed; top: 16px; left: 16px; bottom: 16px; width: 216px; z-index: 40;
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 8px;
+  background: var(--bg-canvas, var(--c-card));
+  border: 1px solid var(--c-line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+}
+.app-dock__logo { display: flex; align-items: baseline; gap: 6px; padding: 6px 10px 14px; }
+.app-dock__os { font-family: var(--font-mono); font-weight: 700; font-size: 17px; color: var(--c-ink); letter-spacing: 0.02em; align-self: center; }
+.app-dock__items { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.app-dock__section { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-faint); padding: 14px 12px 6px; }
+.app-dock__items > .app-dock__section:first-child { padding-top: 4px; }
+.app-dock__item {
+  display: flex; align-items: center; gap: 11px; height: 40px; padding: 0 10px; width: 100%;
+  border: none; background: transparent; border-radius: 10px; cursor: pointer; text-align: left;
+  color: var(--c-dim); font-family: var(--font-sans); font-size: 14px; font-weight: 500;
+  transition: background 140ms ease, color 140ms ease;
+}
+.app-dock__item:hover { background: var(--neutral-50); color: var(--c-ink); }
+.app-dock__item--active { background: var(--neutral-50); color: var(--c-ink); font-weight: 600; }
+.app-dock__item--active .app-dock__icon { color: var(--accent); }
+.app-dock__icon { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.app-dock__logout { margin-top: 4px; }
 @media (min-width: 1400px) {
   .app { min-width: 0; }
 }
@@ -611,6 +638,10 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 .brand-logo { display: block; }
 [data-theme="dark"] .brand-logo { filter: brightness(0) invert(1); }
 
+/* Node-detail floating popover */
+@keyframes cvPopIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .card[style*="cvPopIn"] { animation: none !important; } }
+
 /* ── Board launcher dock — hover-expand overlay ───────────────── */
 .board-dock {
   position: fixed; top: 50%; left: 16px; transform: translateY(-50%); z-index: 30;
@@ -643,9 +674,13 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
   transition: opacity 120ms ease, transform 120ms ease;
 }
 .board-dock:hover .board-dock__label { opacity: 1; transform: none; transition-delay: 90ms; }
+/* Pinned-open: stays wide with labels shown (after hover rules so it wins) */
+.board-dock.board-dock--open, .board-dock.board-dock--open:hover { width: 208px; }
+.board-dock.board-dock--open .board-dock__label { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .board-dock, .board-dock:hover, .board-dock__label { transition: none; }
 }
+
 .auth-card h1 { margin: 2px 0 0; font-size: 24px; letter-spacing: -0.01em; }
 .auth-sub { margin: 4px 0 0; font-size: 13.5px; color: var(--c-dim); }
 .auth-field { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }

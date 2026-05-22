@@ -1,5 +1,5 @@
 import React from "react";
-const { AgentCard, BrandolphDot, Drawer, Icon, ModelChip, OutputCard, PageHeader, Reveal, StatusPill, useIsTeam } = window;
+const { AgentCard, BrandolphDot, Drawer, Icon, ModelChip, OutputCard, PageHeader, Reveal, StatusPill, useIsTeam, PinButton, usePins } = window;
 /* Briefs library + Brief detail + Specialists directory + Canvas. */
 
 const { useState: useBrState } = React;
@@ -50,7 +50,7 @@ function BriefsLibrary({ go }) {
           <tbody className="stagger">
             {filtered.map((b, i) => (
               <tr key={b.id} style={{borderBottom: i < filtered.length - 1 ? "1px solid var(--c-line)" : "none", cursor:"pointer"}}
-                onClick={() => go("brief-detail/" + b.id)}
+                onClick={() => go("board/" + b.id)}
                 onMouseEnter={e => e.currentTarget.style.background = "var(--neutral-50)"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
@@ -91,13 +91,18 @@ function BriefsLibrary({ go }) {
 function BriefDetail({ id, go }) {
   const brief = window.CI_BRIEFS.find(b => b.id === id) || window.CI_BRIEFS[0];
   const outputs = window.CI_OUTPUTS.filter(o => o.briefId === brief.id);
-  const [tab, setTab] = useBrState("overview");
+  const [win, setWin] = useBrState(null);   // "overview" | "recommendation" | null — open as floating windows
   const depts = [...new Set(brief.agents.map(aid => window.CI_AGENTS.find(a => a.id === aid)?.dept))].filter(Boolean).length;
 
   const TABS = [["overview","Overview"],["recommendation","Recommendation"],["delivery","Delivery"]];
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") setWin(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
-    <div style={{padding:"22px 36px 60px", maxWidth: tab === "delivery" ? 1340 : 1100, margin: "0 auto"}}>
+    <div style={{padding:"22px 36px 60px", maxWidth: 1100, margin: "0 auto"}}>
       <button onClick={() => go("briefs")} className="btn btn--link" style={{fontSize: 12, marginBottom: 14}}>
         <Icon name="arrowLeft" size={13} /> All briefs
       </button>
@@ -112,96 +117,95 @@ function BriefDetail({ id, go }) {
           <StatusPill status={brief.status} />
           <div style={{display:"flex", gap: 8}}>
             {brief.status === "draft" && <button className="btn btn--primary btn--sm">Approve <Icon name="check" size={13} /></button>}
-            <button className="btn btn--primary btn--sm" onClick={() => go("board/" + brief.id)}><Icon name="canvas" size={13} /> Open as board</button>
             <button className="btn btn--ghost btn--sm">Revise with Brandolph</button>
             <button className="btn btn--ghost btn--icon" aria-label="Export PDF"><Icon name="download" size={14} /></button>
           </div>
         </div>
       </div>
 
-      {/* Deck tabs */}
+      {/* Deck tabs — Overview/Recommendation open as floating windows; Delivery opens the board */}
       <div style={{display:"flex", gap: 2, borderBottom:"1px solid var(--c-line)", marginBottom: 26}}>
         {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} style={{
+          <button key={k} onClick={() => k === "delivery" ? go("board/" + brief.id) : setWin(w => w === k ? null : k)} style={{
             border:"none", background:"transparent", cursor:"pointer", padding:"10px 16px",
-            fontFamily:"var(--font-sans)", fontSize: 14, fontWeight: tab === k ? 600 : 500,
-            color: tab === k ? "var(--c-ink)" : "var(--c-faint)",
-            borderBottom: tab === k ? "2px solid var(--yellow-500)" : "2px solid transparent", marginBottom: -1,
-          }}>{l}</button>
+            fontFamily:"var(--font-sans)", fontSize: 14, fontWeight: win === k ? 600 : 500,
+            color: win === k ? "var(--c-ink)" : "var(--c-faint)",
+            borderBottom: win === k ? "2px solid var(--yellow-500)" : "2px solid transparent", marginBottom: -1,
+            display:"inline-flex", alignItems:"center", gap:6,
+          }}>{l}{k === "delivery" && <Icon name="canvas" size={13} />}</button>
         ))}
       </div>
 
-      {/* OVERVIEW — the proposition fold */}
-      {tab === "overview" && (
-        <div style={{animation:"routeIn 320ms var(--ease-out, ease) both"}}>
-          <div style={{background:"var(--yellow-500)", borderRadius: 14, padding:"30px 36px", marginBottom: 24, position:"relative", overflow:"hidden"}}>
-            <div style={{position:"absolute", top: 16, right: 20, fontFamily:"var(--font-mono)", fontSize: 10, letterSpacing:"0.18em", color:"rgba(48,48,48,0.6)", textTransform:"uppercase", fontWeight:500}}>Single-minded proposition</div>
-            <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 28, letterSpacing:"-0.005em", lineHeight: 1.25, margin: 0, color:"#1a1f36", fontWeight: 500, maxWidth: 820}}>"{brief.smp}"</p>
-          </div>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 16, marginBottom: 22}}>
-            <BriefSection title="Background"          body={brief.background} />
-            <BriefSection title="Objective"           body={brief.objective} />
-            <BriefSection title="Audience"            body={brief.audience} />
-            <BriefSection title="Metrics that matter" body={brief.metrics} />
-          </div>
-          <div className="card" style={{padding: 22}}>
-            <div className="eyebrow" style={{marginBottom: 14}}>Deliverables · {brief.deliverables.length}</div>
-            <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
-              {brief.deliverables.map((d, i) => (
-                <span key={i} className="pill" style={{height: 28, padding:"0 14px", fontSize:11.5}}>{d}</span>
-              ))}
-            </div>
-          </div>
+      {/* Base — calm proposition summary; the detail lives in the windows / board */}
+      <div style={{maxWidth: 900}}>
+        <div style={{background:"var(--yellow-500)", borderRadius: 14, padding:"30px 36px", marginBottom: 22, position:"relative", overflow:"hidden"}}>
+          <div style={{position:"absolute", top: 16, right: 20, fontFamily:"var(--font-mono)", fontSize: 10, letterSpacing:"0.18em", color:"rgba(48,48,48,0.6)", textTransform:"uppercase", fontWeight:500}}>Single-minded proposition</div>
+          <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 28, letterSpacing:"-0.005em", lineHeight: 1.25, margin: 0, color:"#1a1f36", fontWeight: 500, maxWidth: 820}}>"{brief.smp}"</p>
         </div>
-      )}
+        <div style={{display:"flex", gap:12, flexWrap:"wrap", alignItems:"center"}}>
+          <button className="btn btn--primary" onClick={() => go("board/" + brief.id)}><Icon name="canvas" size={14} /> Open the board</button>
+          <button className="btn btn--ghost btn--sm" onClick={() => setWin("overview")}>Overview</button>
+          <button className="btn btn--ghost btn--sm" onClick={() => setWin("recommendation")}>Recommendation</button>
+          <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.06em"}}>{outputs.length} outputs · {depts} departments · {brief.credits} cr</span>
+        </div>
+      </div>
 
-      {/* RECOMMENDATION — Brandolph's approach */}
-      {tab === "recommendation" && (
-        <div style={{animation:"routeIn 320ms var(--ease-out, ease) both"}}>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 16, marginBottom: 22}}>
-            <BriefSection title="Creative strategy" body={brief.strategy} />
-            <BriefSection title="Tone"              body={brief.tone} />
-            <BriefSection title="Direction"         body={brief.direction} />
-            <BriefSection title="Mandatories"       body={brief.mandatories} />
-          </div>
-          <div style={{background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius: 12, padding: 22, marginBottom: 22}}>
-            <div className="eyebrow eyebrow--pink" style={{marginBottom: 14}}>What this brief is NOT doing</div>
-            <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17, lineHeight: 1.55, color:"var(--c-ink)", margin: 0}}>"{brief.notDoing}"</p>
-          </div>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 16}}>
-            <div className="card" style={{padding: 20, borderLeft: "3px solid var(--yellow-500)"}}>
-              <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Strategic assumptions</div>
-              <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-                {brief.assumptions.map((a, i) => (
-                  <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}</li>
-                ))}
-              </ul>
+      {/* Small floating window — opens on the same page, no full-screen modal */}
+      {win && (
+        <>
+          <div onClick={() => setWin(null)} style={{position:"fixed", inset:0, zIndex:60}} />
+          <div className="card" style={{position:"fixed", top:170, left:284, width:440, maxHeight:"calc(100vh - 200px)", overflowY:"auto", zIndex:61, boxShadow:"var(--shadow-xl)", animation:"cvPopIn 180ms cubic-bezier(.2,.8,.2,1)"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:"1px solid var(--c-line)", position:"sticky", top:0, background:"var(--c-card)"}}>
+              <h3 style={{margin:0, fontSize:17}}>{win === "overview" ? "Overview" : "Recommendation"}</h3>
+              <button onClick={() => setWin(null)} className="btn btn--icon btn--ghost" aria-label="Close"><Icon name="close" size={15} /></button>
             </div>
-            <div className="card" style={{padding: 20, borderLeft: "3px solid var(--orange-500)"}}>
-              <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom: 12}}>Production watchouts</div>
-              <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-                {brief.watchouts.map((w, i) => (
-                  <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}</li>
-                ))}
-              </ul>
+            <div style={{padding:"20px 22px"}}>
+              {win === "overview" ? (
+                <>
+                  <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14, marginBottom: 18}}>
+                    <BriefSection title="Background"          body={brief.background} />
+                    <BriefSection title="Objective"           body={brief.objective} />
+                    <BriefSection title="Audience"            body={brief.audience} />
+                    <BriefSection title="Metrics that matter" body={brief.metrics} />
+                  </div>
+                  <div className="card card--inset" style={{padding: 18}}>
+                    <div className="eyebrow" style={{marginBottom: 12}}>Deliverables · {brief.deliverables.length}</div>
+                    <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
+                      {brief.deliverables.map((d, i) => <span key={i} className="pill" style={{height: 28, padding:"0 14px", fontSize:11.5}}>{d}</span>)}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14, marginBottom: 18}}>
+                    <BriefSection title="Creative strategy" body={brief.strategy} />
+                    <BriefSection title="Tone"              body={brief.tone} />
+                    <BriefSection title="Direction"         body={brief.direction} />
+                    <BriefSection title="Mandatories"       body={brief.mandatories} />
+                  </div>
+                  <div style={{background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius: 12, padding: 18, marginBottom: 18}}>
+                    <div className="eyebrow eyebrow--pink" style={{marginBottom: 12}}>What this brief is NOT doing</div>
+                    <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 16, lineHeight: 1.55, color:"var(--c-ink)", margin: 0}}>"{brief.notDoing}"</p>
+                  </div>
+                  <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14}}>
+                    <div className="card card--inset" style={{padding: 18, borderLeft: "3px solid var(--yellow-500)"}}>
+                      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Strategic assumptions</div>
+                      <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
+                        {brief.assumptions.map((a, i) => <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}</li>)}
+                      </ul>
+                    </div>
+                    <div className="card card--inset" style={{padding: 18, borderLeft: "3px solid var(--orange-500)"}}>
+                      <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom: 12}}>Production watchouts</div>
+                      <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
+                        {brief.watchouts.map((w, i) => <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}</li>)}
+                      </ul>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* DELIVERY — the per-brief logic canvas */}
-      {tab === "delivery" && (
-        <div style={{animation:"routeIn 320ms var(--ease-out, ease) both"}}>
-          <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom: 14}}>
-            <p style={{fontSize: 14, color:"var(--c-dim)", margin: 0, maxWidth: 640}}>
-              How the work connects — from the BIO through the brief to each specialist and the output they produced. <strong style={{color:"var(--c-ink)", fontWeight:600}}>Click any node</strong> for the result and the rationale behind it.
-            </p>
-            <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.06em", whiteSpace:"nowrap"}}>
-              {outputs.length} outputs · {depts} departments · {brief.credits} cr
-            </span>
-          </div>
-          <BriefDelivery brief={brief} outputs={outputs} />
-        </div>
+        </>
       )}
     </div>
   );
@@ -229,6 +233,8 @@ function SpecialistsDirectory({ go }) {
   const all = window.CI_AGENTS;
   const live = all.filter(a => a.status === "live").length;
   const soon = all.length - live;
+  const pins = usePins();
+  const pinned = all.filter(a => pins.has("specialists", a.id));
 
   /* Usage from produced outputs → "most used for this brand" */
   const usage = {};
@@ -277,6 +283,26 @@ function SpecialistsDirectory({ go }) {
           <button className="btn btn--primary btn--sm" onClick={() => go && go("specialist-new")}><Icon name="plus" size={13} /> New specialist</button>
         </>}
       />
+
+      {/* Pinned specialists */}
+      {pinned.length > 0 && !q && (
+        <section style={{marginBottom: 26}}>
+          <div className="eyebrow eyebrow--yellow" style={{marginBottom: 10}}>★ Pinned · your preferred specialists</div>
+          <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap: 10}}>
+            {pinned.map(a => (
+              <button key={a.id} onClick={() => setOpenId(a.id)} className="card"
+                style={{textAlign:"left", cursor:"pointer", padding:"12px 14px", display:"flex", alignItems:"center", gap:10,
+                  borderLeft:`3px solid ${window.CI_DEPT_COLORS[a.dept] || "var(--neutral-400)"}`}}>
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</div>
+                  <div className="eyebrow">{a.dept}</div>
+                </div>
+                <PinButton kind="specialists" id={a.id} />
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Most used for this brand */}
       {mostUsed.length > 0 && !q && (
@@ -441,6 +467,7 @@ function SpecialistDrawer({ open, agent, onClose }) {
   return (
     <Drawer open={open} onClose={onClose} title={agent.name} eyebrow={`${agent.code} · ${agent.dept}`}
       footer={<>
+        <PinButton kind="specialists" id={agent.id} size={18} style={{marginRight:"auto"}} />
         <button className="btn btn--ghost" onClick={onClose}>Close</button>
         <button className="btn btn--primary">Add to next assembly · {agent.cr} cr</button>
       </>}>
@@ -693,7 +720,8 @@ function InteractiveCanvas({ nodeData, edges, onNodeClick, renderNode, height = 
     if (d) wrapRef.current.releasePointerCapture?.(e.pointerId);
     /* A node press that didn't move is a click → open its detail. */
     if (d && d.mode === "node" && !d.moved && onNodeClick) {
-      onNodeClick(nodeById(d.id));
+      const rect = nodeRefs.current[d.id] ? nodeRefs.current[d.id].getBoundingClientRect() : null;
+      onNodeClick(nodeById(d.id), rect);
     }
     drag.current = null;
     setPanning(false);
@@ -971,9 +999,15 @@ function BriefBoard({ id, go }) {
 
   const [extraNodes, setExtraNodes] = useBrState([]);
   const [extraEdges, setExtraEdges] = useBrState([]);
-  const [sel, setSel] = useBrState(null);
+  const [pop, setPop] = useBrState(null);   // { ref, rect } — floating detail near the node
   const [addOpen, setAddOpen] = useBrState(false);
   const [connectFrom, setConnectFrom] = useBrState(null);
+  const [win, setWin] = useBrState(null);   // "overview" | "recommendation" | null — small windows
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") { setWin(null); setPop(null); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [panel, setPanel] = useBrState(null);   // "brief" | "ask" | null
   const [ask, setAsk] = useBrState("");
   const seq = React.useRef(0);
@@ -996,18 +1030,18 @@ function BriefBoard({ id, go }) {
     setAsk(""); setPanel(null);
   };
 
-  const onNodeClick = (node) => {
+  const onNodeClick = (node, rect) => {
     if (!node) return;
     if (connectFrom && connectFrom !== node.id) {
       setExtraEdges(es => [...es, { from: connectFrom, to: node.id, fromSide:"right", toSide:"left" }]);
       setConnectFrom(null);
       return;
     }
-    if (node.ref && node.ref.type !== "note") setSel(node.ref);
+    if (node.ref && node.ref.type !== "note") setPop({ ref: node.ref, rect });
   };
 
   React.useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") { setConnectFrom(null); setAddOpen(false); setPanel(null); } };
+    const onKey = (e) => { if (e.key === "Escape") { setConnectFrom(null); setAddOpen(false); setPanel(null); setPop(null); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -1029,7 +1063,10 @@ function BriefBoard({ id, go }) {
       position:"relative", background:"var(--c-card)", borderRadius:12,
       borderTop:`1px solid ${edge}`, borderRight:`1px solid ${edge}`, borderBottom:`1px solid ${edge}`,
       borderLeft:`3px solid ${accent}`,
-      boxShadow: active ? "0 12px 30px rgba(0,0,0,0.14)" : "var(--shadow-sm)", ...extra,
+      boxShadow: active ? "0 14px 32px rgba(0,0,0,0.16)" : "var(--shadow-sm)",
+      transform: active ? "translateY(-2px)" : "none",
+      transition: "transform 180ms cubic-bezier(.34,1.56,.64,1), box-shadow 180ms ease, border-color 140ms ease",
+      ...extra,
     });
     const handle = n.kind !== "note" ? <ConnectHandle nid={n.id} /> : null;
 
@@ -1087,16 +1124,35 @@ function BriefBoard({ id, go }) {
     );
   };
 
-  // Detail drawer content
-  const ref = sel || {};
+  // Floating detail content — derived from the clicked node
+  const ref = (pop && pop.ref) || {};
   const output = ref.type === "output" ? outputs.find(o => o.id === ref.id) : null;
   const specialist = ref.type === "specialist" ? window.CI_AGENTS.find(a => a.id === ref.id)
     : output ? window.CI_AGENTS.find(a => a.id === output.agentId) : null;
-  let dTitle = "", dEye = "", dBody = null;
-  if (ref.type === "bio") { dEye = "Source · the canon"; dTitle = "Brand Intelligence Object"; dBody = <p style={{fontSize:14, lineHeight:1.55}}><em className="b-voice">{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p>; }
-  else if (ref.type === "brief") { dEye = "L1 · Brandolph"; dTitle = brief.title; dBody = <><p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:17, lineHeight:1.5, marginBottom:12}}>"{brief.smp}"</p><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{brief.objective}</p></>; }
-  else if (ref.type === "specialist" && specialist) { const sp = specialistSpec(specialist); dEye = `${specialist.code} · ${specialist.dept}`; dTitle = specialist.name; dBody = <><p style={{fontSize:14, lineHeight:1.5, marginBottom:12}}>{specialist.job}</p><div className="eyebrow" style={{marginBottom:6}}>Why this specialist</div><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{sp.objective}</p></>; }
-  else if (output) { dEye = `${output.type}${specialist ? " · " + specialist.name : ""}`; dTitle = "Output"; dBody = <>{output.status && <div style={{marginBottom:12}}><StatusPill status={output.status} /></div>}<p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:16, lineHeight:1.55, marginBottom:14}}>"{output.body}"</p><div className="card card--inset" style={{padding:"14px 16px", borderLeft:"3px solid var(--yellow-500)"}}><div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>Why this creative choice</div><p style={{fontSize:13.5, lineHeight:1.5, margin:0}}>{outputRationale(output, specialist)}</p></div></>; }
+  let dEye = "", dBody = null;
+  if (ref.type === "bio") { dEye = "Source · the canon"; dBody = <><h3 style={{margin:"0 0 10px", fontSize:18}}>Brand Intelligence Object</h3><p style={{fontSize:14, lineHeight:1.55, color:"var(--c-dim)"}}><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p></>; }
+  else if (ref.type === "brief") { dEye = "L1 · Brandolph"; dBody = <><p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:19, lineHeight:1.45, color:"var(--c-ink)", margin:"0 0 12px"}}>"{brief.smp}"</p><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5, margin:0}}>{brief.objective}</p></>; }
+  else if (ref.type === "specialist" && specialist) { const sp = specialistSpec(specialist); dEye = `${specialist.code} · ${specialist.dept}`; dBody = <><h3 style={{margin:"0 0 8px", fontSize:18}}>{specialist.name}</h3><p style={{fontSize:14, lineHeight:1.5, color:"var(--c-ink)", margin:"0 0 16px"}}>{specialist.job}</p><div style={{height:1, background:"var(--c-line)", margin:"0 -16px 12px"}} /><div className="eyebrow" style={{marginBottom:6, color:"var(--c-faint)"}}>Why Brandolph routes here</div><p style={{fontSize:12.5, color:"var(--c-dim)", lineHeight:1.5, margin:0}}>{sp.objective}</p></>; }
+  else if (output) {
+    dEye = `${output.type}${specialist ? " · " + specialist.name : ""}`;
+    dBody = (
+      <>
+        {output.status && <div style={{marginBottom:14}}><StatusPill status={output.status} /></div>}
+        {/* THE OUTPUT — the hero of the card: big, italic, roomy */}
+        <div className="eyebrow" style={{marginBottom:10}}>The output</div>
+        <p style={{
+          fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic",
+          fontSize:21, lineHeight:1.5, letterSpacing:"-0.005em", color:"var(--c-ink)", margin:"0 0 12px",
+        }}>"{output.body}"</p>
+        <div style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.04em"}}>{output.meta}</div>
+        {/* divider — clearly separates output from rationale */}
+        <div style={{height:1, background:"var(--c-line)", margin:"16px -16px 14px"}} />
+        {/* THE RATIONALE — clearly secondary */}
+        <div className="eyebrow" style={{marginBottom:6, color:"var(--c-faint)"}}>Why this choice</div>
+        <p style={{fontSize:12.5, lineHeight:1.5, color:"var(--c-dim)", margin:0}}>{outputRationale(output, specialist)}</p>
+      </>
+    );
+  }
 
   const addMenu = (
     <div style={{position:"relative"}}>
@@ -1120,75 +1176,140 @@ function BriefBoard({ id, go }) {
     </div>
   );
 
+  const tabActive = (k) => k === "delivery" ? !win : win === k;
   return (
-    <div style={{position:"fixed", inset:0, background:"var(--c-bg)"}}>
-      {/* Floating launcher dock — icon-only, hover-expands as an overlay */}
-      <nav className="board-dock" aria-label="Navigation">
-        <div className="board-dock__brand">
-          <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height:16, width:"auto"}} />
-        </div>
-        <div className="board-dock__rule" />
-        {BOARD_LAUNCH.map(it => (
-          <button key={it.id} className="board-dock__item" onClick={() => go(it.id)}>
-            <span className="board-dock__icon"><Icon name={it.icon} size={17} /></span>
-            <span className="board-dock__label">{it.label}</span>
-          </button>
-        ))}
-      </nav>
-
-      {/* Collapsible top windows */}
-      <div style={{position:"fixed", top:14, left:"50%", transform:"translateX(-50%)", zIndex:30, display:"flex", flexDirection:"column", alignItems:"center", gap:8}}>
-        <div style={{display:"flex", gap:8, alignItems:"center"}}>
-          <button onClick={() => go("brief-detail/" + brief.id)} className="card" style={{display:"flex", alignItems:"center", gap:8, padding:"7px 12px", cursor:"pointer", border:"1px solid var(--c-line)"}}>
-            <Icon name="arrowLeft" size={12} /><span style={{fontSize:13, fontWeight:600, color:"var(--c-ink)"}}>{brief.title}</span>
-          </button>
-          <button onClick={() => setPanel(p => p === "brief" ? null : "brief")} className="btn btn--ghost btn--sm" style={panel === "brief" ? {borderColor:"var(--neutral-300)"} : undefined}>Brief <Icon name="chev" size={12} /></button>
-          <button onClick={() => setPanel(p => p === "ask" ? null : "ask")} className="btn btn--ghost btn--sm" style={panel === "ask" ? {borderColor:"var(--neutral-300)"} : undefined}><BrandolphDot /> Ask Brandolph</button>
-        </div>
-        {panel === "brief" && (
-          <div className="card" style={{width:540, maxWidth:"calc(100vw - 120px)", padding:18, boxShadow:"var(--shadow-lg)"}}>
-            <div className="eyebrow eyebrow--yellow" style={{marginBottom:8}}>Proposition</div>
-            <p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:18, lineHeight:1.4, color:"var(--c-ink)", margin:"0 0 14px"}}>"{brief.smp}"</p>
-            <div className="eyebrow" style={{marginBottom:4}}>Objective</div>
-            <p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5, margin:"0 0 14px"}}>{brief.objective}</p>
-            <div className="eyebrow" style={{marginBottom:8}}>Deliverables</div>
-            <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>{brief.deliverables.map((d, i) => <span key={i} className="pill" style={{height:26, padding:"0 11px", fontSize:11}}>{d}</span>)}</div>
+    <div style={{display:"flex", flexDirection:"column", height:"calc(100vh - 56px)", minHeight:0}}>
+      {/* Brief header — integrated into the flow page (one page) */}
+      <div style={{padding:"18px 32px 0", flexShrink:0}}>
+        <button onClick={() => go("briefs")} className="btn btn--link" style={{fontSize:12, marginBottom:10}}><Icon name="arrowLeft" size={13} /> All briefs</button>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:24, marginBottom:12}}>
+          <div>
+            <div className="eyebrow" style={{marginBottom:6}}>{brief.type} · {brief.createdAt} · {brief.credits} cr · {brief.agents.length} specialists</div>
+            <h1 style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:30, letterSpacing:"-0.015em", lineHeight:1.05, margin:0, color:"var(--c-ink)", fontWeight:500}}>{brief.title}</h1>
           </div>
-        )}
-        {panel === "ask" && (
-          <div className="card" style={{width:440, maxWidth:"calc(100vw - 120px)", padding:14, boxShadow:"var(--shadow-lg)"}}>
-            <div style={{display:"flex", alignItems:"center", gap:7, marginBottom:10}}><BrandolphDot /><span className="eyebrow eyebrow--yellow">Ask Brandolph</span></div>
-            <textarea value={ask} onChange={e => setAsk(e.target.value)} rows={2} placeholder="Ask anything, or brief a change…"
-              style={{width:"100%", boxSizing:"border-box", border:"1px solid var(--c-line)", borderRadius:9, padding:"9px 11px", fontFamily:"inherit", fontSize:13.5, color:"var(--c-ink)", background:"var(--c-bg)", outline:"none", resize:"none", lineHeight:1.45}} />
-            <button className="btn btn--primary btn--sm" style={{marginTop:8}} onClick={sendAsk}>Send <Icon name="arrow" size={13} /></button>
-            <span style={{fontSize:11, color:"var(--c-faint)", marginLeft:10}}>Drops Brandolph's reply onto the board.</span>
+          <div style={{display:"flex", flexDirection:"column", gap:8, alignItems:"flex-end"}}>
+            <StatusPill status={brief.status} />
+            <div style={{display:"flex", gap:8}}>
+              <button className="btn btn--ghost btn--sm">Revise with Brandolph</button>
+              <button className="btn btn--ghost btn--icon" aria-label="Export"><Icon name="download" size={14} /></button>
+            </div>
           </div>
-        )}
+        </div>
+        <div style={{display:"flex", gap:2, borderBottom:"1px solid var(--c-line)"}}>
+          {[["overview","Overview"],["recommendation","Recommendation"],["delivery","Delivery"]].map(([k, l]) => (
+            <button key={k} onClick={() => k === "delivery" ? setWin(null) : setWin(w => w === k ? null : k)} style={{
+              border:"none", background:"transparent", cursor:"pointer", padding:"10px 16px",
+              fontFamily:"var(--font-sans)", fontSize:14, fontWeight: tabActive(k) ? 600 : 500,
+              color: tabActive(k) ? "var(--c-ink)" : "var(--c-faint)",
+              borderBottom: tabActive(k) ? "2px solid var(--yellow-500)" : "2px solid transparent", marginBottom:-1,
+              display:"inline-flex", alignItems:"center", gap:6,
+            }}>{l}{k === "delivery" && <Icon name="canvas" size={13} />}</button>
+          ))}
+        </div>
       </div>
 
-      {/* Connect banner */}
-      {connectFrom && (
-        <div style={{position:"fixed", bottom:74, left:"50%", transform:"translateX(-50%)", zIndex:31}}>
-          <div className="card" style={{padding:"9px 14px", display:"flex", alignItems:"center", gap:12, border:"1px solid var(--accent)"}}>
-            <span style={{fontSize:13, color:"var(--c-ink)"}}>Connecting from <strong>{nodeName(connectFrom)}</strong> — click a node to link.</span>
-            <button className="btn btn--ghost btn--sm" onClick={() => setConnectFrom(null)}>Cancel</button>
+      {/* Delivery — the flow canvas, filling the page */}
+      <div style={{flex:1, position:"relative", minHeight:0}}>
+        {connectFrom && (
+          <div style={{position:"absolute", bottom:64, left:"50%", transform:"translateX(-50%)", zIndex:20}}>
+            <div className="card" style={{padding:"9px 14px", display:"flex", alignItems:"center", gap:12, border:"1px solid var(--accent)"}}>
+              <span style={{fontSize:13, color:"var(--c-ink)"}}>Connecting from <strong>{nodeName(connectFrom)}</strong> — click a node to link.</span>
+              <button className="btn btn--ghost btn--sm" onClick={() => setConnectFrom(null)}>Cancel</button>
+            </div>
           </div>
-        </div>
+        )}
+        <InteractiveCanvas
+          key={brief.id}
+          nodeData={allNodes}
+          edges={allEdges}
+          renderNode={renderNode}
+          onNodeClick={onNodeClick}
+          height="100%"
+          exportName={brief.id + "-board"}
+          toolbarExtra={addMenu}
+          helper={connectFrom ? <>Click a node to connect · Esc to cancel.</> : <>Drag to pan · scroll to zoom · <strong style={{color:"var(--c-ink)", fontWeight:600}}>+</strong> on a node to connect it · click a result for the rationale.</>}
+        />
+      </div>
+
+      {/* Overview / Recommendation — small windows on the same page */}
+      {win && (
+        <>
+          <div onClick={() => setWin(null)} style={{position:"fixed", inset:0, zIndex:55}} />
+          <div className="card" style={{position:"fixed", top:120, right:36, width:440, maxHeight:"calc(100vh - 160px)", overflowY:"auto", zIndex:56, boxShadow:"var(--shadow-xl)", animation:"cvPopIn 180ms cubic-bezier(.2,.8,.2,1)"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:"1px solid var(--c-line)", position:"sticky", top:0, background:"var(--c-card)"}}>
+              <h3 style={{margin:0, fontSize:17}}>{win === "overview" ? "Overview" : "Recommendation"}</h3>
+              <button onClick={() => setWin(null)} className="btn btn--icon btn--ghost" aria-label="Close"><Icon name="close" size={15} /></button>
+            </div>
+            <div style={{padding:"18px"}}>
+              {win === "overview" ? (
+                <div style={{display:"flex", flexDirection:"column", gap:14}}>
+                  <div style={{background:"var(--yellow-500)", borderRadius:12, padding:"18px 20px"}}>
+                    <div className="eyebrow" style={{marginBottom:8, color:"rgba(48,48,48,0.6)"}}>Single-minded proposition</div>
+                    <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:18, lineHeight:1.35, margin:0, color:"#1a1f36", fontWeight:500}}>"{brief.smp}"</p>
+                  </div>
+                  <BriefSection title="Background"          body={brief.background} />
+                  <BriefSection title="Objective"           body={brief.objective} />
+                  <BriefSection title="Audience"            body={brief.audience} />
+                  <BriefSection title="Metrics that matter" body={brief.metrics} />
+                  <div className="card card--inset" style={{padding:16}}>
+                    <div className="eyebrow" style={{marginBottom:10}}>Deliverables · {brief.deliverables.length}</div>
+                    <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>{brief.deliverables.map((d, i) => <span key={i} className="pill" style={{height:28, padding:"0 14px", fontSize:11.5}}>{d}</span>)}</div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{display:"flex", flexDirection:"column", gap:14}}>
+                  <BriefSection title="Creative strategy" body={brief.strategy} />
+                  <BriefSection title="Tone"              body={brief.tone} />
+                  <BriefSection title="Direction"         body={brief.direction} />
+                  <BriefSection title="Mandatories"       body={brief.mandatories} />
+                  <div style={{background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius:12, padding:16}}>
+                    <div className="eyebrow eyebrow--pink" style={{marginBottom:10}}>What this brief is NOT doing</div>
+                    <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:15, lineHeight:1.5, color:"var(--c-ink)", margin:0}}>"{brief.notDoing}"</p>
+                  </div>
+                  <div className="card card--inset" style={{padding:16, borderLeft:"3px solid var(--yellow-500)"}}>
+                    <div className="eyebrow eyebrow--yellow" style={{marginBottom:10}}>Strategic assumptions</div>
+                    <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8}}>
+                      {brief.assumptions.map((a, i) => <li key={i} style={{fontSize:13, color:"var(--c-ink)", display:"flex", gap:8, lineHeight:1.5}}><span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}</li>)}
+                    </ul>
+                  </div>
+                  <div className="card card--inset" style={{padding:16, borderLeft:"3px solid var(--orange-500)"}}>
+                    <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom:10}}>Production watchouts</div>
+                    <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8}}>
+                      {brief.watchouts.map((w, i) => <li key={i} style={{fontSize:13, color:"var(--c-ink)", display:"flex", gap:8, lineHeight:1.5}}><span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
-      <InteractiveCanvas
-        key={brief.id}
-        nodeData={allNodes}
-        edges={allEdges}
-        renderNode={renderNode}
-        onNodeClick={onNodeClick}
-        height="100vh"
-        exportName={brief.id + "-board"}
-        toolbarExtra={addMenu}
-        helper={connectFrom ? <>Click a node to connect · Esc to cancel.</> : <>Drag to pan · scroll to zoom · <strong style={{color:"var(--c-ink)", fontWeight:600}}>+</strong> on a node to connect it · click a result for the rationale.</>}
-      />
-
-      <Drawer open={!!sel} onClose={() => setSel(null)} title={dTitle} eyebrow={dEye} width={440}>{dBody}</Drawer>
+      {/* Floating detail — opens next to the clicked node, not on the side */}
+      {pop && (() => {
+        const r = pop.rect, W = 384, gap = 14;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        let left = r ? r.right + gap : vw / 2 - W / 2;
+        if (r && left + W > vw - 12) left = r.left - gap - W;
+        if (left < 12) left = 12;
+        const top = r ? Math.max(12, Math.min(r.top, vh - 360)) : 90;
+        return (
+          <>
+            <div onClick={() => setPop(null)} style={{position:"fixed", inset:0, zIndex:49}} />
+            <div className="card" style={{position:"fixed", top, left, width:W, zIndex:50, maxHeight:"calc(100vh - 24px)", overflowY:"auto", boxShadow:"var(--shadow-xl)", animation:"cvPopIn 160ms cubic-bezier(.2,.8,.2,1)"}}>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8, padding:"14px 16px 0"}}>
+                <span className="eyebrow eyebrow--yellow" style={{paddingTop:3}}>{dEye}</span>
+                <div style={{display:"flex", alignItems:"center", gap:2, flexShrink:0}}>
+                  {ref.type === "output" && <PinButton kind="outputs" id={ref.id} size={16} />}
+                  {ref.type === "specialist" && <PinButton kind="specialists" id={ref.id} size={16} />}
+                  <button onClick={() => setPop(null)} className="btn btn--icon btn--ghost" aria-label="Close" style={{height:26, width:26}}><Icon name="close" size={14} /></button>
+                </div>
+              </div>
+              <div style={{padding:"6px 16px 16px"}}>{dBody}</div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -1249,6 +1370,7 @@ function Library({ go }) {
   const [toast, setToast] = useBrState(null);
   const [menuFor, setMenuFor] = useBrState(null);
   const isTeam = useIsTeam();
+  const pins = usePins();
 
   const outputs = window.CI_OUTPUTS;
   const kinds = window.CI_OUTPUT_KINDS;
@@ -1260,11 +1382,15 @@ function Library({ go }) {
     window.__libToast = setTimeout(() => setToast(null), 2400);
   };
 
-  const filtered = kind === "all" ? outputs : outputs.filter(o => o.kind === kind);
+  const filtered = kind === "all" ? outputs
+    : kind === "pinned" ? outputs.filter(o => pins.has("outputs", o.id))
+    : outputs.filter(o => o.kind === kind);
   const groups = briefs
     .map(b => ({ brief: b, items: filtered.filter(o => o.briefId === b.id) }))
     .filter(g => g.items.length);
-  const countFor = (k) => (k === "all" ? outputs.length : outputs.filter(o => o.kind === k).length);
+  const countFor = (k) => k === "all" ? outputs.length
+    : k === "pinned" ? outputs.filter(o => pins.has("outputs", o.id)).length
+    : outputs.filter(o => o.kind === k).length;
 
   return (
     <div style={{padding:"24px 36px 80px"}}>
@@ -1280,6 +1406,11 @@ function Library({ go }) {
         <button onClick={() => setKind("all")}
           className={"pill" + (kind === "all" ? " pill--dark" : "")}
           style={{cursor:"pointer", height:30, padding:"0 12px"}}>All · {countFor("all")}</button>
+        {countFor("pinned") > 0 && (
+          <button onClick={() => setKind("pinned")}
+            className={"pill" + (kind === "pinned" ? " pill--dark" : " pill--yellow")}
+            style={{cursor:"pointer", height:30, padding:"0 12px"}}>★ Pinned · {countFor("pinned")}</button>
+        )}
         {kinds.map(k => {
           const n = countFor(k.key);
           if (!n) return null;
@@ -1298,7 +1429,7 @@ function Library({ go }) {
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:14}}>
               <div style={{display:"flex", alignItems:"baseline", gap:10}}>
                 <h3 style={{margin:0, fontSize:17, letterSpacing:"-0.005em"}}>{g.brief.title}</h3>
-                <button className="btn btn--link" style={{fontSize:12}} onClick={() => go("brief-detail/" + g.brief.id)}>Open brief →</button>
+                <button className="btn btn--link" style={{fontSize:12}} onClick={() => go("board/" + g.brief.id)}>Open brief →</button>
               </div>
               <span style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.08em", textTransform:"uppercase"}}>{g.items.length} {g.items.length === 1 ? "output" : "outputs"}</span>
             </div>
@@ -1355,8 +1486,11 @@ function LibraryOutput({ o, go, flash, isTeam, briefs, menuOpen, onMenu, closeMe
   return (
     <div className="card" style={{padding:16, display:"flex", flexDirection:"column", gap:10, position:"relative"}}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8}}>
-        <span className="eyebrow eyebrow--yellow" style={{maxWidth:"70%"}}>{o.type}</span>
-        {o.status && <StatusPill status={o.status} />}
+        <span className="eyebrow eyebrow--yellow" style={{maxWidth:"62%"}}>{o.type}</span>
+        <div style={{display:"flex", alignItems:"center", gap:6}}>
+          {o.status && <StatusPill status={o.status} />}
+          <PinButton kind="outputs" id={o.id} />
+        </div>
       </div>
 
       <p style={{

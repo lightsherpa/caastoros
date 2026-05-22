@@ -333,7 +333,7 @@ function HomeConsole({ tweaks }) {
         <div className="eyebrow" style={{margin:"14px 4px 10px"}}>Recent briefs</div>
         <div style={{display:"flex", flexDirection:"column", gap: 6}}>
           {window.CI_BRIEFS.slice(0,3).map(b => (
-            <a key={b.id} href={"#/brief-detail/" + b.id} className="card" style={{
+            <a key={b.id} href={"#/board/" + b.id} className="card" style={{
               padding:"10px 12px", textDecoration:"none", cursor:"pointer",
               display:"flex", flexDirection:"column", gap: 4,
             }}>
@@ -406,7 +406,7 @@ function HomeCards({ tweaks }) {
 
       <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap: 18, marginBottom: 32}}>
         <Reveal delay={50}>
-          <a href="#/brief-detail/b-pricing-relaunch" className="card" style={{padding: 22, display:"flex", flexDirection:"column", height:"100%", cursor:"pointer", textDecoration:"none"}}>
+          <a href="#/board/b-pricing-relaunch" className="card" style={{padding: 22, display:"flex", flexDirection:"column", height:"100%", cursor:"pointer", textDecoration:"none"}}>
             <div className="eyebrow eyebrow--yellow" style={{marginBottom: 8}}>Finish what's running</div>
             <h3 style={{fontSize: 18, letterSpacing:"-0.01em", margin: 0, marginBottom: 8}}>Pricing relaunch</h3>
             <p style={{fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5, margin: 0, flex: 1}}>
@@ -510,12 +510,12 @@ function HomeDesk({ tweaks }) {
             <div className="eyebrow" style={{marginBottom: 10}}>What's running</div>
             <div style={{display:"flex", flexDirection:"column", gap: 8}}>
               {window.CI_BRIEFS.filter(b => b.status === "in-production").map(b => (
-                <a href={"#/brief-detail/" + b.id} key={b.id} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius: 8, border:"1px solid var(--c-line)", textDecoration:"none", color:"inherit"}}>
+                <a href={"#/board/" + b.id} key={b.id} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius: 8, border:"1px solid var(--c-line)", textDecoration:"none", color:"inherit"}}>
                   <span style={{fontSize:13, fontWeight: 500}}>{b.title}</span>
                   <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--yellow-700)"}}>● live</span>
                 </a>
               ))}
-              <a href="#/brief-detail/b-honduras-microlot" style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius: 8, border:"1px solid var(--c-line)", textDecoration:"none", color:"inherit"}}>
+              <a href="#/board/b-honduras-microlot" style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius: 8, border:"1px solid var(--c-line)", textDecoration:"none", color:"inherit"}}>
                 <span style={{fontSize:13, fontWeight: 500}}>Honduras single-origin</span>
                 <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"#1d6b4b"}}>● in craft</span>
               </a>
@@ -703,7 +703,7 @@ function HomeDashboard({ go }) {
           </div>
           <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap:12}}>
             {inFlight.map(b => (
-              <a key={b.id} href={"#/brief-detail/" + b.id} className="card" style={{padding:16, textDecoration:"none", color:"inherit", cursor:"pointer", display:"flex", flexDirection:"column", gap:7}}>
+              <a key={b.id} href={"#/board/" + b.id} className="card" style={{padding:16, textDecoration:"none", color:"inherit", cursor:"pointer", display:"flex", flexDirection:"column", gap:7}}>
                 <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10}}><span className="eyebrow">{b.type}</span><StatusPill status={b.status} /></div>
                 <div style={{fontSize:14.5, fontWeight:500, color:"var(--c-ink)", letterSpacing:"-0.005em"}}>{b.title}</div>
                 <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop:7, borderTop:"1px dashed var(--c-line-2)"}}>
@@ -986,7 +986,7 @@ function HomeCreate({ tweaks, go }) {
                         </button>
                       )}
                       {phase === "done" && (
-                        <a href="#/brief-detail/b-pricing-relaunch" className="btn btn--primary">
+                        <a href="#/board/b-pricing-relaunch" className="btn btn--primary">
                           <Icon name="check" size={14} /> Open the work
                         </a>
                       )}
