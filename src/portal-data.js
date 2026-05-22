@@ -126,6 +126,14 @@ window.CI_DEPT_META = {
 /* Subscription tier labels (for "unlocks from" copy). */
 window.CI_TIERS = { "00":"Free", "01":"Studio", "02":"Brandolph", "03":"Suite" };
 
+/* Brand workspaces — multi-brand is a higher-plan (Suite) feature. The
+   first is the active/seeded one; the rest demonstrate the switcher. */
+window.CI_WORKSPACES = [
+  { id:"vinilo", name:"Vinilo",          initial:"V", bio:91, plan:"Tier 02 · Brandolph", campaigns:9 },
+  { id:"lumen",  name:"Lúmen Studio",    initial:"L", bio:64, plan:"Tier 01 · Studio",    campaigns:3 },
+  { id:"otono",  name:"Otoño Skincare",  initial:"O", bio:78, plan:"Tier 02 · Brandolph", campaigns:6 },
+];
+
 /* ── Specialist prompting (Phase A) ───────────────────────────────── */
 /* Brand-global refusal rules. Every specialist inherits these; the QA
    specialist gates outputs against them. Sourced from the BIO + the

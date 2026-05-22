@@ -594,6 +594,133 @@ function HomeDesk({ tweaks }) {
 
 /* ════════════════════════════════════════════════════════════════ */
 /* Variant D — CREATE (the launchpad — default home)                */
+/* Workspace switcher — multi-brand is a Suite-plan feature. */
+function WorkspaceBar() {
+  const [open, setOpen] = useBState(false);
+  const [active, setActive] = useBState("vinilo");
+  const ws = window.CI_WORKSPACES || [];
+  const cur = ws.find(w => w.id === active) || ws[0];
+  if (!cur) return null;
+  return (
+    <div style={{maxWidth:1080, margin:"0 auto 16px", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+      <div style={{position:"relative"}}>
+        <button onClick={() => setOpen(o => !o)} className="card" style={{display:"flex", alignItems:"center", gap:10, padding:"7px 12px", cursor:"pointer", border:"1px solid var(--c-line)"}}>
+          <span style={{width:30, height:30, borderRadius:8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:13}}>{cur.initial}</span>
+          <div style={{textAlign:"left", lineHeight:1.2}}>
+            <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{cur.name}</div>
+            <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)"}}>BIO {cur.bio}% · {cur.plan}</div>
+          </div>
+          <Icon name="chev" size={14} />
+        </button>
+        {open && (
+          <>
+            <div onClick={() => setOpen(false)} style={{position:"fixed", inset:0, zIndex:40}} />
+            <div style={{position:"absolute", top:"calc(100% + 6px)", left:0, zIndex:41, width:288, background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:12, boxShadow:"var(--shadow-lg)", padding:6}}>
+              <div className="eyebrow" style={{padding:"6px 10px"}}>Switch workspace</div>
+              {ws.map(w => (
+                <button key={w.id} onClick={() => { setActive(w.id); setOpen(false); }}
+                  style={{display:"flex", alignItems:"center", gap:10, width:"100%", textAlign:"left", border:"none", background:"transparent", padding:"8px 10px", borderRadius:8, cursor:"pointer"}}
+                  onMouseEnter={e => e.currentTarget.style.background = "var(--neutral-50)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <span style={{width:26, height:26, borderRadius:7, background: w.id === active ? "var(--neutral-900)" : "var(--neutral-50)", color: w.id === active ? "#fff" : "var(--c-dim)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:12}}>{w.initial}</span>
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontSize:13, fontWeight:500, color:"var(--c-ink)"}}>{w.name}</div>
+                    <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)"}}>BIO {w.bio}% · {w.campaigns} campaigns</div>
+                  </div>
+                  {w.id === active && <Icon name="check" size={14} />}
+                </button>
+              ))}
+              <div style={{height:1, background:"var(--c-line)", margin:"6px 8px"}} />
+              <button style={{display:"flex", alignItems:"center", gap:8, width:"100%", textAlign:"left", border:"none", background:"transparent", padding:"8px 10px", borderRadius:8, cursor:"pointer", color:"var(--c-ink)", fontSize:13}}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--neutral-50)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <Icon name="plus" size={14} /> New workspace
+                <span style={{fontFamily:"var(--font-mono)", fontSize:9, color:"var(--c-faint)", marginLeft:"auto", letterSpacing:"0.1em"}}>SUITE PLAN</span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      <div style={{display:"flex", alignItems:"center", gap:7, fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.12em", textTransform:"uppercase"}}>
+        <BrandolphDot /> Brandolph is reading {cur.name}
+      </div>
+    </div>
+  );
+}
+
+/* Mini analytics — credits · campaigns + success · library peek + in-flight. */
+function HomeDashboard({ go }) {
+  const briefs = window.CI_BRIEFS;
+  const credits = window.CI_CREDITS;
+  const shipped = briefs.filter(b => ["shipped","delivered","approved"].includes(b.status)).length;
+  const successRate = Math.round((shipped / briefs.length) * 100);
+  const inFlight = briefs.filter(b => b.status === "in-production" || b.status === "approved");
+  const recent = window.CI_OUTPUTS.filter(o => o.kind !== "upload").slice(0, 4);
+  const big = (color) => ({ fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:36, fontWeight:500, lineHeight:1, color: color || "var(--c-ink)" });
+  const cardStyle = { padding:18, display:"flex", flexDirection:"column", gap:10, height:"100%", boxSizing:"border-box" };
+
+  return (
+    <div style={{maxWidth:1080, margin:"0 auto"}}>
+      <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:14, marginBottom:18, alignItems:"stretch"}}>
+        <Reveal>
+          <div className="card" style={cardStyle}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">Credits this cycle</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("credits")}>Ledger →</button></div>
+            <div style={{display:"flex", alignItems:"baseline", gap:8}}><span style={big()}>{credits.balance}</span><span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>/ {credits.monthly} · {credits.resetsInDays}d left</span></div>
+            <div style={{height:6, background:"var(--neutral-50)", borderRadius:999, overflow:"hidden", display:"flex"}}>
+              {credits.split.filter(s => s.credits > 0).map((s, i) => <div key={i} style={{flex: s.pct || 1, background: s.color}} />)}
+            </div>
+          </div>
+        </Reveal>
+        <Reveal delay={80}>
+          <div className="card" style={cardStyle}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">Campaigns</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("briefs")}>All briefs →</button></div>
+            <div style={{display:"flex", alignItems:"baseline", gap:20}}>
+              <div><div style={big()}>{briefs.length}</div><div className="eyebrow" style={{marginTop:5}}>created</div></div>
+              <div><div style={big("var(--green-600)")}>{successRate}%</div><div className="eyebrow" style={{marginTop:5}}>success rate</div></div>
+            </div>
+            <div style={{fontSize:12, color:"var(--c-faint)"}}>{inFlight.length} in flight · {shipped} shipped</div>
+          </div>
+        </Reveal>
+        <Reveal delay={160}>
+          <div className="card" style={cardStyle}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">Library</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("library")}>Open →</button></div>
+            <div style={{display:"flex", flexDirection:"column", gap:7, marginTop:2}}>
+              {recent.map(o => (
+                <div key={o.id} style={{display:"flex", alignItems:"center", gap:8, fontSize:12.5}}>
+                  <span style={{width:6, height:6, borderRadius:"50%", background:"var(--yellow-500)", flexShrink:0}} />
+                  <span style={{flex:1, minWidth:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", color:"var(--c-ink)"}}>{o.type}</span>
+                  <span style={{fontFamily:"var(--font-mono)", fontSize:9.5, color:"var(--c-faint)", textTransform:"uppercase"}}>{o.kind}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+      </div>
+
+      {inFlight.length > 0 && (
+        <Reveal>
+          <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:12}}>
+            <h3 style={{fontSize:16, margin:0, letterSpacing:"-0.005em"}}>In flight · {inFlight.length}</h3>
+            <button className="btn btn--link" style={{fontSize:12}} onClick={() => go("briefs")}>View all →</button>
+          </div>
+          <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap:12}}>
+            {inFlight.map(b => (
+              <a key={b.id} href={"#/brief-detail/" + b.id} className="card" style={{padding:16, textDecoration:"none", color:"inherit", cursor:"pointer", display:"flex", flexDirection:"column", gap:7}}>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10}}><span className="eyebrow">{b.type}</span><StatusPill status={b.status} /></div>
+                <div style={{fontSize:14.5, fontWeight:500, color:"var(--c-ink)", letterSpacing:"-0.005em"}}>{b.title}</div>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop:7, borderTop:"1px dashed var(--c-line-2)"}}>
+                  <div style={{display:"flex", gap:3}}>
+                    {b.agents.slice(0, 5).map(aid => { const a = window.CI_AGENTS.find(x => x.id === aid); return <span key={aid} title={a?.name} style={{width:9, height:9, borderRadius:"50%", background: window.CI_DEPT_COLORS[a?.dept] || "var(--neutral-400)", outline:"1px solid var(--c-line)"}} />; })}
+                  </div>
+                  <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{b.credits} cr · {b.createdAt}</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </Reveal>
+      )}
+    </div>
+  );
+}
+
 function HomeCreate({ tweaks, go }) {
   const [scope, setScope] = useBState("all");
   const [mode, setMode]   = useBState("flow");
@@ -634,6 +761,9 @@ function HomeCreate({ tweaks, go }) {
 
   return (
     <div style={{padding:"24px 36px 72px"}}>
+      {/* Workspace switcher */}
+      <WorkspaceBar />
+
       {/* HERO — the launchpad */}
       <Reveal>
         <section style={{
@@ -872,105 +1002,8 @@ function HomeCreate({ tweaks, go }) {
         </section>
       </Reveal>
 
-      {/* ── DASHBOARD — only visible at idle; hides while review is active ── */}
-      {!isActive && (
-        <div style={{maxWidth: 1080, margin: "0 auto"}}>
-
-          {/* IN FLIGHT */}
-          <Reveal>
-            <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom: 14}}>
-              <h3 style={{fontSize: 17, margin: 0, letterSpacing:"-0.005em"}}>In flight · {flowsInFlight.length}</h3>
-              <a href="#/briefs" className="btn btn--link" style={{fontSize: 12}}>View all briefs →</a>
-            </div>
-            {flowsInFlight.length > 0 ? (
-              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap: 12, marginBottom: 36}}>
-                {flowsInFlight.map(b => (
-                  <a key={b.id} href={"#/brief-detail/" + b.id} className="card" style={{
-                    padding: 18, textDecoration:"none", color:"inherit",
-                    cursor:"pointer", display:"flex", flexDirection:"column", gap: 8,
-                    transition:"border-color 140ms ease",
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = "var(--yellow-500)"}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = "var(--c-line)"}
-                  >
-                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 12}}>
-                      <div className="eyebrow">{b.type}</div>
-                      <StatusPill status={b.status} />
-                    </div>
-                    <div style={{fontSize: 15, fontWeight: 500, color:"var(--c-ink)", letterSpacing:"-0.005em"}}>{b.title}</div>
-                    <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5, margin: 0, flex: 1}}>"{b.smp}"</p>
-                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop: 8, borderTop: "1px dashed var(--c-line-2)"}}>
-                      <div style={{display:"flex", gap: 3}}>
-                        {b.agents.slice(0, 5).map(aid => {
-                          const a = window.CI_AGENTS.find(x => x.id === aid);
-                          const accent = window.CI_DEPT_COLORS[a?.dept] || "var(--neutral-400)";
-                          return <span key={aid} title={a?.name} style={{width: 10, height: 10, borderRadius:"50%", background: accent, border:"1.5px solid #fff", outline:"1px solid var(--c-line)"}} />;
-                        })}
-                      </div>
-                      <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>{b.credits} cr · {b.createdAt}</span>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="card" style={{padding: 36, textAlign:"center", marginBottom: 36, background:"var(--c-bg)", boxShadow:"none", border:"1px dashed var(--c-line-2)"}}>
-                <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 16, color:"var(--c-faint)", marginBottom: 6}}>Nothing in flight.</div>
-                <div style={{fontSize: 13, color:"var(--c-dim)"}}>
-                  <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>Type a prompt above to brief the first one.</em>
-                </div>
-              </div>
-            )}
-          </Reveal>
-
-          {/* TRY SOMETHING */}
-          <Reveal>
-            <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom: 14}}>
-              <h3 style={{fontSize: 17, margin: 0, letterSpacing:"-0.005em"}}>Don't know where to start?</h3>
-              <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.08em", textTransform:"uppercase"}}>Click to drop into the composer</span>
-            </div>
-            <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))", gap: 12, marginBottom: 36}}>
-              {tryPrompts.map((p, i) => (
-                <button key={i} onClick={() => { setInput(p.text); setPhase("idle"); }} className="card" style={{
-                  padding: 16, textAlign:"left", cursor:"pointer", border:"1px solid var(--c-line)",
-                  background:"var(--c-card)", display:"flex", flexDirection:"column", gap: 8,
-                  transition:"border-color 140ms ease",
-                }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = "var(--yellow-500)"}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = "var(--c-line)"}
-                >
-                  <div className="eyebrow eyebrow--yellow">{p.eyebrow}</div>
-                  <div style={{fontSize: 14, color:"var(--c-ink)", lineHeight: 1.45, flex: 1}}>{p.text}</div>
-                  <div style={{paddingTop: 8, borderTop:"1px dashed var(--c-line-2)", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                    <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.06em"}}>Est. {p.est} cr</span>
-                    <Icon name="arrow" size={13} />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Reveal>
-
-          {/* BRANDOLPH IS WATCHING */}
-          <Reveal>
-            <div style={{
-              background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius: 16,
-              padding: "20px 24px", display:"flex", gap: 22, alignItems:"flex-start",
-            }}>
-              <BrandolphAvatar size={44} />
-              <div style={{flex: 1}}>
-                <div className="eyebrow eyebrow--yellow" style={{marginBottom: 6}}>Brandolph is watching</div>
-                <p style={{fontSize: 14.5, lineHeight: 1.5, color:"var(--c-ink)", margin: 0, marginBottom: 14}}>
-                  <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>You shipped two things last week.</em> The annual page is converting at 6.2%. The Honduras essay is with Lia in human craft. <strong>Today, the work I'd push is the summer brief.</strong> Two questions when you're ready.
-                </p>
-                <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
-                  <button className="btn btn--ghost btn--sm" onClick={() => setInput("Brief Summer Tuesdays. The Tuesday afternoon footfall is the metric.")}>Continue the summer brief →</button>
-                  <a href="#/bio" className="btn btn--ghost btn--sm">Read me my BIO</a>
-                  <a href="#/credits" className="btn btn--ghost btn--sm">Where the credits went</a>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      )}
+      {/* Mini analytics dashboard — only at idle */}
+      {!isActive && <HomeDashboard go={go} />}
     </div>
   );
 }
