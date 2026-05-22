@@ -223,6 +223,10 @@ window.CI_BRIEFS = [
     status: "in-production",
     credits: 37,
     agents: ["a02","a03","a12","a13","a14","a18","a24"],
+    clarifications: [
+      { q:"Annual at 11.4× monthly, or 10×?", why:"At 10× you compete with your own monthly. At 11.4× you're offering 1-in-12 free — that reads as a decision, not a discount." },
+      { q:"Is the wholesale audience in or out of this push?", why:"They convert on email differently. In → I route sequence variant B. Out → we don't spend a Sonnet pass on copy that won't land." },
+    ],
     createdAt: "Mon · 14 May",
   },
   {
@@ -313,19 +317,22 @@ window.CI_OUTPUTS = [
     id:"o1", briefId:"b-pricing-relaunch", kind:"page",
     type:"PRICING PAGE · HERO", agentId:"a12", status:"approved",
     body:"Stay for the year, and the coffee stays the price. Annual takes 1 in 12 off the bill — but the point isn't the dollar; the point is the decision to commit to a slower Tuesday on purpose.",
-    meta:"38 words · est. 9.4 readability"
+    meta:"38 words · est. 9.4 readability",
+    rationale:"Led with the commitment, not the discount — the BIO forbids urgency and frames price as cost-of-pause, so the hero sells the decision and lets the 1-in-12 sit as a quiet proof, never the headline."
   },
   {
     id:"o2", briefId:"b-pricing-relaunch", kind:"email",
     type:"EMAIL 1 · ANNOUNCE", agentId:"a13", status:"in-production",
     body:"Annual is now an option. It isn't cheaper because we ran the numbers and got generous; it's cheaper because we asked you to commit to something. Annual subscribers told us they don't want flexibility — they want the bag on the kitchen counter on the same day each month.",
-    meta:"247 words · 3-part sequence"
+    meta:"247 words · 3-part sequence",
+    rationale:"Opened by naming the objection out loud (“it isn't cheaper because we got generous”) — the audience is warm and skeptical of pricing emails, so disarming the cynicism earns the read before the case for annual is even made."
   },
   {
     id:"o3", briefId:"b-pricing-relaunch", kind:"copy",
     type:"SUBJECT LINES · ×6", agentId:"a14", status:"approved",
     body:"01 · There's a slower Tuesday in here  ·  02 · Annual is now an option  ·  03 · A small case for committing  ·  04 · One-in-twelve, on us  ·  05 · The Tuesday plan  ·  06 · Re: that subscription",
-    meta:"6 variants · A/B intent split"
+    meta:"6 variants · A/B intent split",
+    rationale:"Kept every subject under 40 characters and split them by intent — the trial-ending cohort opens twice as much, so the watchout said don't waste position 1 on subscribers; variants 1 and 4 are aimed at the cohort that actually opens."
   },
   {
     id:"o4", briefId:"b-pricing-relaunch", kind:"qa",
@@ -337,7 +344,8 @@ window.CI_OUTPUTS = [
     id:"o6", briefId:"b-pricing-relaunch", kind:"image",
     type:"PRICING HERO · KEY VISUAL", agentId:"a18", status:"in-production",
     body:"A single bag on a sunlit kitchen counter, Tuesday-morning light. Annual band wraps the lower third in warm amber. No price on the visual — the price lives in the copy.",
-    meta:"1600×900 · 3 crops · Flux 2"
+    meta:"1600×900 · 3 crops · Flux 2",
+    rationale:"No price on the visual — the BIO keeps price in copy, not image. Chose Tuesday-morning kitchen light over studio product shots so the frame says “ritual” not “sale”, matching the cost-of-pause strategy."
   },
 
   /* ── Honduras single-origin ── */
@@ -345,7 +353,8 @@ window.CI_OUTPUTS = [
     id:"o5", briefId:"b-honduras-microlot", kind:"longform",
     type:"LONG-FORM · ESSAY OPENER", agentId:"a15", status:"review",
     body:"Don José grew this. He has 1.4 hectares and the inheritance of a name that, in his town, you don't introduce because everyone knows it already. We don't need to tell you the elevation or the variety. We need to tell you that the coffee is named after the person, and that's where you'll start.",
-    meta:"1,840 words · editorial register"
+    meta:"1,840 words · editorial register",
+    rationale:"Started on the grower's name, not the elevation or varietal — the BIO marks provenance as mandatory but warns against decoration, so the essay leads with the person and earns the spec details later instead of front-loading them."
   },
   {
     id:"o7", briefId:"b-honduras-microlot", kind:"image",

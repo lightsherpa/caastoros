@@ -1,5 +1,5 @@
 import React from "react";
-const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, Login, useSession } = window;
+const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, Login, useSession } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
 
@@ -27,7 +27,6 @@ const CLIENT_ROUTES = [
   { id:"library",     label:"Library",            icon:"files",    section:"Workspace" },
   { id:"bio",         label:"Brand Intelligence", icon:"bio",      section:"Brand" },
   { id:"specialists", label:"Specialists",        icon:"team",     section:"Capabilities" },
-  { id:"canvas",      label:"Canvas",             icon:"canvas",   section:"Capabilities" },
   { id:"craft",       label:"Human craft",        icon:"craft",    section:"Capabilities" },
   { id:"credits",     label:"Credits",            icon:"credit",   section:"Account" },
   { id:"settings",    label:"Settings",           icon:"settings", section:"Account" },
@@ -242,7 +241,7 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
 }
 
 /* Top yellow strip --------------------------------------------- */
-function TopBar({ portal, route, brandName }) {
+function TopBar({ portal, route, brandName, go }) {
   const isClient = portal === "client";
   const titles = {
     home:        ["Create",            "Workspace"],
@@ -271,6 +270,17 @@ function TopBar({ portal, route, brandName }) {
       <span style={{color:"rgba(48,48,48,0.4)"}}>/</span>
       <div className="topbar__title">{title}</div>
       <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap: 14}}>
+        {isClient && (
+          <button onClick={() => go && go("home")}
+            style={{
+              display:"inline-flex", alignItems:"center", gap:7, height:32, padding:"0 14px",
+              background:"var(--neutral-900)", color:"#fff", border:"none", borderRadius:9,
+              fontFamily:"var(--font-sans)", fontWeight:600, fontSize:13, letterSpacing:"-0.01em",
+              cursor:"pointer", boxShadow:"0 2px 6px rgba(0,0,0,0.18)",
+            }}>
+            <Icon name="plus" size={14} /> Start a brief
+          </button>
+        )}
         {isClient && (
           <div style={{display:"flex", alignItems:"center", gap:6, fontFamily:"var(--font-mono)", fontSize:10.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"rgba(48,48,48,0.7)"}}>
             <BrandolphDot /> Brandolph is reading
@@ -301,7 +311,7 @@ function App() {
   useShellEffect(() => {
     if (!session) return;
     if (onLoginRoute) { go(session.role === "team" ? "team" : "home"); return; }
-    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery" || route.id === "specialist-new";
+    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery" || route.id === "specialist-new" || route.id === "canvas" || route.id === "board";
     const isTeamRoute = TEAM_ROUTES.some(r => r.id === route.id) || route.id === "team-job";
     if (session.role === "client" && !isClientRoute) go("home");
     if (session.role === "team"   && !isTeamRoute  ) go("team");
@@ -315,6 +325,16 @@ function App() {
 
   const logout = () => { window.CI_AUTH.signOut(); go("login"); };
 
+  /* Board route — full-bleed canvas workspace (its own floating launcher). */
+  if (portal === "client" && route.id === "board") {
+    return (
+      <>
+        <BriefBoard id={route.param} go={go} />
+        <PortalTweaks tweaks={tweaks} setTweak={setTweak} ds={ds} setDs={setDs} />
+      </>
+    );
+  }
+
   return (
     <div className="app" data-screen-label={portal === "client" ? "Client portal" : "Team portal"}>
       <Sidebar
@@ -327,7 +347,7 @@ function App() {
         bioScore={tweaks.bioScore || 91}
       />
       <div style={{display:"flex", flexDirection:"column", minWidth:0}}>
-        <TopBar portal={portal} route={route.id} brandName={window.CI_BRAND.name} />
+        <TopBar portal={portal} route={route.id} brandName={window.CI_BRAND.name} go={go} />
         <main className="scroll" style={{flex:1, overflowY:"auto"}}>
           <div className="route-view" key={route.id + "/" + (route.param || "")}>
             <ScreenRouter route={route} go={go} tweaks={tweaks} setTweak={setTweak} />

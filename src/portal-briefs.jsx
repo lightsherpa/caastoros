@@ -91,138 +91,118 @@ function BriefsLibrary({ go }) {
 function BriefDetail({ id, go }) {
   const brief = window.CI_BRIEFS.find(b => b.id === id) || window.CI_BRIEFS[0];
   const outputs = window.CI_OUTPUTS.filter(o => o.briefId === brief.id);
+  const [tab, setTab] = useBrState("overview");
+  const depts = [...new Set(brief.agents.map(aid => window.CI_AGENTS.find(a => a.id === aid)?.dept))].filter(Boolean).length;
+
+  const TABS = [["overview","Overview"],["recommendation","Recommendation"],["delivery","Delivery"]];
 
   return (
-    <div style={{padding:"24px 36px 60px", maxWidth: 1200, margin: "0 auto"}}>
+    <div style={{padding:"22px 36px 60px", maxWidth: tab === "delivery" ? 1340 : 1100, margin: "0 auto"}}>
       <button onClick={() => go("briefs")} className="btn btn--link" style={{fontSize: 12, marginBottom: 14}}>
         <Icon name="arrowLeft" size={13} /> All briefs
       </button>
 
-      <div style={{display:"grid", gridTemplateColumns:"1fr auto", gap: 24, alignItems:"start", marginBottom: 28}}>
+      {/* Persistent header */}
+      <div style={{display:"grid", gridTemplateColumns:"1fr auto", gap: 24, alignItems:"start", marginBottom: 18}}>
         <div>
-          <div className="eyebrow" style={{marginBottom: 8}}>{brief.type} · {brief.createdAt}</div>
-          <h1 style={{
-            fontFamily:"Georgia, serif", fontStyle:"italic",
-            fontSize: 42, letterSpacing:"-0.015em", lineHeight: 1.1,
-            margin: 0, color:"var(--c-ink)", fontWeight: 500,
-          }}>{brief.title}</h1>
+          <div className="eyebrow" style={{marginBottom: 8}}>{brief.type} · {brief.createdAt} · {brief.credits} cr · {brief.agents.length} specialists</div>
+          <h1 style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 36, letterSpacing:"-0.015em", lineHeight: 1.1, margin: 0, color:"var(--c-ink)", fontWeight: 500}}>{brief.title}</h1>
         </div>
         <div style={{display:"flex", flexDirection:"column", gap: 10, alignItems:"flex-end"}}>
           <StatusPill status={brief.status} />
           <div style={{display:"flex", gap: 8}}>
-            {brief.status === "draft" && <button className="btn btn--primary">Approve <Icon name="check" size={13} /></button>}
+            {brief.status === "draft" && <button className="btn btn--primary btn--sm">Approve <Icon name="check" size={13} /></button>}
+            <button className="btn btn--primary btn--sm" onClick={() => go("board/" + brief.id)}><Icon name="canvas" size={13} /> Open as board</button>
             <button className="btn btn--ghost btn--sm">Revise with Brandolph</button>
-            <button className="btn btn--ghost btn--sm">Send to team →</button>
-            <button className="btn btn--ghost btn--icon" aria-label="Copy JSON"><Icon name="files" size={14} /></button>
             <button className="btn btn--ghost btn--icon" aria-label="Export PDF"><Icon name="download" size={14} /></button>
           </div>
         </div>
       </div>
 
-      {/* SMP block — the yellow pull-quote */}
-      <div style={{
-        background:"var(--yellow-500)",
-        borderRadius: 14,
-        padding:"32px 38px",
-        marginBottom: 28,
-        position:"relative",
-        overflow:"hidden",
-      }}>
-        <div style={{position:"absolute", top: 18, right: 22, fontFamily:"var(--font-mono)", fontSize: 10, letterSpacing:"0.18em", color:"rgba(48,48,48,0.6)", textTransform:"uppercase", fontWeight:500}}>
-          Single-minded proposition
-        </div>
-        <p style={{
-          fontFamily:"Georgia, serif", fontStyle:"italic",
-          fontSize: 30, letterSpacing:"-0.005em", lineHeight: 1.25,
-          margin: 0, color:"var(--c-ink)", fontWeight: 500,
-          maxWidth: 820,
-        }}>
-          "{brief.smp}"
-        </p>
+      {/* Deck tabs */}
+      <div style={{display:"flex", gap: 2, borderBottom:"1px solid var(--c-line)", marginBottom: 26}}>
+        {TABS.map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} style={{
+            border:"none", background:"transparent", cursor:"pointer", padding:"10px 16px",
+            fontFamily:"var(--font-sans)", fontSize: 14, fontWeight: tab === k ? 600 : 500,
+            color: tab === k ? "var(--c-ink)" : "var(--c-faint)",
+            borderBottom: tab === k ? "2px solid var(--yellow-500)" : "2px solid transparent", marginBottom: -1,
+          }}>{l}</button>
+        ))}
       </div>
 
-      {/* Two-column body grid */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 18, marginBottom: 22}}>
-        <BriefSection title="Background"            body={brief.background} />
-        <BriefSection title="Objective"             body={brief.objective} />
-        <BriefSection title="Audience"              body={brief.audience} />
-        <BriefSection title="Creative strategy"     body={brief.strategy} />
-        <BriefSection title="Tone"                  body={brief.tone} />
-        <BriefSection title="Direction"             body={brief.direction} />
-        <BriefSection title="Mandatories"           body={brief.mandatories} />
-        <BriefSection title="Metrics that matter"   body={brief.metrics} />
-      </div>
-
-      {/* Deliverables */}
-      <div className="card" style={{padding: 22, marginBottom: 22}}>
-        <div className="eyebrow" style={{marginBottom: 14}}>Deliverables</div>
-        <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
-          {brief.deliverables.map((d, i) => (
-            <span key={i} className="pill" style={{height: 28, padding:"0 14px", fontSize:11.5, background:"var(--neutral-50)"}}>{d}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* What we're NOT doing — red card */}
-      <div style={{
-        background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius: 12,
-        padding: 22, marginBottom: 22,
-      }}>
-        <div className="eyebrow eyebrow--pink" style={{marginBottom: 14}}>What this brief is NOT doing</div>
-        <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17, lineHeight: 1.55, color:"var(--c-ink)", margin: 0}}>
-          "{brief.notDoing}"
-        </p>
-      </div>
-
-      {/* Strategic assumptions + Watchouts */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 18, marginBottom: 30}}>
-        <div className="card" style={{padding: 20, borderLeft: "3px solid var(--yellow-500)"}}>
-          <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Strategic assumptions</div>
-          <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-            {brief.assumptions.map((a, i) => (
-              <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}>
-                <span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="card" style={{padding: 20, borderLeft: "3px solid var(--orange-500)"}}>
-          <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom: 12}}>Production watchouts</div>
-          <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-            {brief.watchouts.map((w, i) => (
-              <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}>
-                <span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {/* Outputs */}
-      {outputs.length > 0 && (
-        <>
-          <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom: 14}}>
-            <h2 style={{margin: 0, fontSize: 20, letterSpacing:"-0.01em"}}>Outputs · {outputs.length}</h2>
-            <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.06em"}}>
-              {brief.agents.length} specialists · from {[...new Set(brief.agents.map(id => window.CI_AGENTS.find(a => a.id === id)?.dept))].filter(Boolean).length} departments · {brief.credits} cr spent
-            </span>
+      {/* OVERVIEW — the proposition fold */}
+      {tab === "overview" && (
+        <div style={{animation:"routeIn 320ms var(--ease-out, ease) both"}}>
+          <div style={{background:"var(--yellow-500)", borderRadius: 14, padding:"30px 36px", marginBottom: 24, position:"relative", overflow:"hidden"}}>
+            <div style={{position:"absolute", top: 16, right: 20, fontFamily:"var(--font-mono)", fontSize: 10, letterSpacing:"0.18em", color:"rgba(48,48,48,0.6)", textTransform:"uppercase", fontWeight:500}}>Single-minded proposition</div>
+            <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 28, letterSpacing:"-0.005em", lineHeight: 1.25, margin: 0, color:"#1a1f36", fontWeight: 500, maxWidth: 820}}>"{brief.smp}"</p>
           </div>
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 18, marginBottom: 22}}>
-            {outputs.map(o => <OutputCard key={o.id} output={o} />)}
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 16, marginBottom: 22}}>
+            <BriefSection title="Background"          body={brief.background} />
+            <BriefSection title="Objective"           body={brief.objective} />
+            <BriefSection title="Audience"            body={brief.audience} />
+            <BriefSection title="Metrics that matter" body={brief.metrics} />
           </div>
-        </>
+          <div className="card" style={{padding: 22}}>
+            <div className="eyebrow" style={{marginBottom: 14}}>Deliverables · {brief.deliverables.length}</div>
+            <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
+              {brief.deliverables.map((d, i) => (
+                <span key={i} className="pill" style={{height: 28, padding:"0 14px", fontSize:11.5}}>{d}</span>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Agents involved */}
-      <div className="card" style={{padding: 22}}>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 14}}>
-          <div className="eyebrow">Department assembled · {brief.agents.length} specialists</div>
-          <a href="#/specialists" className="btn btn--link" style={{fontSize: 12}}>Browse the directory →</a>
+      {/* RECOMMENDATION — Brandolph's approach */}
+      {tab === "recommendation" && (
+        <div style={{animation:"routeIn 320ms var(--ease-out, ease) both"}}>
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 16, marginBottom: 22}}>
+            <BriefSection title="Creative strategy" body={brief.strategy} />
+            <BriefSection title="Tone"              body={brief.tone} />
+            <BriefSection title="Direction"         body={brief.direction} />
+            <BriefSection title="Mandatories"       body={brief.mandatories} />
+          </div>
+          <div style={{background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius: 12, padding: 22, marginBottom: 22}}>
+            <div className="eyebrow eyebrow--pink" style={{marginBottom: 14}}>What this brief is NOT doing</div>
+            <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17, lineHeight: 1.55, color:"var(--c-ink)", margin: 0}}>"{brief.notDoing}"</p>
+          </div>
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 16}}>
+            <div className="card" style={{padding: 20, borderLeft: "3px solid var(--yellow-500)"}}>
+              <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Strategic assumptions</div>
+              <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
+                {brief.assumptions.map((a, i) => (
+                  <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="card" style={{padding: 20, borderLeft: "3px solid var(--orange-500)"}}>
+              <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom: 12}}>Production watchouts</div>
+              <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
+                {brief.watchouts.map((w, i) => (
+                  <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
-        <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap: 10}}>
-          {brief.agents.map(aid => <AgentCard key={aid} agentId={aid} compact />)}
+      )}
+
+      {/* DELIVERY — the per-brief logic canvas */}
+      {tab === "delivery" && (
+        <div style={{animation:"routeIn 320ms var(--ease-out, ease) both"}}>
+          <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom: 14}}>
+            <p style={{fontSize: 14, color:"var(--c-dim)", margin: 0, maxWidth: 640}}>
+              How the work connects — from the BIO through the brief to each specialist and the output they produced. <strong style={{color:"var(--c-ink)", fontWeight:600}}>Click any node</strong> for the result and the rationale behind it.
+            </p>
+            <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.06em", whiteSpace:"nowrap"}}>
+              {outputs.length} outputs · {depts} departments · {brief.credits} cr
+            </span>
+          </div>
+          <BriefDelivery brief={brief} outputs={outputs} />
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -602,17 +582,32 @@ const CANVAS_EDGES = [
 
 const CANVAS_COLORS = {
   bio:"var(--yellow-500)", brief:"var(--neutral-900)", territory:"var(--purple-500)",
-  copy:"var(--green-600)", asset:"var(--pink-500)", feedback:"var(--orange-500)",
+  specialist:"var(--purple-500)", copy:"var(--green-600)", asset:"var(--pink-500)",
+  qa:"var(--blue-600)", upload:"var(--neutral-400)", feedback:"var(--orange-500)",
 };
 
 const SCALE_MIN = 0.4, SCALE_MAX = 2;
 
-function CanvasView() {
-  const [nodes, setNodes] = React.useState(() => CANVAS_NODES.map(n => ({ ...n })));
+/* Reusable pan/zoom/drag canvas. Renders nodeData + edges; clicking a
+   node (without dragging) fires onNodeClick(node). */
+function InteractiveCanvas({ nodeData, edges, onNodeClick, renderNode, height = "calc(100vh - 56px)", controls = true, helper, exportName = "canvas", toolbarExtra }) {
+  const [nodes, setNodes] = React.useState(() => nodeData.map(n => ({ ...n })));
   const [view, setView]   = React.useState({ x: 24, y: 28, scale: 1 });
   const [sizes, setSizes] = React.useState({});      // id -> measured height
   const [hovered, setHovered] = React.useState(null);
   const [panning, setPanning] = React.useState(false);
+
+  /* Merge external nodeData changes (added/removed nodes) while keeping
+     positions of nodes the user has already dragged. */
+  React.useEffect(() => {
+    setNodes(prev => {
+      const byId = new Map(prev.map(n => [n.id, n]));
+      return nodeData.map(n => {
+        const ex = byId.get(n.id);
+        return ex ? { ...n, x: ex.x, y: ex.y } : { ...n };
+      });
+    });
+  }, [nodeData]);
 
   const wrapRef  = React.useRef(null);
   const nodeRefs = React.useRef({});
@@ -694,7 +689,12 @@ function CanvasView() {
     }
   };
   const endDrag = (e) => {
-    if (drag.current) wrapRef.current.releasePointerCapture?.(e.pointerId);
+    const d = drag.current;
+    if (d) wrapRef.current.releasePointerCapture?.(e.pointerId);
+    /* A node press that didn't move is a click → open its detail. */
+    if (d && d.mode === "node" && !d.moved && onNodeClick) {
+      onNodeClick(nodeById(d.id));
+    }
     drag.current = null;
     setPanning(false);
   };
@@ -717,10 +717,10 @@ function CanvasView() {
   };
 
   const exportLayout = () => {
-    const data = JSON.stringify({ nodes, edges: CANVAS_EDGES }, null, 2);
+    const data = JSON.stringify({ nodes, edges }, null, 2);
     const url = URL.createObjectURL(new Blob([data], { type:"application/json" }));
     const a = document.createElement("a");
-    a.href = url; a.download = "vinilo-canvas.json"; a.click();
+    a.href = url; a.download = exportName + ".json"; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -735,7 +735,7 @@ function CanvasView() {
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       style={{
-        position:"relative", height:"calc(100vh - 56px)", overflow:"hidden",
+        position:"relative", height, overflow:"hidden", borderRadius: 14,
         cursor: panning ? "grabbing" : "grab", touchAction:"none",
       }}
     >
@@ -748,11 +748,8 @@ function CanvasView() {
       }} />
 
       {/* Floating controls */}
-      <div onPointerDown={stop} style={{position:"absolute", top: 20, left: 24, zIndex: 5, display:"flex", gap: 10}}>
-        <span className="pill pill--yellow">Phase 3 — preview</span>
-        <span className="pill">Vinilo · canvas</span>
-      </div>
-      <div onPointerDown={stop} style={{position:"absolute", top: 20, right: 24, zIndex: 5, display:"flex", gap: 8, alignItems:"center"}}>
+      <div onPointerDown={stop} style={{position:"absolute", top: 16, right: 18, zIndex: 5, display:"flex", gap: 8, alignItems:"center"}}>
+        {toolbarExtra}
         <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.06em"}}>{Math.round(view.scale * 100)}%</span>
         <button className="btn btn--ghost btn--sm" onClick={fitView}>Fit view</button>
         <button className="btn btn--ghost btn--sm" onClick={exportLayout}>Export</button>
@@ -773,7 +770,7 @@ function CanvasView() {
               <path d="M0,0 L10,5 L0,10 z" fill="var(--yellow-600)" />
             </marker>
           </defs>
-          {CANVAS_EDGES.map((e, i) => {
+          {edges.map((e, i) => {
             const on = hovered && (e.from === hovered || e.to === hovered);
             const dim = hovered && !on;
             return (
@@ -806,20 +803,23 @@ function CanvasView() {
             onPointerDown={(e) => startNode(e, n)}
             onEnter={() => setHovered(n.id)}
             onLeave={() => setHovered(h => (h === n.id ? null : h))}
-          />
+          >
+            {renderNode ? renderNode(n, { active: hovered === n.id, dragging: drag.current && drag.current.id === n.id }) : null}
+          </CanvasNode>
         ))}
       </div>
 
       {/* Bottom helper */}
-      <div onPointerDown={stop} style={{position:"absolute", bottom: 24, left: "50%", transform:"translateX(-50%)", zIndex: 5}}>
-        <div className="card" style={{padding:"10px 16px", display:"flex", alignItems:"center", gap: 14}}>
-          <BrandolphDot />
-          <span style={{fontSize: 13, color:"var(--c-dim)"}}>
-            <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>Senior users live here.</em> Drag the grid to pan · scroll to zoom · drag any node.
-          </span>
-          <a href="#/home" className="btn btn--ghost btn--sm">Back to chat</a>
+      {helper !== false && (
+        <div onPointerDown={stop} style={{position:"absolute", bottom: 18, left: "50%", transform:"translateX(-50%)", zIndex: 5}}>
+          <div className="card" style={{padding:"9px 16px", display:"flex", alignItems:"center", gap: 12}}>
+            <BrandolphDot />
+            <span style={{fontSize: 12.5, color:"var(--c-dim)"}}>
+              {helper || <>Drag to pan · scroll to zoom · <strong style={{color:"var(--c-ink)", fontWeight:600}}>click any node</strong> for the detail and rationale.</>}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       <style>{`
         .cv-node { animation: cvNodeIn 420ms cubic-bezier(.2,.8,.2,1) both; }
@@ -837,7 +837,384 @@ function CanvasView() {
   );
 }
 
-function CanvasNode({ node, color, refCb, active, dim, dragging, index, onPointerDown, onEnter, onLeave }) {
+/* Standalone demo canvas (kept for deep-links; no longer a nav item). */
+function CanvasView() {
+  return <InteractiveCanvas nodeData={CANVAS_NODES} edges={CANVAS_EDGES} exportName="vinilo-canvas" />;
+}
+
+/* Build a brief's logic graph: BIO → brief → specialist → output(s). */
+function buildBriefGraph(brief, outputs) {
+  const brand = window.CI_BRAND;
+  const rowH = 104, gapBlock = 26;
+  const specIds = [...new Set(outputs.map(o => o.agentId).filter(Boolean))];
+  const useSpecs = specIds.length ? specIds : (brief.agents || []);
+  const kindFor = (o) => o.kind === "upload" ? "upload" : o.kind === "qa" ? "qa" : (o.kind === "image" ? "asset" : "copy");
+
+  const nodes = [], edges = [];
+  let y = 40;
+  useSpecs.forEach((sid) => {
+    const a = window.CI_AGENTS.find(x => x.id === sid);
+    const outs = outputs.filter(o => o.agentId === sid);
+    const blockStart = y;
+    const n = Math.max(1, outs.length);
+    nodes.push({ id:"spec-"+sid, x:700, y: blockStart + (n * rowH) / 2 - rowH / 2, w:240, kind:"specialist",
+      title: a ? a.name : sid, sub: `${a ? a.code : ""}${a ? " · " + a.dept : ""}`, ref:{ type:"specialist", id:sid } });
+    edges.push({ from:"brief", to:"spec-"+sid, fromSide:"right", toSide:"left" });
+    outs.forEach((o, j) => {
+      const oy = blockStart + j * rowH;
+      nodes.push({ id:"out-"+o.id, x:1040, y: oy, w:260, kind: kindFor(o), title:o.type, sub:o.meta, ref:{ type:"output", id:o.id } });
+      edges.push({ from:"spec-"+sid, to:"out-"+o.id, fromSide:"right", toSide:"left" });
+    });
+    y = blockStart + n * rowH + gapBlock;
+  });
+
+  const ys = nodes.map(n => n.y);
+  const midY = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : 120;
+  nodes.unshift({ id:"brief", x:360, y:midY, w:260, kind:"brief", title:brief.title, sub:"L1 · Brandolph", ref:{ type:"brief" } });
+  nodes.unshift({ id:"bio", x:40, y:midY, w:260, kind:"bio", title:"Brand Intelligence Object", sub:`BIO · ${brand.bioCompleteness}%`, ref:{ type:"bio" } });
+  edges.unshift({ from:"bio", to:"brief", fromSide:"right", toSide:"left" });
+  return { nodes, edges };
+}
+
+/* Why a specialist made its creative choice — explicit field or derived. */
+function outputRationale(o, specialist) {
+  if (o && o.rationale) return o.rationale;
+  const spec = specialist ? specialistSpec(specialist) : {};
+  const who = specialist ? specialist.name : "The specialist";
+  if (spec.voice) return `${who} wrote to the brand voice — ${spec.voice.toLowerCase()} — and shaped it to: ${spec.outputContract || "the brief"}.`;
+  return `${who} read the BIO first, then ${spec.objective ? spec.objective.toLowerCase() : "produced the deliverable to the brief"}`;
+}
+
+/* Per-brief Delivery view: the canvas + a node-detail drawer. */
+function BriefDelivery({ brief, outputs }) {
+  const [sel, setSel] = useBrState(null);
+  const graph = React.useMemo(() => buildBriefGraph(brief, outputs), [brief.id]);
+
+  const open = (node) => { if (node && node.ref) setSel(node.ref); };
+  const ref = sel || {};
+  const output = ref.type === "output" ? outputs.find(o => o.id === ref.id) : null;
+  const specialist =
+    ref.type === "specialist" ? window.CI_AGENTS.find(a => a.id === ref.id)
+    : output ? window.CI_AGENTS.find(a => a.id === output.agentId) : null;
+
+  let title = "", eyebrow = "", body = null;
+  if (ref.type === "bio") {
+    eyebrow = "Source · the canon"; title = "Brand Intelligence Object";
+    body = <p style={{fontSize:14.5, color:"var(--c-ink)", lineHeight:1.55}}>Everything downstream is judged against the BIO. <em className="b-voice">{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p>;
+  } else if (ref.type === "brief") {
+    eyebrow = "L1 · Brandolph"; title = brief.title;
+    body = <><p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:17, lineHeight:1.5, color:"var(--c-ink)", marginBottom:12}}>"{brief.smp}"</p><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{brief.objective}</p></>;
+  } else if (ref.type === "specialist" && specialist) {
+    const spec = specialistSpec(specialist);
+    eyebrow = `${specialist.code} · ${specialist.dept}`; title = specialist.name;
+    body = <>
+      <p style={{fontSize:14, color:"var(--c-ink)", lineHeight:1.5, marginBottom:14}}>{specialist.job}</p>
+      <div className="eyebrow" style={{marginBottom:6}}>Why Brandolph routed this here</div>
+      <p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{spec.objective || "Best fit for this part of the brief."}</p>
+    </>;
+  } else if (output) {
+    eyebrow = `${output.type}${specialist ? " · " + specialist.name : ""}`; title = "Output";
+    body = <>
+      {output.status && <div style={{marginBottom:12}}><StatusPill status={output.status} /></div>}
+      <p style={{fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic", fontSize:16, lineHeight:1.55, color:"var(--c-ink)", marginBottom:14}}>"{output.body}"</p>
+      <div style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)", marginBottom:18}}>{output.meta}</div>
+      <div className="card card--inset" style={{padding:"14px 16px", borderLeft:"3px solid var(--yellow-500)"}}>
+        <div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>Why this creative choice</div>
+        <p style={{fontSize:13.5, color:"var(--c-ink)", lineHeight:1.5, margin:0}}>{outputRationale(output, specialist)}</p>
+      </div>
+    </>;
+  }
+
+  return (
+    <div>
+      <InteractiveCanvas
+        key={brief.id}
+        nodeData={graph.nodes}
+        edges={graph.edges}
+        onNodeClick={open}
+        height="calc(100vh - 250px)"
+        exportName={brief.id}
+      />
+      <Drawer open={!!sel} onClose={() => setSel(null)} title={title} eyebrow={eyebrow} width={440}>
+        {body}
+      </Drawer>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════ */
+/* BRIEF BOARD — the whole brief as a Miro-style canvas workspace.    */
+/* Floating launcher + toolbar; Ask-Brandolph, specialists, results   */
+/* as draggable nodes; +Add to drop another ask or specialist.        */
+
+const BOARD_LAUNCH = [
+  { id:"home",        icon:"sparkles", label:"Create" },
+  { id:"briefs",      icon:"brief",    label:"Briefs" },
+  { id:"library",     icon:"files",    label:"Library" },
+  { id:"specialists", icon:"team",     label:"Specialists" },
+  { id:"credits",     icon:"credit",   label:"Credits" },
+  { id:"settings",    icon:"settings", label:"Settings" },
+];
+
+function boardReply(text) {
+  const m = text.toLowerCase();
+  if (/why|reason|rational/.test(m)) return "Because the BIO frames price as cost-of-pause — the work leans on the decision to slow down, not the discount.";
+  if (/change|revise|tweak|edit/.test(m)) return "On it. I'll route that back to the specialist and hold the QA gate until it clears the brand rules.";
+  if (/who|specialist|which/.test(m)) return "For this I'd add Conversion Copy and Brand Consistency QA — smallest crew that earns the change.";
+  return "Heard. I'll sharpen that into a sub-brief and assemble the right specialist — give me a beat.";
+}
+
+function BriefBoard({ id, go }) {
+  const brief = window.CI_BRIEFS.find(b => b.id === id) || window.CI_BRIEFS[0];
+  const outputs = window.CI_OUTPUTS.filter(o => o.briefId === brief.id);
+  const base = React.useMemo(() => buildBriefGraph(brief, outputs), [brief.id]);
+
+  const [extraNodes, setExtraNodes] = useBrState([]);
+  const [extraEdges, setExtraEdges] = useBrState([]);
+  const [sel, setSel] = useBrState(null);
+  const [addOpen, setAddOpen] = useBrState(false);
+  const [connectFrom, setConnectFrom] = useBrState(null);
+  const [panel, setPanel] = useBrState(null);   // "brief" | "ask" | null
+  const [ask, setAsk] = useBrState("");
+  const seq = React.useRef(0);
+
+  const allNodes = React.useMemo(() => [...base.nodes, ...extraNodes], [base, extraNodes]);
+  const allEdges = React.useMemo(() => [...base.edges, ...extraEdges], [base, extraEdges]);
+  const nodeName = (nid) => { const n = allNodes.find(x => x.id === nid); return n ? n.title : nid; };
+
+  const addSpecialist = (a) => {
+    const nid = "specx-" + a.id + "-" + (++seq.current);
+    setExtraNodes(ns => [...ns, { id:nid, x:700, y: 480 + ns.length * 44, w:240, kind:"specialist", title:a.name, sub:`${a.code} · ${a.dept}`, ref:{ type:"specialist", id:a.id } }]);
+    setAddOpen(false);
+    setConnectFrom(nid);
+  };
+  const sendAsk = () => {
+    const text = ask.trim(); if (!text) return;
+    const rid = "ans-" + (++seq.current);
+    setExtraNodes(ns => [...ns, { id:rid, x: 380, y: 480 + ns.length * 44, w:300, kind:"note", title:"Brandolph", body: boardReply(text), ref:{ type:"note" } }]);
+    setExtraEdges(es => [...es, { from:"brief", to:rid, fromSide:"bottom", toSide:"top", dashed:true }]);
+    setAsk(""); setPanel(null);
+  };
+
+  const onNodeClick = (node) => {
+    if (!node) return;
+    if (connectFrom && connectFrom !== node.id) {
+      setExtraEdges(es => [...es, { from: connectFrom, to: node.id, fromSide:"right", toSide:"left" }]);
+      setConnectFrom(null);
+      return;
+    }
+    if (node.ref && node.ref.type !== "note") setSel(node.ref);
+  };
+
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") { setConnectFrom(null); setAddOpen(false); setPanel(null); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const ConnectHandle = ({ nid }) => (
+    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setConnectFrom(nid); }}
+      title="Connect to another node"
+      style={{position:"absolute", right:-9, top:"calc(50% - 9px)", width:18, height:18, borderRadius:"50%",
+        border:"1px solid var(--c-line)", background:"var(--c-card)", color:"var(--c-faint)", cursor:"crosshair",
+        display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"var(--shadow-sm)", zIndex:4}}>
+      <Icon name="plus" size={11} />
+    </button>
+  );
+
+  const renderNode = (n, { active }) => {
+    const accent = CANVAS_COLORS[n.kind] || CANVAS_COLORS.copy;
+    const edge = (connectFrom === n.id) ? "var(--accent)" : (active ? "var(--yellow-500)" : "var(--c-line)");
+    const card = (extra) => ({
+      position:"relative", background:"var(--c-card)", borderRadius:12,
+      borderTop:`1px solid ${edge}`, borderRight:`1px solid ${edge}`, borderBottom:`1px solid ${edge}`,
+      borderLeft:`3px solid ${accent}`,
+      boxShadow: active ? "0 12px 30px rgba(0,0,0,0.14)" : "var(--shadow-sm)", ...extra,
+    });
+    const handle = n.kind !== "note" ? <ConnectHandle nid={n.id} /> : null;
+
+    if (n.kind === "brief") {
+      return (
+        <div style={card({ padding:0, overflow:"hidden" })}>
+          <div style={{padding:"12px 14px", background:"var(--yellow-50)", borderBottom:"1px solid var(--c-line)"}}>
+            <div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>The brief · L1 Brandolph</div>
+            <p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:14.5, lineHeight:1.4, color:"var(--c-ink)", margin:0}}>"{brief.smp}"</p>
+          </div>
+          {brief.clarifications && (
+            <div style={{padding:"12px 14px"}}>
+              <div className="eyebrow" style={{marginBottom:8}}>Brandolph asked first</div>
+              <div style={{display:"flex", flexDirection:"column", gap:10}}>
+                {brief.clarifications.map((c, i) => (
+                  <div key={i}>
+                    <div style={{display:"flex", gap:7, fontSize:12.5, fontWeight:600, color:"var(--c-ink)", lineHeight:1.35}}>
+                      <span style={{fontFamily:"var(--font-mono)", color:"var(--yellow-700)"}}>{String(i+1).padStart(2,"0")}</span>{c.q}
+                    </div>
+                    <div style={{fontSize:11.5, color:"var(--c-dim)", lineHeight:1.4, marginTop:3, paddingLeft:18}}>{c.why}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {handle}
+        </div>
+      );
+    }
+    if (n.kind === "note") {
+      return (
+        <div style={card({ padding:14 })}>
+          <div style={{display:"flex", alignItems:"center", gap:6, marginBottom:8}}><BrandolphDot /><span className="eyebrow eyebrow--yellow">Brandolph</span></div>
+          <p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:14, lineHeight:1.5, color:"var(--c-ink)", margin:0}}>{n.body}</p>
+        </div>
+      );
+    }
+    if (n.kind === "bio") {
+      return <div style={card({ padding:13 })}><div className="eyebrow" style={{marginBottom:4, fontSize:9}}>Source · canon</div><div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{n.title}</div><div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", marginTop:2}}>{n.sub}</div>{handle}</div>;
+    }
+    if (n.kind === "specialist") {
+      return <div style={card({ padding:13 })}><div className="eyebrow" style={{marginBottom:4, fontSize:9}}>Specialist · {n.sub}</div><div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{n.title}</div>{handle}</div>;
+    }
+    const o = window.CI_OUTPUTS.find(x => "out-" + x.id === n.id);
+    return (
+      <div style={card({ padding:13 })}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6, marginBottom:5}}>
+          <span className="eyebrow eyebrow--yellow" style={{fontSize:9, maxWidth:"70%"}}>{n.title}</span>
+          {o && o.status && <StatusPill status={o.status} />}
+        </div>
+        {o && <p style={{fontSize:12, color:"var(--c-dim)", lineHeight:1.4, margin:"0 0 5px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden"}}>{o.body}</p>}
+        <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)"}}>{n.sub}</div>
+        {handle}
+      </div>
+    );
+  };
+
+  // Detail drawer content
+  const ref = sel || {};
+  const output = ref.type === "output" ? outputs.find(o => o.id === ref.id) : null;
+  const specialist = ref.type === "specialist" ? window.CI_AGENTS.find(a => a.id === ref.id)
+    : output ? window.CI_AGENTS.find(a => a.id === output.agentId) : null;
+  let dTitle = "", dEye = "", dBody = null;
+  if (ref.type === "bio") { dEye = "Source · the canon"; dTitle = "Brand Intelligence Object"; dBody = <p style={{fontSize:14, lineHeight:1.55}}><em className="b-voice">{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p>; }
+  else if (ref.type === "brief") { dEye = "L1 · Brandolph"; dTitle = brief.title; dBody = <><p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:17, lineHeight:1.5, marginBottom:12}}>"{brief.smp}"</p><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{brief.objective}</p></>; }
+  else if (ref.type === "specialist" && specialist) { const sp = specialistSpec(specialist); dEye = `${specialist.code} · ${specialist.dept}`; dTitle = specialist.name; dBody = <><p style={{fontSize:14, lineHeight:1.5, marginBottom:12}}>{specialist.job}</p><div className="eyebrow" style={{marginBottom:6}}>Why this specialist</div><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{sp.objective}</p></>; }
+  else if (output) { dEye = `${output.type}${specialist ? " · " + specialist.name : ""}`; dTitle = "Output"; dBody = <>{output.status && <div style={{marginBottom:12}}><StatusPill status={output.status} /></div>}<p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:16, lineHeight:1.55, marginBottom:14}}>"{output.body}"</p><div className="card card--inset" style={{padding:"14px 16px", borderLeft:"3px solid var(--yellow-500)"}}><div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>Why this creative choice</div><p style={{fontSize:13.5, lineHeight:1.5, margin:0}}>{outputRationale(output, specialist)}</p></div></>; }
+
+  const addMenu = (
+    <div style={{position:"relative"}}>
+      <button className="btn btn--primary btn--sm" onClick={() => setAddOpen(o => !o)}><Icon name="plus" size={13} /> Add specialist</button>
+      {addOpen && (
+        <>
+          <div onClick={() => setAddOpen(false)} style={{position:"fixed", inset:0, zIndex:40}} />
+          <div style={{position:"absolute", top:"calc(100% + 6px)", right:0, zIndex:41, width:240, background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:12, boxShadow:"var(--shadow-lg)", padding:6}}>
+            <div className="eyebrow" style={{padding:"6px 10px 4px"}}>Drop a specialist, then connect it</div>
+            <div style={{maxHeight:240, overflowY:"auto"}}>
+              {window.CI_AGENTS.filter(a => a.status === "live").slice(0, 10).map(a => (
+                <button key={a.id} onClick={() => addSpecialist(a)} style={{display:"block", width:"100%", textAlign:"left", border:"none", background:"transparent", padding:"7px 10px", borderRadius:8, cursor:"pointer", fontSize:12.5, color:"var(--c-ink)"}}
+                  onMouseEnter={e => e.currentTarget.style.background="var(--neutral-50)"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                  {a.name} <span style={{color:"var(--c-faint)", fontFamily:"var(--font-mono)", fontSize:10}}>· {a.dept}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{position:"fixed", inset:0, background:"var(--c-bg)"}}>
+      {/* Floating launcher dock — icon-only, hover-expands as an overlay */}
+      <nav className="board-dock" aria-label="Navigation">
+        <div className="board-dock__brand">
+          <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height:16, width:"auto"}} />
+        </div>
+        <div className="board-dock__rule" />
+        {BOARD_LAUNCH.map(it => (
+          <button key={it.id} className="board-dock__item" onClick={() => go(it.id)}>
+            <span className="board-dock__icon"><Icon name={it.icon} size={17} /></span>
+            <span className="board-dock__label">{it.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* Collapsible top windows */}
+      <div style={{position:"fixed", top:14, left:"50%", transform:"translateX(-50%)", zIndex:30, display:"flex", flexDirection:"column", alignItems:"center", gap:8}}>
+        <div style={{display:"flex", gap:8, alignItems:"center"}}>
+          <button onClick={() => go("brief-detail/" + brief.id)} className="card" style={{display:"flex", alignItems:"center", gap:8, padding:"7px 12px", cursor:"pointer", border:"1px solid var(--c-line)"}}>
+            <Icon name="arrowLeft" size={12} /><span style={{fontSize:13, fontWeight:600, color:"var(--c-ink)"}}>{brief.title}</span>
+          </button>
+          <button onClick={() => setPanel(p => p === "brief" ? null : "brief")} className="btn btn--ghost btn--sm" style={panel === "brief" ? {borderColor:"var(--neutral-300)"} : undefined}>Brief <Icon name="chev" size={12} /></button>
+          <button onClick={() => setPanel(p => p === "ask" ? null : "ask")} className="btn btn--ghost btn--sm" style={panel === "ask" ? {borderColor:"var(--neutral-300)"} : undefined}><BrandolphDot /> Ask Brandolph</button>
+        </div>
+        {panel === "brief" && (
+          <div className="card" style={{width:540, maxWidth:"calc(100vw - 120px)", padding:18, boxShadow:"var(--shadow-lg)"}}>
+            <div className="eyebrow eyebrow--yellow" style={{marginBottom:8}}>Proposition</div>
+            <p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:18, lineHeight:1.4, color:"var(--c-ink)", margin:"0 0 14px"}}>"{brief.smp}"</p>
+            <div className="eyebrow" style={{marginBottom:4}}>Objective</div>
+            <p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5, margin:"0 0 14px"}}>{brief.objective}</p>
+            <div className="eyebrow" style={{marginBottom:8}}>Deliverables</div>
+            <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>{brief.deliverables.map((d, i) => <span key={i} className="pill" style={{height:26, padding:"0 11px", fontSize:11}}>{d}</span>)}</div>
+          </div>
+        )}
+        {panel === "ask" && (
+          <div className="card" style={{width:440, maxWidth:"calc(100vw - 120px)", padding:14, boxShadow:"var(--shadow-lg)"}}>
+            <div style={{display:"flex", alignItems:"center", gap:7, marginBottom:10}}><BrandolphDot /><span className="eyebrow eyebrow--yellow">Ask Brandolph</span></div>
+            <textarea value={ask} onChange={e => setAsk(e.target.value)} rows={2} placeholder="Ask anything, or brief a change…"
+              style={{width:"100%", boxSizing:"border-box", border:"1px solid var(--c-line)", borderRadius:9, padding:"9px 11px", fontFamily:"inherit", fontSize:13.5, color:"var(--c-ink)", background:"var(--c-bg)", outline:"none", resize:"none", lineHeight:1.45}} />
+            <button className="btn btn--primary btn--sm" style={{marginTop:8}} onClick={sendAsk}>Send <Icon name="arrow" size={13} /></button>
+            <span style={{fontSize:11, color:"var(--c-faint)", marginLeft:10}}>Drops Brandolph's reply onto the board.</span>
+          </div>
+        )}
+      </div>
+
+      {/* Connect banner */}
+      {connectFrom && (
+        <div style={{position:"fixed", bottom:74, left:"50%", transform:"translateX(-50%)", zIndex:31}}>
+          <div className="card" style={{padding:"9px 14px", display:"flex", alignItems:"center", gap:12, border:"1px solid var(--accent)"}}>
+            <span style={{fontSize:13, color:"var(--c-ink)"}}>Connecting from <strong>{nodeName(connectFrom)}</strong> — click a node to link.</span>
+            <button className="btn btn--ghost btn--sm" onClick={() => setConnectFrom(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <InteractiveCanvas
+        key={brief.id}
+        nodeData={allNodes}
+        edges={allEdges}
+        renderNode={renderNode}
+        onNodeClick={onNodeClick}
+        height="100vh"
+        exportName={brief.id + "-board"}
+        toolbarExtra={addMenu}
+        helper={connectFrom ? <>Click a node to connect · Esc to cancel.</> : <>Drag to pan · scroll to zoom · <strong style={{color:"var(--c-ink)", fontWeight:600}}>+</strong> on a node to connect it · click a result for the rationale.</>}
+      />
+
+      <Drawer open={!!sel} onClose={() => setSel(null)} title={dTitle} eyebrow={dEye} width={440}>{dBody}</Drawer>
+    </div>
+  );
+}
+
+
+function CanvasNode({ node, color, refCb, active, dim, dragging, index, onPointerDown, onEnter, onLeave, children }) {
+  const shell = {
+    position:"absolute", left: node.x, top: node.y, width: node.w,
+    cursor: dragging ? "grabbing" : "grab",
+    opacity: dim ? 0.55 : 1,
+    transform: dragging ? "scale(1.02)" : "none",
+    transition: dragging
+      ? "box-shadow 140ms ease, border-color 140ms ease"
+      : "box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease, opacity 160ms ease",
+    animationDelay: `${index * 45}ms`,
+    userSelect:"none", touchAction:"none", zIndex: active || dragging ? 3 : 1,
+  };
+  /* Custom content (boards) — shell provides position + interactions only. */
+  if (children) {
+    return (
+      <div ref={refCb} className="cv-node" onPointerDown={onPointerDown} onMouseEnter={onEnter} onMouseLeave={onLeave} style={shell}>
+        {children}
+      </div>
+    );
+  }
+  /* Default card body (delivery canvas) */
   return (
     <div
       ref={refCb}
@@ -846,7 +1223,7 @@ function CanvasNode({ node, color, refCb, active, dim, dragging, index, onPointe
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       style={{
-        position:"absolute", left: node.x, top: node.y, width: node.w,
+        ...shell,
         background:"var(--c-card)", borderRadius: 8,
         borderTop: "1px solid " + (active ? "var(--yellow-500)" : "var(--c-line)"),
         borderRight: "1px solid " + (active ? "var(--yellow-500)" : "var(--c-line)"),
@@ -854,14 +1231,6 @@ function CanvasNode({ node, color, refCb, active, dim, dragging, index, onPointe
         borderLeft: `3px solid ${color}`,
         padding: "10px 12px",
         boxShadow: active ? "0 8px 24px rgba(0,0,0,0.14)" : "var(--shadow-md)",
-        cursor: dragging ? "grabbing" : "grab",
-        opacity: dim ? 0.55 : 1,
-        transform: dragging ? "scale(1.02)" : "none",
-        transition: dragging
-          ? "box-shadow 140ms ease, border-color 140ms ease"
-          : "box-shadow 160ms ease, border-color 160ms ease, transform 160ms ease, opacity 160ms ease",
-        animationDelay: `${index * 45}ms`,
-        userSelect:"none", touchAction:"none", zIndex: active || dragging ? 3 : 1,
       }}
     >
       <div className="eyebrow" style={{marginBottom: 4, fontSize: 9}}>{node.kind.toUpperCase()}</div>
@@ -1304,4 +1673,4 @@ function SpecialistAuthor({ go }) {
   );
 }
 
-Object.assign(window, { BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, Library, SpecialistAuthor });
+Object.assign(window, { BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, Library, SpecialistAuthor, BriefBoard });
