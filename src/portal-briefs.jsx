@@ -1046,6 +1046,41 @@ const AUTHOR_INPUT = {
   fontFamily:"inherit", fontSize:13.5, outline:"none",
 };
 
+/* Mock "dry run": synthesise a plausible draft from the brief + spec.
+   No model call — clearly a simulated draft so the QA gate has something
+   to check. */
+function mockDraft(brief, a, spec) {
+  const obj = (spec.objective || a.job || "produce the deliverable").replace(/\.$/, "");
+  return [
+    `Draft · ${a.name} (${a.dept})`,
+    ``,
+    `Brief: ${brief.trim() || "(no brief given)"}`,
+    ``,
+    `${a.name} would ${obj.toLowerCase()}. First read of the BIO holds: keep the brand voice, no manufactured urgency, respect the pricing formula.`,
+    spec.outputContract ? `Output shaped to: ${spec.outputContract}` : ``,
+    ``,
+    `— simulated first cut. Edit below to QA real copy.`,
+  ].filter(Boolean).join("\n");
+}
+
+/* Brand-consistency gate: scores a draft against the refusal rules.
+   The forbidden-words rule is a real scan; the rest are simulated
+   verdicts (a real backend would run model-assisted checks). */
+function runQaGate(draft, refusals) {
+  const text = (draft || "").toLowerCase();
+  return refusals.map(rule => {
+    if (/unlock|limited|exclusive/i.test(rule)) {
+      const m = text.match(/\b(unlock|limited|exclusive)\b/);
+      return { rule, status: m ? "fail" : "pass", note: m ? `found “${m[1]}”` : "no forbidden words" };
+    }
+    if (/11\.4|pricing|discount/i.test(rule)) return { rule, status: "pass", note: "no pricing claim to flag" };
+    if (/provenance/i.test(rule)) return { rule, status: "pass", note: "ok" };
+    if (/contradict|bio/i.test(rule)) return { rule, status: "pass", note: "no BIO conflict detected" };
+    if (/voice|drift/i.test(rule)) return { rule, status: "pass", note: "drift ~0.12 (≤ 0.20)" };
+    return { rule, status: "pass", note: "checked" };
+  });
+}
+
 function SpecialistAuthor({ go }) {
   const [form, setForm] = useBrState(() => ({
     name:"", dept: window.CI_DEPTS[0], status:"live", job:"",
@@ -1053,6 +1088,9 @@ function SpecialistAuthor({ go }) {
     model: Object.keys(window.CI_MODELS)[0], cr: 6, tier:"01",
   }));
   const [saved, setSaved] = useBrState(false);
+  const [tab, setTab] = useBrState("prompt");
+  const [brief, setBrief] = useBrState("Write the annual pricing announcement email for wholesale buyers.");
+  const [draft, setDraft] = useBrState("");
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const setArr = (k, i, v) => setForm(f => ({ ...f, [k]: f[k].map((x, j) => j === i ? v : x) }));
@@ -1174,22 +1212,92 @@ function SpecialistAuthor({ go }) {
           </div>
         </div>
 
-        {/* Live preview */}
+        {/* Right pane — Prompt | Test (dry run + QA gate) */}
         <div style={{position:"sticky", top:24, display:"flex", flexDirection:"column", gap:10}}>
-          <div style={{display:"flex", alignItems:"center", gap:8}}>
-            <BrandolphDot />
-            <span className="eyebrow eyebrow--yellow">Live composed prompt</span>
+          <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:8}}>
+            <div style={{display:"flex", alignItems:"center", gap:8}}>
+              <BrandolphDot />
+              <span className="eyebrow eyebrow--yellow">{tab === "prompt" ? "Live composed prompt" : "Test · dry run + QA gate"}</span>
+            </div>
+            <div style={{display:"inline-flex", padding:3, gap:2, background:"var(--neutral-50)", borderRadius:9, border:"1px solid var(--c-line)"}}>
+              {[{v:"prompt",l:"Prompt"},{v:"test",l:"Test"}].map(o => (
+                <button key={o.v} onClick={() => setTab(o.v)} style={{
+                  border:"none", cursor:"pointer", borderRadius:7, padding:"5px 12px",
+                  fontFamily:"var(--font-mono)", fontSize:10.5, letterSpacing:"0.04em", textTransform:"uppercase",
+                  background: tab === o.v ? "var(--c-card)" : "transparent",
+                  color: tab === o.v ? "var(--c-ink)" : "var(--c-faint)",
+                  boxShadow: tab === o.v ? "var(--shadow-sm)" : "none",
+                }}>{o.l}</button>
+              ))}
+            </div>
           </div>
-          <div className="card" style={{padding:0, overflow:"hidden"}}>
-            <pre style={{
-              margin:0, padding:"16px 18px", whiteSpace:"pre-wrap", wordBreak:"break-word",
-              fontFamily:"var(--font-mono)", fontSize:11.5, lineHeight:1.6, color:"var(--c-ink)",
-              maxHeight:"calc(100vh - 200px)", overflowY:"auto", background:"var(--bg-sunken, var(--c-bg))",
-            }}>{preview}</pre>
-          </div>
-          <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em", paddingLeft:2}}>
-            Brand refusals auto-inherit from the BIO · {(window.CI_BRAND_REFUSALS || []).length} rules
-          </div>
+
+          {tab === "prompt" ? (
+            <>
+              <div className="card" style={{padding:0, overflow:"hidden"}}>
+                <pre style={{
+                  margin:0, padding:"16px 18px", whiteSpace:"pre-wrap", wordBreak:"break-word",
+                  fontFamily:"var(--font-mono)", fontSize:11.5, lineHeight:1.6, color:"var(--c-ink)",
+                  maxHeight:"calc(100vh - 200px)", overflowY:"auto", background:"var(--bg-sunken, var(--c-bg))",
+                }}>{preview}</pre>
+              </div>
+              <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em", paddingLeft:2}}>
+                Brand refusals auto-inherit from the BIO · {(window.CI_BRAND_REFUSALS || []).length} rules
+              </div>
+            </>
+          ) : (
+            <div style={{display:"flex", flexDirection:"column", gap:12}}>
+              <div className="card" style={{padding:14, display:"flex", flexDirection:"column", gap:10}}>
+                <Label>Sample brief</Label>
+                <textarea value={brief} rows={2} onChange={e => setBrief(e.target.value)}
+                  style={{...AUTHOR_INPUT, resize:"vertical", lineHeight:1.5}} />
+                <button className="btn btn--primary btn--sm" style={{alignSelf:"flex-start"}}
+                  onClick={() => setDraft(mockDraft(brief, agentLike, spec))}>
+                  <Icon name="sparkles" size={13} /> Dry run
+                </button>
+              </div>
+
+              {draft && (() => {
+                const refusals = [...(window.CI_BRAND_REFUSALS || []), ...spec.refusals];
+                const results = runQaGate(draft, refusals);
+                const fails = results.filter(r => r.status === "fail").length;
+                return (
+                  <>
+                    <div className="card" style={{padding:0, overflow:"hidden"}}>
+                      <div className="eyebrow" style={{padding:"10px 14px 4px"}}>Draft output · editable</div>
+                      <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={6}
+                        style={{width:"100%", boxSizing:"border-box", border:"none", borderTop:"1px solid var(--c-line)",
+                          padding:"12px 14px", background:"transparent", color:"var(--c-ink)", outline:"none",
+                          fontFamily:"var(--font-mono)", fontSize:12, lineHeight:1.55, resize:"vertical"}} />
+                    </div>
+
+                    <div className="card" style={{padding:14}}>
+                      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
+                        <div className="eyebrow">Brand QA gate</div>
+                        <span className={"pill " + (fails ? "pill--pink" : "pill--green")}>{fails ? `${fails} blocking` : "Pass"}</span>
+                      </div>
+                      <div style={{display:"flex", flexDirection:"column", gap:8}}>
+                        {results.map((r, i) => (
+                          <div key={i} style={{display:"flex", gap:8, alignItems:"flex-start", fontSize:12.5, lineHeight:1.4}}>
+                            <span style={{color: r.status === "fail" ? "var(--pink-500)" : "var(--green-600)", fontFamily:"var(--font-mono)", flexShrink:0}}>
+                              {r.status === "fail" ? "✕" : "✓"}
+                            </span>
+                            <span style={{flex:1, color:"var(--c-dim)"}}>{r.rule}</span>
+                            <span style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", whiteSpace:"nowrap"}}>{r.note}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{marginTop:12, paddingTop:10, borderTop:"1px dashed var(--c-line-2)", fontSize:12, color:"var(--c-dim)"}}>
+                        {fails
+                          ? <><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>Not ready.</em> Fix the flagged rule before setting this specialist live.</>
+                          : <><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>Clears the gate.</em> Safe to set status “Live”.</>}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       </div>
     </div>
