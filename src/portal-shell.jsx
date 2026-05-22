@@ -1,5 +1,5 @@
 import React from "react";
-const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, Library, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, Login, useSession } = window;
+const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, Login, useSession } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
 
@@ -153,6 +153,7 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
             const active = currentRoute === r.id
               || (r.id === "briefs" && currentRoute === "brief-detail")
               || (r.id === "bio" && currentRoute === "discovery")
+              || (r.id === "specialists" && currentRoute === "specialist-new")
               || (r.id === "team" && currentRoute === "team-job");
             return (
               <React.Fragment key={r.id}>
@@ -251,6 +252,7 @@ function TopBar({ portal, route, brandName }) {
     library:     ["Library",           "Workspace"],
     "brief-detail":["Brief",           "Workspace"],
     specialists: ["Specialists · 33 on shift", "Workspace"],
+    "specialist-new": ["New specialist", "Capabilities"],
     canvas:      ["Canvas",            "Workspace"],
     craft:       ["Human craft",       "Workspace"],
     credits:     ["Credits",           "Workspace"],
@@ -299,7 +301,7 @@ function App() {
   useShellEffect(() => {
     if (!session) return;
     if (onLoginRoute) { go(session.role === "team" ? "team" : "home"); return; }
-    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery";
+    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery" || route.id === "specialist-new";
     const isTeamRoute = TEAM_ROUTES.some(r => r.id === route.id) || route.id === "team-job";
     if (session.role === "client" && !isClientRoute) go("home");
     if (session.role === "team"   && !isTeamRoute  ) go("team");
@@ -351,7 +353,8 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "briefs":       return <BriefsLibrary go={go} />;
     case "library":      return <Library go={go} />;
     case "brief-detail": return <BriefDetail id={route.param} go={go} />;
-    case "specialists":  return <SpecialistsDirectory />;
+    case "specialists":  return <SpecialistsDirectory go={go} />;
+    case "specialist-new": return <SpecialistAuthor go={go} />;
     case "canvas":       return <CanvasView />;
     case "craft":        return <CraftMarketplace go={go} tier={tweaks.tier} />;
     case "credits":      return <CreditsLedger />;

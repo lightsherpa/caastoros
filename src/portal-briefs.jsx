@@ -239,7 +239,7 @@ function BriefSection({ title, body }) {
 /* ════════════════════════════════════════════════════════════════ */
 /* SPECIALISTS DIRECTORY (L2)                                        */
 
-function SpecialistsDirectory() {
+function SpecialistsDirectory({ go }) {
   const [dept, setDept] = useBrState("all");
   const [openId, setOpenId] = useBrState(null);
   const [query, setQuery] = useBrState("");
@@ -292,7 +292,10 @@ function SpecialistsDirectory() {
         eyebrow="L2 · 33 senior specialists"
         title="The department, on shift."
         sub="Brandolph reads the brief. The specialists do the work. Each one routes to the model best suited to the job — visible, auditable, paid out of the same credit pool."
-        right={<span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{live} live · {soon} coming soon</span>}
+        right={<>
+          <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{live} live · {soon} coming soon</span>
+          <button className="btn btn--primary btn--sm" onClick={() => go && go("specialist-new")}><Icon name="plus" size={13} /> New specialist</button>
+        </>}
       />
 
       {/* Most used for this brand */}
@@ -414,9 +417,9 @@ function specialistSpec(a) {
 /* Compose the effective system prompt from the four layers in the plan:
    platform preamble + brand/BIO context + specialist spec + task context.
    Model routing is internal — only included on the team/admin side. */
-function composeSpecialistPrompt(a, isTeam) {
+function composeSpecialistPrompt(a, isTeam, specArg) {
   const brand = window.CI_BRAND;
-  const spec = specialistSpec(a);
+  const spec = specArg || specialistSpec(a);
   const meta = window.CI_DEPT_META[a.dept] || {};
   const model = window.CI_MODELS[a.model];
   const refusals = [...(window.CI_BRAND_REFUSALS || []), ...(spec.refusals || [])];
@@ -1033,4 +1036,164 @@ function LibraryOutput({ o, go, flash, isTeam, briefs, menuOpen, onMenu, closeMe
   );
 }
 
-Object.assign(window, { BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, Library });
+/* ════════════════════════════════════════════════════════════════ */
+/* SPECIALIST AUTHOR — define a new specialist with a live prompt      */
+/* preview (assembles PLATFORM + BIO + SPEC + TASK from form state).   */
+
+const AUTHOR_INPUT = {
+  width:"100%", boxSizing:"border-box", padding:"9px 11px", borderRadius:9,
+  border:"1px solid var(--c-line)", background:"var(--c-card)", color:"var(--c-ink)",
+  fontFamily:"inherit", fontSize:13.5, outline:"none",
+};
+
+function SpecialistAuthor({ go }) {
+  const [form, setForm] = useBrState(() => ({
+    name:"", dept: window.CI_DEPTS[0], status:"live", job:"",
+    role:"", objective:"", method:[""], outputContract:"", voice:"", tools:[""], refusals:[""],
+    model: Object.keys(window.CI_MODELS)[0], cr: 6, tier:"01",
+  }));
+  const [saved, setSaved] = useBrState(false);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setArr = (k, i, v) => setForm(f => ({ ...f, [k]: f[k].map((x, j) => j === i ? v : x) }));
+  const addArr = (k) => setForm(f => ({ ...f, [k]: [...f[k], ""] }));
+  const delArr = (k, i) => setForm(f => ({ ...f, [k]: f[k].filter((_, j) => j !== i) }));
+
+  const nextNum = Math.max(0, ...window.CI_AGENTS.map(a => parseInt(String(a.id).slice(1)) || 0)) + 1;
+  const code = "L2-" + String(nextNum).padStart(2, "0");
+
+  const useTemplate = () => {
+    const t = window.CI_DEPT_SPECS[form.dept] || {};
+    setForm(f => ({ ...f,
+      role: t.role || "", objective: t.objective || "",
+      method: (t.method || [""]).slice(), outputContract: t.outputContract || "",
+      voice: t.voice || "", tools: (t.tools || [""]).slice(), refusals: (t.refusals || [""]).slice(),
+    }));
+  };
+
+  const agentLike = { name: form.name || "New specialist", code, dept: form.dept, model: form.model };
+  const spec = {
+    role: form.role, objective: form.objective, method: form.method.filter(s => s.trim()),
+    outputContract: form.outputContract, voice: form.voice,
+    tools: form.tools.filter(s => s.trim()), refusals: form.refusals.filter(s => s.trim()),
+  };
+  const preview = composeSpecialistPrompt(agentLike, true, spec);
+
+  const canSave = form.name.trim().length > 0;
+  const save = () => {
+    if (!canSave) return;
+    const id = "a" + String(nextNum).padStart(2, "0");
+    window.CI_AGENTS.push({ id, code, dept: form.dept, name: form.name.trim(), job: form.job, model: form.model, cr: Number(form.cr) || 0, status: form.status });
+    window.CI_SPECIALIST_SPECS[id] = spec;
+    setSaved(true);
+    setTimeout(() => go("specialists"), 700);
+  };
+
+  const Label = ({ children }) => <div className="eyebrow" style={{marginBottom:6}}>{children}</div>;
+  const ListEditor = ({ k, placeholder }) => (
+    <div style={{display:"flex", flexDirection:"column", gap:6}}>
+      {form[k].map((v, i) => (
+        <div key={i} style={{display:"flex", gap:6}}>
+          <input value={v} placeholder={placeholder} onChange={e => setArr(k, i, e.target.value)} style={AUTHOR_INPUT} />
+          {form[k].length > 1 && (
+            <button onClick={() => delArr(k, i)} className="btn btn--ghost btn--icon" style={{flexShrink:0}} aria-label="Remove"><Icon name="close" size={14} /></button>
+          )}
+        </div>
+      ))}
+      <button onClick={() => addArr(k)} className="btn btn--link" style={{fontSize:12, alignSelf:"flex-start"}}><Icon name="plus" size={12} /> Add</button>
+    </div>
+  );
+
+  return (
+    <div style={{padding:"24px 36px 80px"}}>
+      <PageHeader
+        eyebrow="Capabilities · admin"
+        title="New specialist"
+        sub="Define an L2 specialist. The prompt on the right is the real composed brief — PLATFORM + the live BIO + this spec + the task — assembled as you type."
+        right={<>
+          <button className="btn btn--ghost" onClick={() => go("specialists")}>Cancel</button>
+          <button className="btn btn--primary" disabled={!canSave} onClick={save} style={!canSave ? {opacity:0.5, cursor:"not-allowed"} : undefined}>
+            {saved ? "Saved ✓" : "Save specialist"}
+          </button>
+        </>}
+      />
+
+      <div style={{display:"grid", gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr)", gap:28, alignItems:"start"}}>
+        {/* Form */}
+        <div style={{display:"flex", flexDirection:"column", gap:18}}>
+          <div className="card" style={{padding:18, display:"flex", flexDirection:"column", gap:14}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+              <div className="eyebrow">Identity</div>
+              <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{code}</span>
+            </div>
+            <div><Label>Name</Label><input value={form.name} placeholder="e.g. The Wholesale Closer" onChange={e => set("name", e.target.value)} style={AUTHOR_INPUT} /></div>
+            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
+              <div><Label>Department</Label>
+                <select value={form.dept} onChange={e => set("dept", e.target.value)} style={AUTHOR_INPUT}>
+                  {window.CI_DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div><Label>Status</Label>
+                <select value={form.status} onChange={e => set("status", e.target.value)} style={AUTHOR_INPUT}>
+                  <option value="live">Live</option><option value="soon">Coming soon</option><option value="draft">Draft</option>
+                </select>
+              </div>
+            </div>
+            <div><Label>The job · one-liner</Label><input value={form.job} placeholder="What this specialist does, in one line." onChange={e => set("job", e.target.value)} style={AUTHOR_INPUT} /></div>
+          </div>
+
+          <div className="card" style={{padding:18, display:"flex", flexDirection:"column", gap:14}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+              <div className="eyebrow">Prompt spec</div>
+              <button onClick={useTemplate} className="btn btn--link" style={{fontSize:12}}><Icon name="refresh" size={12} /> Prefill from {form.dept} template</button>
+            </div>
+            <div><Label>Role</Label><input value={form.role} placeholder="a conversion copywriter who…" onChange={e => set("role", e.target.value)} style={AUTHOR_INPUT} /></div>
+            <div><Label>Objective</Label><textarea value={form.objective} rows={2} placeholder="What a good run produces." onChange={e => set("objective", e.target.value)} style={{...AUTHOR_INPUT, resize:"vertical", lineHeight:1.5}} /></div>
+            <div><Label>Method · steps</Label><ListEditor k="method" placeholder="A step the specialist follows" /></div>
+            <div><Label>Output contract</Label><textarea value={form.outputContract} rows={2} placeholder="Shape / length / format it must return." onChange={e => set("outputContract", e.target.value)} style={{...AUTHOR_INPUT, resize:"vertical", lineHeight:1.5}} /></div>
+            <div><Label>Voice</Label><input value={form.voice} placeholder="Voice constraints (inherits brand voice)." onChange={e => set("voice", e.target.value)} style={AUTHOR_INPUT} /></div>
+            <div><Label>Tools</Label><ListEditor k="tools" placeholder="e.g. Exa search, image generation" /></div>
+            <div><Label>Refusals · won't do (on top of brand rules)</Label><ListEditor k="refusals" placeholder="A hard rule this specialist won't break" /></div>
+          </div>
+
+          <div className="card" style={{padding:18, display:"flex", flexDirection:"column", gap:14}}>
+            <div className="eyebrow">Routing & cost</div>
+            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12}}>
+              <div><Label>Model</Label>
+                <select value={form.model} onChange={e => set("model", e.target.value)} style={AUTHOR_INPUT}>
+                  {Object.entries(window.CI_MODELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </div>
+              <div><Label>Credits / run</Label><input type="number" min="0" value={form.cr} onChange={e => set("cr", e.target.value)} style={AUTHOR_INPUT} /></div>
+              <div><Label>Unlocks from</Label>
+                <select value={form.tier} onChange={e => set("tier", e.target.value)} style={AUTHOR_INPUT}>
+                  {Object.entries(window.CI_TIERS).map(([k, v]) => <option key={k} value={k}>Tier {k} · {v}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live preview */}
+        <div style={{position:"sticky", top:24, display:"flex", flexDirection:"column", gap:10}}>
+          <div style={{display:"flex", alignItems:"center", gap:8}}>
+            <BrandolphDot />
+            <span className="eyebrow eyebrow--yellow">Live composed prompt</span>
+          </div>
+          <div className="card" style={{padding:0, overflow:"hidden"}}>
+            <pre style={{
+              margin:0, padding:"16px 18px", whiteSpace:"pre-wrap", wordBreak:"break-word",
+              fontFamily:"var(--font-mono)", fontSize:11.5, lineHeight:1.6, color:"var(--c-ink)",
+              maxHeight:"calc(100vh - 200px)", overflowY:"auto", background:"var(--bg-sunken, var(--c-bg))",
+            }}>{preview}</pre>
+          </div>
+          <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em", paddingLeft:2}}>
+            Brand refusals auto-inherit from the BIO · {(window.CI_BRAND_REFUSALS || []).length} rules
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, Library, SpecialistAuthor });
