@@ -404,12 +404,56 @@ function SpecialistRow({ a, usage, last, onClick }) {
   );
 }
 
+/* Resolve a specialist's runnable spec: department template + per-id override. */
+function specialistSpec(a) {
+  const base = window.CI_DEPT_SPECS[a.dept] || {};
+  const over = (window.CI_SPECIALIST_SPECS || {})[a.id] || {};
+  return { ...base, ...over };
+}
+
+/* Compose the effective system prompt from the four layers in the plan:
+   platform preamble + brand/BIO context + specialist spec + task context.
+   Model routing is internal — only included on the team/admin side. */
+function composeSpecialistPrompt(a, isTeam) {
+  const brand = window.CI_BRAND;
+  const spec = specialistSpec(a);
+  const meta = window.CI_DEPT_META[a.dept] || {};
+  const model = window.CI_MODELS[a.model];
+  const refusals = [...(window.CI_BRAND_REFUSALS || []), ...(spec.refusals || [])];
+  const L = [];
+  L.push("# PLATFORM");
+  L.push(`You are ${a.name} (${a.code}), an L2 specialist inside CaastorOS. Brandolph (L1) routed this brief to you. You do not chat — you return a deliverable a CMO would approve without a second pass.`);
+  L.push("");
+  L.push("# BRAND CONTEXT  ·  from the Brand Intelligence Object");
+  L.push(`Brand: ${brand.name} — ${brand.tagline}`);
+  L.push(`BIO completeness: ${brand.bioCompleteness}%. The BIO is canon; read it before responding.`);
+  L.push("Refusals (hard rules):");
+  refusals.forEach(r => L.push(`  • ${r}`));
+  L.push("");
+  L.push("# SPECIALIST SPEC");
+  L.push(`Role: ${spec.role || a.job}`);
+  if (spec.objective) L.push(`Objective: ${spec.objective}`);
+  if (spec.method) { L.push("Method:"); spec.method.forEach((s, i) => L.push(`  ${i + 1}. ${s}`)); }
+  if (spec.outputContract) L.push(`Output contract: ${spec.outputContract}`);
+  if (spec.voice) L.push(`Voice: ${spec.voice}`);
+  if (meta.capabilities) L.push(`Capabilities: ${meta.capabilities.join(", ")}`);
+  if (spec.tools) L.push(`Tools: ${spec.tools.join(", ")}`);
+  if (isTeam) L.push(`Model routing: ${model ? model.label : a.model} (primary)`);
+  L.push("");
+  L.push("# TASK");
+  L.push("{ the sharpened brief + relevant prior outputs / uploads for this run are injected here }");
+  return L.join("\n");
+}
+
 function SpecialistDrawer({ open, agent, onClose }) {
+  const [showPrompt, setShowPrompt] = useBrState(false);
   if (!agent) return null;
   const isTeam = useIsTeam();
   const m = window.CI_MODELS[agent.model];
   const accent = isTeam ? m.color : (window.CI_DEPT_COLORS[agent.dept] || "var(--neutral-300)");
   const meta = window.CI_DEPT_META[agent.dept] || {};
+  const spec = specialistSpec(agent);
+  const refusals = [...(window.CI_BRAND_REFUSALS || []), ...(spec.refusals || [])];
   const tierLabel = (window.CI_TIERS || {})[meta.tierFrom] || meta.tierFrom;
   return (
     <Drawer open={open} onClose={onClose} title={agent.name} eyebrow={`${agent.code} · ${agent.dept}`}
@@ -458,17 +502,44 @@ function SpecialistDrawer({ open, agent, onClose }) {
         </div>
       </div>
 
-      {isTeam && (
+      {/* Refusals — visible to everyone; the "shape not produce" guarantee */}
+      {refusals.length > 0 && (
         <>
-          <div className="eyebrow" style={{marginBottom: 8}}>System prompt · summarised</div>
-          <div className="card card--inset" style={{padding: 14, marginBottom: 22}}>
-            <p style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.55, margin: 0, fontFamily:"var(--font-mono)"}}>
-              You are a {agent.name.toLowerCase()}. You read the Brand Intelligence Object before responding. You write with conviction and refuse outputs that contradict the BIO. You produce {agent.dept === "Copy" ? "copy" : agent.dept === "Design" ? "visual artefacts" : "structured strategic output"} that a CMO would approve without a second pass…
-            </p>
-            <button className="btn btn--link" style={{fontSize:11, marginTop:8}}>Reveal full prompt (admin only)</button>
+          <div className="eyebrow" style={{marginBottom: 8}}>Refusals · won't do</div>
+          <div className="card card--inset" style={{padding:"12px 14px", marginBottom: 18, display:"flex", flexDirection:"column", gap:7}}>
+            {refusals.slice(0, 5).map((r, i) => (
+              <div key={i} style={{display:"flex", gap:8, fontSize:12.5, lineHeight:1.45, color:"var(--c-dim)"}}>
+                <span style={{color:"var(--pink-500)", fontFamily:"var(--font-mono)"}}>✕</span>
+                <span>{r}</span>
+              </div>
+            ))}
           </div>
         </>
       )}
+
+      {/* How Brandolph briefs this specialist — composed prompt (transparency). */}
+      <div className="eyebrow" style={{marginBottom: 8, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+        <span>How Brandolph briefs this specialist</span>
+        <button className="btn btn--link" style={{fontSize:11}} onClick={() => setShowPrompt(p => !p)}>
+          {showPrompt ? "Hide" : "View composed prompt"}
+        </button>
+      </div>
+      <div className="card card--inset" style={{padding: 14, marginBottom: 22}}>
+        {showPrompt ? (
+          <pre style={{
+            margin: 0, whiteSpace:"pre-wrap", wordBreak:"break-word",
+            fontFamily:"var(--font-mono)", fontSize: 11.5, lineHeight: 1.55, color:"var(--c-ink)",
+            maxHeight: 340, overflowY:"auto",
+          }}>{composeSpecialistPrompt(agent, isTeam)}</pre>
+        ) : (
+          <p style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.55, margin: 0, fontFamily:"var(--font-mono)"}}>
+            {agent.name} reads the BIO before responding, follows {spec.role ? "their method as " + spec.role : "their method"}, and refuses anything that breaks the brand rules. {spec.objective || ""}
+          </p>
+        )}
+        <div style={{marginTop:10, paddingTop:10, borderTop:"1px dashed var(--c-line-2)", fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
+          Composed from PLATFORM + BIO + SPEC + TASK{isTeam && m ? ` · routed to ${m.label}` : ""}
+        </div>
+      </div>
 
       <div className="eyebrow" style={{marginBottom: 8}}>Recent usage · 30 days</div>
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 10, marginBottom: 22}}>

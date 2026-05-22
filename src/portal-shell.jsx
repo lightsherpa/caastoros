@@ -26,9 +26,9 @@ const CLIENT_ROUTES = [
   { id:"briefs",      label:"Briefs",             icon:"brief",    section:"Workspace" },
   { id:"library",     label:"Library",            icon:"files",    section:"Workspace" },
   { id:"bio",         label:"Brand Intelligence", icon:"bio",      section:"Brand" },
-  { id:"specialists", label:"Specialists",        icon:"team",     section:"Intelligence" },
-  { id:"canvas",      label:"Canvas",             icon:"canvas",   section:"Intelligence" },
-  { id:"craft",       label:"Human craft",        icon:"craft",    section:"Intelligence" },
+  { id:"specialists", label:"Specialists",        icon:"team",     section:"Capabilities" },
+  { id:"canvas",      label:"Canvas",             icon:"canvas",   section:"Capabilities" },
+  { id:"craft",       label:"Human craft",        icon:"craft",    section:"Capabilities" },
   { id:"credits",     label:"Credits",            icon:"credit",   section:"Account" },
   { id:"settings",    label:"Settings",           icon:"settings", section:"Account" },
 ];
@@ -93,10 +93,10 @@ function useRoute() {
 /* Logo / brandmark mini ----------------------------------------- */
 function Brandmark() {
   return (
-    <div style={{display:"flex", alignItems:"center", gap: 9}}>
-      <img src="intelligence/assets/logo-full-yellow.png" alt="Caastor"
-        className="brand-logo" style={{height: 24, width:"auto", display:"block"}} />
-      <span className="eyebrow" style={{fontSize:9, letterSpacing:"0.18em", paddingTop: 2}}>Intelligence</span>
+    <div style={{display:"flex", alignItems:"baseline", gap: 5}}>
+      <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS"
+        className="brand-logo" style={{height: 34, width:"auto", display:"block", alignSelf:"center"}} />
+      <span style={{fontFamily:"var(--font-mono)", fontSize: 15, fontWeight: 600, color:"var(--c-ink)", letterSpacing:"0.01em"}}>OS</span>
     </div>
   );
 }

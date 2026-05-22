@@ -67,10 +67,10 @@ function Login({ role = "client", go }) {
   return (
     <div className={"auth-root" + (isTeam ? " auth-root--team" : "")}>
       <form className="auth-card" onSubmit={submit}>
-        <div className="auth-mark">
-          <img src="intelligence/assets/logo-full-yellow.png" alt="Caastor" className="brand-logo" style={{height: 30, width:"auto"}} />
+        <div className="auth-mark" style={{display:"flex", alignItems:"baseline", gap:5}}>
+          <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height: 38, width:"auto", alignSelf:"center"}} />
+          <span style={{fontFamily:"var(--font-mono)", fontSize:18, fontWeight:600, color:"var(--text-primary)", letterSpacing:"0.01em"}}>OS</span>
         </div>
-        <div className="eyebrow">Caastor Intelligence</div>
         <h1>{isTeam ? "Team portal" : "Client portal"}</h1>
         <p className="auth-sub">
           {isTeam ? "La Mesa creative team" : id.name + " · Vinilo"}
