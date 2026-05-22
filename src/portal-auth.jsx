@@ -68,7 +68,7 @@ function Login({ role = "client", go }) {
     <div className={"auth-root" + (isTeam ? " auth-root--team" : "")}>
       <form className="auth-card" onSubmit={submit}>
         <div className="auth-mark">
-          <BrandolphAvatar size={40} color={isTeam ? "violet" : "yellow"} />
+          <img src="intelligence/assets/logo-full-yellow.png" alt="Caastor" className="brand-logo" style={{height: 30, width:"auto"}} />
         </div>
         <div className="eyebrow">Caastor Intelligence</div>
         <h1>{isTeam ? "Team portal" : "Client portal"}</h1>

@@ -263,7 +263,7 @@ function CreditsLedger() {
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 14}}>
         <h3 style={{fontSize: 18, margin: 0, letterSpacing:"-0.005em"}}>Ledger</h3>
         <div style={{display:"flex", gap: 6}}>
-          {[["all","All"],["L1","L1 · Brandolph"],["L2","L2 · Agents"],["L3","L3 · Humans"]].map(([k, l]) => (
+          {[["all","All"],["L1","L1 · Brandolph"],["L2","L2 · Specialists"],["L3","L3 · Humans"]].map(([k, l]) => (
             <button key={k} onClick={() => setLayer(k)}
               className={"pill" + (layer === k ? " pill--dark" : "")}
               style={{cursor:"pointer", height: 28, padding:"0 12px"}}>{l}</button>
@@ -320,7 +320,7 @@ function SettingsView() {
   const [tab, setTab] = useCState("workspace");
   return (
     <div style={{padding:"24px 36px 60px"}}>
-      <PageHeader eyebrow="Workspace governance" title="Settings" sub="Workspace, billing, members, BIO governance. The rules that hold across every brief, every agent." />
+      <PageHeader eyebrow="Workspace governance" title="Settings" sub="Workspace, billing, members, BIO governance. The rules that hold across every brief, every specialist." />
 
       <div style={{display:"grid", gridTemplateColumns:"220px 1fr", gap: 32}}>
         <nav style={{display:"flex", flexDirection:"column", gap: 2, position:"sticky", top: 0, alignSelf:"start"}}>

@@ -594,21 +594,43 @@ function HomeDesk({ tweaks }) {
 
 /* ════════════════════════════════════════════════════════════════ */
 /* Variant D — CREATE (the launchpad — default home)                */
-function HomeCreate({ tweaks }) {
+function HomeCreate({ tweaks, go }) {
   const [scope, setScope] = useBState("all");
   const [mode, setMode]   = useBState("flow");
   const [input, setInput] = useBState("");
+  const [phase, setPhase] = useBState("idle"); // idle | sharpening | proposing | running | done
   const assembly = useBMemo(() => getAssembly(tweaks.assemblyDensity || 7), [tweaks.assemblyDensity]);
+  const reviewRef = useBRef(null);
 
   const tryPrompts = [
-    { eyebrow:"Conversion",  text:"Launch a Q1 product drop with the pricing page", est: 42 },
-    { eyebrow:"Repositioning", text:"Reposition the brand for a younger audience", est: 68 },
-    { eyebrow:"Seasonal",    text:"A holiday social campaign that doesn't feel like every other one", est: 36 },
-    { eyebrow:"Acquisition", text:"Landing page that converts cold traffic", est: 28 },
+    { eyebrow:"Conversion",    text:"Launch a Q1 product drop with the pricing page", est: 42 },
+    { eyebrow:"Repositioning", text:"Reposition the brand for a younger audience",    est: 68 },
+    { eyebrow:"Seasonal",      text:"A holiday social campaign that doesn't feel like every other one", est: 36 },
+    { eyebrow:"Acquisition",   text:"Landing page that converts cold traffic",         est: 28 },
   ];
 
-  /* "In flight" — active briefs in this workspace */
   const flowsInFlight = window.CI_BRIEFS.filter(b => b.status === "in-production" || b.status === "approved");
+
+  const handleStart = () => {
+    if (!input.trim()) return;
+    setPhase("sharpening");
+    setTimeout(() => reviewRef.current?.scrollIntoView({ behavior:"smooth", block:"nearest" }), 80);
+  };
+
+  const handleKeyDown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleStart();
+  };
+
+  const handleProceed = () => setPhase("proposing");
+
+  const handleRun = () => {
+    setPhase("running");
+    setTimeout(() => setPhase("done"), 2800);
+  };
+
+  const handleReset = () => { setPhase("idle"); setInput(""); };
+
+  const isActive = phase !== "idle";
 
   return (
     <div style={{padding:"24px 36px 72px"}}>
@@ -618,7 +640,8 @@ function HomeCreate({ tweaks }) {
           background: "linear-gradient(180deg, var(--yellow-50) 0%, transparent 70%)",
           borderRadius: 24,
           padding: "56px 32px 24px",
-          marginBottom: 32,
+          marginBottom: isActive ? 0 : 32,
+          transition: "margin-bottom 200ms ease",
         }}>
           <div style={{maxWidth: 760, margin: "0 auto", textAlign: "center"}}>
             <div className="eyebrow eyebrow--yellow" style={{marginBottom: 14, letterSpacing:"0.22em"}}>
@@ -658,18 +681,21 @@ function HomeCreate({ tweaks }) {
             {/* Composer */}
             <div style={{
               marginTop: 24, background:"var(--c-card)",
-              border: "1.5px solid var(--c-line-2)", borderRadius: 16,
-              padding: 18, textAlign:"left",
-              boxShadow: "var(--shadow-md)",
+              border: isActive ? "1.5px solid var(--yellow-500)" : "1.5px solid var(--c-line-2)",
+              borderRadius: 16, padding: 18, textAlign:"left",
+              boxShadow: isActive
+                ? "0 0 0 4px rgba(248,192,54,0.12), var(--shadow-md)"
+                : "var(--shadow-md)",
               transition: "border-color 160ms ease, box-shadow 160ms ease",
             }}
               onFocus={(e) => { e.currentTarget.style.borderColor = "var(--yellow-500)"; e.currentTarget.style.boxShadow = "0 0 0 4px rgba(248,192,54,0.16), var(--shadow-md)"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "var(--c-line-2)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
+              onBlur={(e) => { if (!isActive) { e.currentTarget.style.borderColor = "var(--c-line-2)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; } }}
               tabIndex={-1}
             >
               <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => { setInput(e.target.value); if (phase !== "idle") setPhase("idle"); }}
+                onKeyDown={handleKeyDown}
                 placeholder="e.g. Make the Summer Tuesdays campaign earn the slow afternoon back — café-first, no discount, lift Tuesday footfall by 18%."
                 rows={3}
                 style={{
@@ -711,8 +737,8 @@ function HomeCreate({ tweaks }) {
                     <span style={{margin:"0 4px"}}>+</span>
                     <kbd style={{background:"var(--c-bg)", padding:"2px 6px", borderRadius: 4, border:"1px solid var(--c-line)"}}>↵</kbd>
                   </span>
-                  <button className="btn btn--primary" disabled={!input.trim()}>
-                    Start <Icon name="arrow" size={14} />
+                  <button className="btn btn--primary" disabled={!input.trim()} onClick={handleStart}>
+                    {isActive ? "Re-brief" : "Start"} <Icon name="arrow" size={14} />
                   </button>
                 </div>
               </div>
@@ -722,106 +748,229 @@ function HomeCreate({ tweaks }) {
               <BrandolphDot /> &nbsp;BIO 91% · Brandolph will sharpen your brief before assembly · Asking is free
             </div>
           </div>
+
+          {/* ── REVIEW PANEL — slides in below the composer inside the hero ── */}
+          {isActive && (
+            <div ref={reviewRef} style={{
+              maxWidth: 760, margin: "28px auto 0",
+              animation: "fade 200ms ease",
+            }}>
+
+              {/* Phase: sharpening — Brandolph asks two questions */}
+              {phase === "sharpening" && (
+                <>
+                  <BrandolphDiagnosis onAnswer={() => {}} onProceed={handleProceed} />
+                  <div style={{textAlign:"center", marginTop: 10}}>
+                    <button className="btn btn--link" style={{fontSize: 12}} onClick={handleProceed}>
+                      Skip — proceed with Brandolph's proposal
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Phase: proposing / running / done — inline assembly card */}
+              {(phase === "proposing" || phase === "running" || phase === "done") && (
+                <div style={{display:"flex", flexDirection:"column", gap: 14, textAlign:"left"}}>
+                  <div className="card" style={{padding:"20px 24px", boxShadow:"var(--shadow-md)"}}>
+
+                    {/* Card header */}
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom: 16}}>
+                      <div>
+                        <div className="eyebrow eyebrow--yellow" style={{marginBottom: 4}}>
+                          {phase === "done" ? "Assembly · complete" : "Assembly · ready to run"}
+                        </div>
+                        <div style={{fontSize: 15, fontWeight: 500, color:"var(--c-ink)"}}>
+                          {assembly.agents.length} specialists · {assembly.totalCr} credits
+                        </div>
+                        <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginTop: 3, letterSpacing:"0.04em"}}>
+                          {[...new Set(assembly.agents.map(a => a.dept))].join(" · ")}
+                        </div>
+                      </div>
+                      {phase !== "running" && (
+                        <button className="btn btn--ghost btn--sm" onClick={handleReset}
+                          style={{fontFamily:"var(--font-mono)", fontSize: 10.5, letterSpacing:"0.08em", textTransform:"uppercase"}}>
+                          {phase === "done" ? "← New brief" : "← Re-brief"}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Agent grid */}
+                    <div style={{
+                      display:"grid",
+                      gridTemplateColumns:"repeat(auto-fill, minmax(200px, 1fr))",
+                      gap: 8, marginBottom: 16,
+                    }}>
+                      {assembly.agents.map((a, i) => {
+                        const accent = window.CI_DEPT_COLORS[a.dept] || "var(--neutral-300)";
+                        const st = phase === "running"
+                          ? (i < 2 ? "ok" : i === 2 ? "running" : "queued")
+                          : phase === "done" ? "ok" : "queued";
+                        return (
+                          <div key={a.id} style={{
+                            display:"flex", alignItems:"center", gap: 8,
+                            padding:"8px 10px",
+                            border:"1px solid var(--c-line)",
+                            borderLeft:`3px solid ${accent}`,
+                            borderRadius: 8,
+                            background: st === "running" ? "var(--yellow-50)" : "var(--c-card)",
+                            transition:"background 240ms ease",
+                          }}>
+                            <div style={{flex:1, minWidth:0}}>
+                              <div style={{
+                                fontSize:12.5, fontWeight:500, color:"var(--c-ink)",
+                                whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+                              }}>{a.name}</div>
+                              <div style={{
+                                fontFamily:"var(--font-mono)", fontSize:9.5,
+                                color:"var(--c-faint)", letterSpacing:"0.06em", textTransform:"uppercase",
+                              }}>{a.dept}</div>
+                            </div>
+                            <div style={{display:"flex", alignItems:"center", gap:5, flexShrink:0}}>
+                              <span className="credit" style={{fontSize:10}}>{a.cr} cr</span>
+                              <span className={"dot-state dot-state--" + st} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Footer: total cost + run / running / open CTA */}
+                    <div style={{
+                      paddingTop: 14, borderTop:"1px dashed var(--c-line)",
+                      display:"flex", justifyContent:"space-between", alignItems:"center", gap: 12,
+                    }}>
+                      <div style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-dim)"}}>
+                        Total{" "}
+                        <strong style={{color:"var(--c-ink)"}}>{assembly.totalCr} cr</strong>
+                        <span style={{color:"var(--c-faint)", margin:"0 8px"}}>·</span>
+                        {window.CI_CREDITS.balance - (phase === "done" ? assembly.totalCr : 0)} remaining after
+                      </div>
+                      {phase === "proposing" && (
+                        <button className="btn btn--primary" onClick={handleRun}>
+                          Run — {assembly.totalCr} credits <Icon name="arrow" size={14} />
+                        </button>
+                      )}
+                      {phase === "running" && (
+                        <button className="btn btn--ghost" disabled style={{minWidth:140, justifyContent:"center"}}>
+                          <BrandolphDot state="thinking" />&nbsp;&nbsp;Assembling…
+                        </button>
+                      )}
+                      {phase === "done" && (
+                        <a href="#/brief-detail/b-pricing-relaunch" className="btn btn--primary">
+                          <Icon name="check" size={14} /> Open the work
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Done: Brandolph's wrap-up */}
+                  {phase === "done" && <OutputsReady />}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </Reveal>
 
-      <div style={{maxWidth: 1080, margin: "0 auto"}}>
-        {/* IN FLIGHT — active briefs */}
-        <Reveal>
-          <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom: 14}}>
-            <h3 style={{fontSize: 17, margin: 0, letterSpacing:"-0.005em"}}>In flight · {flowsInFlight.length}</h3>
-            <a href="#/briefs" className="btn btn--link" style={{fontSize: 12}}>View all briefs →</a>
-          </div>
-          {flowsInFlight.length > 0 ? (
-            <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap: 12, marginBottom: 36}}>
-              {flowsInFlight.map(b => (
-                <a key={b.id} href={"#/brief-detail/" + b.id} className="card" style={{
-                  padding: 18, textDecoration:"none", color:"inherit",
-                  cursor:"pointer", display:"flex", flexDirection:"column", gap: 8,
+      {/* ── DASHBOARD — only visible at idle; hides while review is active ── */}
+      {!isActive && (
+        <div style={{maxWidth: 1080, margin: "0 auto"}}>
+
+          {/* IN FLIGHT */}
+          <Reveal>
+            <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom: 14}}>
+              <h3 style={{fontSize: 17, margin: 0, letterSpacing:"-0.005em"}}>In flight · {flowsInFlight.length}</h3>
+              <a href="#/briefs" className="btn btn--link" style={{fontSize: 12}}>View all briefs →</a>
+            </div>
+            {flowsInFlight.length > 0 ? (
+              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap: 12, marginBottom: 36}}>
+                {flowsInFlight.map(b => (
+                  <a key={b.id} href={"#/brief-detail/" + b.id} className="card" style={{
+                    padding: 18, textDecoration:"none", color:"inherit",
+                    cursor:"pointer", display:"flex", flexDirection:"column", gap: 8,
+                    transition:"border-color 140ms ease",
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = "var(--yellow-500)"}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = "var(--c-line)"}
+                  >
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 12}}>
+                      <div className="eyebrow">{b.type}</div>
+                      <StatusPill status={b.status} />
+                    </div>
+                    <div style={{fontSize: 15, fontWeight: 500, color:"var(--c-ink)", letterSpacing:"-0.005em"}}>{b.title}</div>
+                    <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5, margin: 0, flex: 1}}>"{b.smp}"</p>
+                    <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop: 8, borderTop: "1px dashed var(--c-line-2)"}}>
+                      <div style={{display:"flex", gap: 3}}>
+                        {b.agents.slice(0, 5).map(aid => {
+                          const a = window.CI_AGENTS.find(x => x.id === aid);
+                          const accent = window.CI_DEPT_COLORS[a?.dept] || "var(--neutral-400)";
+                          return <span key={aid} title={a?.name} style={{width: 10, height: 10, borderRadius:"50%", background: accent, border:"1.5px solid #fff", outline:"1px solid var(--c-line)"}} />;
+                        })}
+                      </div>
+                      <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>{b.credits} cr · {b.createdAt}</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="card" style={{padding: 36, textAlign:"center", marginBottom: 36, background:"var(--c-bg)", boxShadow:"none", border:"1px dashed var(--c-line-2)"}}>
+                <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 16, color:"var(--c-faint)", marginBottom: 6}}>Nothing in flight.</div>
+                <div style={{fontSize: 13, color:"var(--c-dim)"}}>
+                  <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>Type a prompt above to brief the first one.</em>
+                </div>
+              </div>
+            )}
+          </Reveal>
+
+          {/* TRY SOMETHING */}
+          <Reveal>
+            <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom: 14}}>
+              <h3 style={{fontSize: 17, margin: 0, letterSpacing:"-0.005em"}}>Don't know where to start?</h3>
+              <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.08em", textTransform:"uppercase"}}>Click to drop into the composer</span>
+            </div>
+            <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))", gap: 12, marginBottom: 36}}>
+              {tryPrompts.map((p, i) => (
+                <button key={i} onClick={() => { setInput(p.text); setPhase("idle"); }} className="card" style={{
+                  padding: 16, textAlign:"left", cursor:"pointer", border:"1px solid var(--c-line)",
+                  background:"var(--c-card)", display:"flex", flexDirection:"column", gap: 8,
                   transition:"border-color 140ms ease",
                 }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = "var(--yellow-500)"}
                   onMouseLeave={e => e.currentTarget.style.borderColor = "var(--c-line)"}
                 >
-                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 12}}>
-                    <div className="eyebrow">{b.type}</div>
-                    <StatusPill status={b.status} />
+                  <div className="eyebrow eyebrow--yellow">{p.eyebrow}</div>
+                  <div style={{fontSize: 14, color:"var(--c-ink)", lineHeight: 1.45, flex: 1}}>{p.text}</div>
+                  <div style={{paddingTop: 8, borderTop:"1px dashed var(--c-line-2)", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                    <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.06em"}}>Est. {p.est} cr</span>
+                    <Icon name="arrow" size={13} />
                   </div>
-                  <div style={{fontSize: 15, fontWeight: 500, color:"var(--c-ink)", letterSpacing:"-0.005em"}}>{b.title}</div>
-                  <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5, margin: 0, flex: 1}}>"{b.smp}"</p>
-                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop: 8, borderTop: "1px dashed var(--c-line-2)"}}>
-                    <div style={{display:"flex", gap: 3}}>
-                      {b.agents.slice(0, 5).map(aid => {
-                        const a = window.CI_AGENTS.find(x => x.id === aid);
-                        const accent = window.CI_DEPT_COLORS[a?.dept] || "var(--neutral-400)";
-                        return <span key={aid} title={a?.name} style={{width: 10, height: 10, borderRadius:"50%", background: accent, border:"1.5px solid #fff", outline:"1px solid var(--c-line)"}} />;
-                      })}
-                    </div>
-                    <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>{b.credits} cr · {b.createdAt}</span>
-                  </div>
-                </a>
+                </button>
               ))}
             </div>
-          ) : (
-            <div className="card" style={{padding: 36, textAlign:"center", marginBottom: 36, background:"var(--c-bg)", boxShadow:"none", border:"1px dashed var(--c-line-2)"}}>
-              <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 16, color:"var(--c-faint)", marginBottom: 6}}>
-                Nothing in flight.
-              </div>
-              <div style={{fontSize: 13, color:"var(--c-dim)"}}>
-                <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>Type a prompt above to brief the first one.</em>
-              </div>
-            </div>
-          )}
-        </Reveal>
+          </Reveal>
 
-        {/* TRY SOMETHING — prompt cards */}
-        <Reveal>
-          <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom: 14}}>
-            <h3 style={{fontSize: 17, margin: 0, letterSpacing:"-0.005em"}}>Don't know where to start?</h3>
-            <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.08em", textTransform:"uppercase"}}>Click to drop into the composer</span>
-          </div>
-          <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))", gap: 12, marginBottom: 36}}>
-            {tryPrompts.map((p, i) => (
-              <button key={i} onClick={() => setInput(p.text)} className="card" style={{
-                padding: 16, textAlign:"left", cursor:"pointer", border:"1px solid var(--c-line)",
-                background:"var(--c-card)", display:"flex", flexDirection:"column", gap: 8,
-                transition:"border-color 140ms ease",
-              }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = "var(--yellow-500)"}
-                onMouseLeave={e => e.currentTarget.style.borderColor = "var(--c-line)"}
-              >
-                <div className="eyebrow eyebrow--yellow">{p.eyebrow}</div>
-                <div style={{fontSize: 14, color:"var(--c-ink)", lineHeight: 1.45, flex: 1}}>{p.text}</div>
-                <div style={{paddingTop: 8, borderTop:"1px dashed var(--c-line-2)", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                  <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.06em"}}>Est. {p.est} cr</span>
-                  <Icon name="arrow" size={13} />
+          {/* BRANDOLPH IS WATCHING */}
+          <Reveal>
+            <div style={{
+              background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius: 16,
+              padding: "20px 24px", display:"flex", gap: 22, alignItems:"flex-start",
+            }}>
+              <BrandolphAvatar size={44} />
+              <div style={{flex: 1}}>
+                <div className="eyebrow eyebrow--yellow" style={{marginBottom: 6}}>Brandolph is watching</div>
+                <p style={{fontSize: 14.5, lineHeight: 1.5, color:"var(--c-ink)", margin: 0, marginBottom: 14}}>
+                  <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>You shipped two things last week.</em> The annual page is converting at 6.2%. The Honduras essay is with Lia in human craft. <strong>Today, the work I'd push is the summer brief.</strong> Two questions when you're ready.
+                </p>
+                <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
+                  <button className="btn btn--ghost btn--sm" onClick={() => setInput("Brief Summer Tuesdays. The Tuesday afternoon footfall is the metric.")}>Continue the summer brief →</button>
+                  <a href="#/bio" className="btn btn--ghost btn--sm">Read me my BIO</a>
+                  <a href="#/credits" className="btn btn--ghost btn--sm">Where the credits went</a>
                 </div>
-              </button>
-            ))}
-          </div>
-        </Reveal>
-
-        {/* WHAT BRANDOLPH IS WATCHING — operator strip (light) */}
-        <Reveal>
-          <div style={{
-            background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius: 16,
-            padding: "20px 24px", display:"flex", gap: 22, alignItems:"flex-start",
-          }}>
-            <BrandolphAvatar size={44} />
-            <div style={{flex: 1}}>
-              <div className="eyebrow eyebrow--yellow" style={{marginBottom: 6}}>Brandolph is watching</div>
-              <p style={{fontSize: 14.5, lineHeight: 1.5, color:"var(--c-ink)", margin: 0, marginBottom: 14}}>
-                <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>You shipped two things last week.</em> The annual page is converting at 6.2%. The Honduras essay is with Lia in human craft. <strong>Today, the work I'd push is the summer brief.</strong> Two questions when you're ready.
-              </p>
-              <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
-                <button className="btn btn--ghost btn--sm" onClick={() => setInput("Brief Summer Tuesdays. The Tuesday afternoon footfall is the metric.")}>Continue the summer brief →</button>
-                <a href="#/bio" className="btn btn--ghost btn--sm">Read me my BIO</a>
-                <a href="#/credits" className="btn btn--ghost btn--sm">Where the credits went</a>
               </div>
             </div>
-          </div>
-        </Reveal>
-      </div>
+          </Reveal>
+        </div>
+      )}
     </div>
   );
 }
@@ -829,7 +978,7 @@ function HomeCreate({ tweaks }) {
 /* Dispatcher — chooses which home variant to render */
 function BrandolphHome({ tweaks, setTweak, go }) {
   const v = tweaks.homeVariant || "create";
-  if (v === "create")  return <HomeCreate  tweaks={tweaks} />;
+  if (v === "create")  return <HomeCreate  tweaks={tweaks} go={go} />;
   if (v === "cards")   return <HomeCards   tweaks={tweaks} />;
   if (v === "desk")    return <HomeDesk    tweaks={tweaks} />;
   return <HomeConsole tweaks={tweaks} />;

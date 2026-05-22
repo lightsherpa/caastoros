@@ -1,5 +1,5 @@
 import React from "react";
-const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, Login, useSession } = window;
+const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, Library, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, Login, useSession } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
 
@@ -24,6 +24,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 const CLIENT_ROUTES = [
   { id:"home",        label:"Create",             icon:"sparkles", section:"Workspace" },
   { id:"briefs",      label:"Briefs",             icon:"brief",    section:"Workspace" },
+  { id:"library",     label:"Library",            icon:"files",    section:"Workspace" },
   { id:"bio",         label:"Brand Intelligence", icon:"bio",      section:"Brand" },
   { id:"specialists", label:"Specialists",        icon:"team",     section:"Intelligence" },
   { id:"canvas",      label:"Canvas",             icon:"canvas",   section:"Intelligence" },
@@ -92,18 +93,10 @@ function useRoute() {
 /* Logo / brandmark mini ----------------------------------------- */
 function Brandmark() {
   return (
-    <div style={{display:"flex", alignItems:"center", gap: 10}}>
-      <span style={{
-        width: 30, height: 36,
-        display:"flex", alignItems:"center", justifyContent:"center",
-        flexShrink: 0,
-      }}>
-        <BrandolphAvatar size={26} />
-      </span>
-      <div style={{lineHeight: 1.05}}>
-        <div style={{fontFamily:"var(--font-sans)", fontWeight:700, letterSpacing:"-0.01em", fontSize:14}}>Caastor</div>
-        <div className="eyebrow" style={{fontSize:9, letterSpacing:"0.18em"}}>Intelligence</div>
-      </div>
+    <div style={{display:"flex", alignItems:"center", gap: 9}}>
+      <img src="intelligence/assets/logo-full-yellow.png" alt="Caastor"
+        className="brand-logo" style={{height: 24, width:"auto", display:"block"}} />
+      <span className="eyebrow" style={{fontSize:9, letterSpacing:"0.18em", paddingTop: 2}}>Intelligence</span>
     </div>
   );
 }
@@ -255,8 +248,9 @@ function TopBar({ portal, route, brandName }) {
     discovery:   ["Discovery",         "Brand Intelligence"],
     bio:         ["Brand Intelligence","Workspace"],
     briefs:      ["Briefs",            "Workspace"],
+    library:     ["Library",           "Workspace"],
     "brief-detail":["Brief",           "Workspace"],
-    specialists: ["Specialists · 33 agents", "Workspace"],
+    specialists: ["Specialists · 33 on shift", "Workspace"],
     canvas:      ["Canvas",            "Workspace"],
     craft:       ["Human craft",       "Workspace"],
     credits:     ["Credits",           "Workspace"],
@@ -355,6 +349,7 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "discovery":    return <Discovery go={go} />;
     case "bio":          return <BioViewer go={go} bioScore={tweaks.bioScore} />;
     case "briefs":       return <BriefsLibrary go={go} />;
+    case "library":      return <Library go={go} />;
     case "brief-detail": return <BriefDetail id={route.param} go={go} />;
     case "specialists":  return <SpecialistsDirectory />;
     case "canvas":       return <CanvasView />;
@@ -430,7 +425,7 @@ function PortalTweaks({ tweaks, setTweak, ds, setDs }) {
             { value:"cold",    label:"Cold (months since last brief)" },
             { value:"fresh",   label:"Fresh (no projects yet)" },
           ]} />
-        <TweakSlider label="Assembly density (agents in run)"
+        <TweakSlider label="Assembly density (specialists in run)"
           value={tweaks.assemblyDensity} min={3} max={12} step={1}
           onChange={v => setTweak("assemblyDensity", v)} />
       </TweakSection>

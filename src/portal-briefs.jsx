@@ -16,7 +16,7 @@ function BriefsLibrary({ go }) {
       <PageHeader
         eyebrow="Workspace · Vinilo"
         title="Briefs"
-        sub="The CMO-grade briefs Brandolph has produced. Each one is auditable against the BIO, with the agents that executed it on record."
+        sub="The CMO-grade briefs Brandolph has produced. Each one is auditable against the BIO, with the specialists that executed it on record."
         right={<>
           <button className="btn btn--ghost">Filter <Icon name="filter" size={14} /></button>
           <a href="#/home" className="btn btn--primary">Brief Brandolph <Icon name="plus" size={14} /></a>
@@ -41,7 +41,7 @@ function BriefsLibrary({ go }) {
         <table style={{width:"100%", borderCollapse:"collapse", fontSize: 13.5}}>
           <thead>
             <tr style={{background:"var(--c-bg)", borderBottom:"1px solid var(--c-line)"}}>
-              {["Brief", "SMP", "Status", "Agents", "Credits", "Created"].map((h, i) => (
+              {["Brief", "SMP", "Status", "Specialists", "Credits", "Created"].map((h, i) => (
                 <th key={h} style={{textAlign: i === 4 ? "right" : "left", padding:"12px 18px", fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight: 500}}>{h}</th>
               ))}
               <th></th>
@@ -216,7 +216,7 @@ function BriefDetail({ id, go }) {
       {/* Agents involved */}
       <div className="card" style={{padding: 22}}>
         <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 14}}>
-          <div className="eyebrow">Department assembled · {brief.agents.length} agents</div>
+          <div className="eyebrow">Department assembled · {brief.agents.length} specialists</div>
           <a href="#/specialists" className="btn btn--link" style={{fontSize: 12}}>Browse the directory →</a>
         </div>
         <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap: 10}}>
@@ -242,19 +242,92 @@ function BriefSection({ title, body }) {
 function SpecialistsDirectory() {
   const [dept, setDept] = useBrState("all");
   const [openId, setOpenId] = useBrState(null);
-  const agents = dept === "all" ? window.CI_AGENTS : window.CI_AGENTS.filter(a => a.dept === dept);
+  const [query, setQuery] = useBrState("");
+  const [sort, setSort] = useBrState("dept");
+  const [view, setView] = useBrState("grid");
+
+  const all = window.CI_AGENTS;
+  const live = all.filter(a => a.status === "live").length;
+  const soon = all.length - live;
+
+  /* Usage from produced outputs → "most used for this brand" */
+  const usage = {};
+  window.CI_OUTPUTS.forEach(o => { if (o.agentId) usage[o.agentId] = (usage[o.agentId] || 0) + 1; });
+  const mostUsed = [...all].filter(a => usage[a.id]).sort((x, y) => usage[y.id] - usage[x.id]).slice(0, 4);
+
+  const q = query.trim().toLowerCase();
+  const matches = (a) => {
+    if (dept !== "all" && a.dept !== dept) return false;
+    if (!q) return true;
+    const caps = (window.CI_DEPT_META[a.dept] || {}).capabilities || [];
+    return [a.name, a.dept, a.code, a.job, ...caps].join(" ").toLowerCase().includes(q);
+  };
+  const filtered = all.filter(matches);
+  const sortFns = {
+    dept:    (x, y) => window.CI_DEPTS.indexOf(x.dept) - window.CI_DEPTS.indexOf(y.dept) || x.code.localeCompare(y.code),
+    credits: (x, y) => x.cr - y.cr,
+    used:    (x, y) => (usage[y.id] || 0) - (usage[x.id] || 0) || x.code.localeCompare(y.code),
+  };
+  const flat = [...filtered].sort(sortFns[sort] || sortFns.dept);
+  const grouped = sort === "dept" && view === "grid" && !q;
+
+  const Toggle = ({ val, set, options }) => (
+    <div style={{display:"inline-flex", padding:3, gap:2, background:"var(--neutral-50)", borderRadius:9, border:"1px solid var(--c-line)"}}>
+      {options.map(o => (
+        <button key={o.v} onClick={() => set(o.v)}
+          style={{
+            border:"none", cursor:"pointer", borderRadius:7, padding:"5px 11px",
+            fontFamily:"var(--font-mono)", fontSize:10.5, letterSpacing:"0.04em", textTransform:"uppercase",
+            background: val === o.v ? "var(--c-card)" : "transparent",
+            color: val === o.v ? "var(--c-ink)" : "var(--c-faint)",
+            boxShadow: val === o.v ? "var(--shadow-sm)" : "none",
+          }}>{o.l}</button>
+      ))}
+    </div>
+  );
 
   return (
     <div style={{padding:"24px 36px 60px"}}>
       <PageHeader
-        eyebrow="L2 · 33 senior agents"
+        eyebrow="L2 · 33 senior specialists"
         title="The department, on shift."
         sub="Brandolph reads the brief. The specialists do the work. Each one routes to the model best suited to the job — visible, auditable, paid out of the same credit pool."
-        right={<>
-          <button className="btn btn--ghost btn--sm">Filter <Icon name="filter" size={13} /></button>
-          <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>27 live · 6 coming soon</span>
-        </>}
+        right={<span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{live} live · {soon} coming soon</span>}
       />
+
+      {/* Most used for this brand */}
+      {mostUsed.length > 0 && !q && (
+        <section style={{marginBottom: 26}}>
+          <div className="eyebrow" style={{marginBottom: 10}}>Most used for Vinilo</div>
+          <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap: 10}}>
+            {mostUsed.map(a => (
+              <button key={a.id} onClick={() => setOpenId(a.id)} className="card"
+                style={{textAlign:"left", cursor:"pointer", padding:"12px 14px", display:"flex", alignItems:"center", gap:10,
+                  borderLeft:`3px solid ${window.CI_DEPT_COLORS[a.dept] || "var(--neutral-400)"}`}}>
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</div>
+                  <div className="eyebrow">{a.dept}</div>
+                </div>
+                <span className="credit credit--pending" style={{fontSize:11}}>{usage[a.id]}×</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Controls — search · sort · view */}
+      <div style={{display:"flex", gap: 10, alignItems:"center", marginBottom: 16, flexWrap:"wrap"}}>
+        <div style={{display:"flex", alignItems:"center", gap:8, flex:"1 1 240px", minWidth: 200, height:36, padding:"0 12px",
+          background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:10}}>
+          <Icon name="search" size={15} />
+          <input value={query} onChange={e => setQuery(e.target.value)}
+            placeholder="Search specialists, departments, capabilities…"
+            style={{flex:1, border:0, outline:0, background:"transparent", color:"var(--c-ink)", fontFamily:"inherit", fontSize:13.5, height:"100%"}} />
+          {query && <button onClick={() => setQuery("")} style={{border:0, background:"transparent", cursor:"pointer", color:"var(--c-faint)", padding:0}}><Icon name="close" size={14} /></button>}
+        </div>
+        <Toggle val={sort} set={setSort} options={[{v:"dept",l:"Department"},{v:"credits",l:"Credits"},{v:"used",l:"Most used"}]} />
+        <Toggle val={view} set={setView} options={[{v:"grid",l:"Grid"},{v:"list",l:"List"}]} />
+      </div>
 
       {/* Department filter */}
       <div style={{display:"flex", gap: 6, marginBottom: 24, flexWrap:"wrap"}}>
@@ -263,29 +336,70 @@ function SpecialistsDirectory() {
             className={"pill" + (dept === d ? " pill--dark" : "")}
             style={{height: 30, padding:"0 14px", cursor:"pointer", fontSize: 11}}>
             {d === "all" ? "All departments" : d}
-            {d !== "all" && <span style={{marginLeft: 6, opacity: 0.6}}>· {window.CI_AGENTS.filter(a => a.dept === d).length}</span>}
+            {d !== "all" && <span style={{marginLeft: 6, opacity: 0.6}}>· {all.filter(a => a.dept === d).length}</span>}
           </button>
         ))}
       </div>
 
-      {/* Grouped by dept */}
-      {(dept === "all" ? window.CI_DEPTS : [dept]).map(d => {
-        const list = agents.filter(a => a.dept === d);
-        if (!list.length) return null;
-        return (
-          <section key={d} style={{marginBottom: 32}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom: 14}}>
-              <h3 style={{margin: 0, fontSize: 17, letterSpacing:"-0.005em"}}>{d}</h3>
-              <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.08em", textTransform:"uppercase"}}>{list.length} agents · {list.filter(a => a.status === "live").length} live</span>
-            </div>
-            <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap: 12}}>
-              {list.map(a => <AgentCard key={a.id} agentId={a.id} onClick={() => setOpenId(a.id)} />)}
-            </div>
-          </section>
-        );
-      })}
+      {q && <div className="eyebrow" style={{marginBottom: 14}}>{flat.length} {flat.length === 1 ? "result" : "results"}</div>}
+
+      {/* Results */}
+      {grouped ? (
+        (dept === "all" ? window.CI_DEPTS : [dept]).map(d => {
+          const list = filtered.filter(a => a.dept === d);
+          if (!list.length) return null;
+          return (
+            <section key={d} style={{marginBottom: 32}}>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom: 14}}>
+                <h3 style={{margin: 0, fontSize: 17, letterSpacing:"-0.005em"}}>{d}</h3>
+                <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.08em", textTransform:"uppercase"}}>{list.length} specialists · {list.filter(a => a.status === "live").length} live</span>
+              </div>
+              <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap: 12}}>
+                {list.map(a => <AgentCard key={a.id} agentId={a.id} showCaps onClick={() => setOpenId(a.id)} />)}
+              </div>
+            </section>
+          );
+        })
+      ) : view === "list" ? (
+        <div className="card stagger" style={{padding: 0, overflow:"hidden"}}>
+          {flat.map((a, i) => (
+            <SpecialistRow key={a.id} a={a} usage={usage[a.id] || 0} last={i === flat.length - 1} onClick={() => setOpenId(a.id)} />
+          ))}
+          {!flat.length && <div style={{padding: 28, textAlign:"center", color:"var(--c-faint)", fontSize:13}}>No specialists match “{query}”.</div>}
+        </div>
+      ) : (
+        <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap: 12}}>
+          {flat.map(a => <AgentCard key={a.id} agentId={a.id} showCaps onClick={() => setOpenId(a.id)} />)}
+          {!flat.length && <div style={{gridColumn:"1/-1", padding: 28, textAlign:"center", color:"var(--c-faint)", fontSize:13}}>No specialists match “{query}”.</div>}
+        </div>
+      )}
 
       <SpecialistDrawer open={!!openId} agent={openId ? window.CI_AGENTS.find(a => a.id === openId) : null} onClose={() => setOpenId(null)} />
+    </div>
+  );
+}
+
+/* Compact list row (List view) */
+function SpecialistRow({ a, usage, last, onClick }) {
+  const isTeam = useIsTeam();
+  const accent = isTeam ? window.CI_MODELS[a.model].color : (window.CI_DEPT_COLORS[a.dept] || "var(--neutral-400)");
+  const soon = a.status === "soon";
+  return (
+    <div onClick={onClick}
+      style={{display:"flex", alignItems:"center", gap:14, padding:"12px 16px", cursor:"pointer",
+        borderBottom: last ? "none" : "1px solid var(--c-line)", borderLeft:`3px solid ${accent}`, opacity: soon ? 0.62 : 1}}
+      onMouseEnter={e => e.currentTarget.style.background = "var(--neutral-50)"}
+      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+      <span style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", minWidth:48}}>{a.code}</span>
+      <div style={{flex:"0 0 200px", minWidth:0}}>
+        <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</div>
+        <div className="eyebrow">{a.dept}</div>
+      </div>
+      <div style={{flex:1, minWidth:0, fontSize:12.5, color:"var(--c-dim)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.job}</div>
+      {isTeam && <ModelChip modelKey={a.model} />}
+      {usage > 0 && <span style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)"}}>{usage}×</span>}
+      <span className="credit credit--pending" style={{fontSize:11}}>{a.cr} cr</span>
+      {soon ? <span className="pill" style={{height:18, padding:"0 8px", fontSize:9.5}}>Soon</span> : <Icon name="arrow" size={14} />}
     </div>
   );
 }
@@ -295,15 +409,15 @@ function SpecialistDrawer({ open, agent, onClose }) {
   const isTeam = useIsTeam();
   const m = window.CI_MODELS[agent.model];
   const accent = isTeam ? m.color : (window.CI_DEPT_COLORS[agent.dept] || "var(--neutral-300)");
+  const meta = window.CI_DEPT_META[agent.dept] || {};
+  const tierLabel = (window.CI_TIERS || {})[meta.tierFrom] || meta.tierFrom;
   return (
     <Drawer open={open} onClose={onClose} title={agent.name} eyebrow={`${agent.code} · ${agent.dept}`}
       footer={<>
         <button className="btn btn--ghost" onClick={onClose}>Close</button>
         <button className="btn btn--primary">Add to next assembly · {agent.cr} cr</button>
       </>}>
-      <div style={{
-        background: accent, height: 6, borderRadius: 4, marginBottom: 18,
-      }} />
+      <div style={{ background: accent, height: 6, borderRadius: 4, marginBottom: 18 }} />
 
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 18}}>
         {isTeam ? <ModelChip modelKey={agent.model} /> : (
@@ -313,7 +427,36 @@ function SpecialistDrawer({ open, agent, onClose }) {
       </div>
 
       <div className="eyebrow" style={{marginBottom: 8}}>The job</div>
-      <p style={{fontSize:14.5, color:"var(--c-ink)", lineHeight: 1.55, marginBottom: 22}}>{agent.job}</p>
+      <p style={{fontSize:14.5, color:"var(--c-ink)", lineHeight: 1.55, marginBottom: 18}}>{agent.job}</p>
+
+      {meta.capabilities && (
+        <>
+          <div className="eyebrow" style={{marginBottom: 8}}>Capabilities</div>
+          <div style={{display:"flex", flexWrap:"wrap", gap:6, marginBottom: 18}}>
+            {meta.capabilities.map(c => (
+              <span key={c} style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)",
+                border:"1px solid var(--c-line)", borderRadius:7, padding:"3px 9px"}}>{c}</span>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom: 18}}>
+        {meta.bestFor && (
+          <div className="card card--inset" style={{padding:"12px 14px", gridColumn:"1/-1"}}>
+            <div className="eyebrow" style={{marginBottom:4}}>Brandolph picks this for</div>
+            <div style={{fontSize:13.5, color:"var(--c-ink)", lineHeight:1.45}}>{meta.bestFor}</div>
+          </div>
+        )}
+        <div className="card card--inset" style={{padding:"12px 14px"}}>
+          <div className="eyebrow" style={{marginBottom:4}}>Turnaround</div>
+          <div style={{fontSize:14, color:"var(--c-ink)"}}>{meta.turnaround || "—"}</div>
+        </div>
+        <div className="card card--inset" style={{padding:"12px 14px"}}>
+          <div className="eyebrow" style={{marginBottom:4}}>Unlocks from</div>
+          <div style={{fontSize:14, color:"var(--c-ink)"}}>Tier {meta.tierFrom} · {tierLabel}</div>
+        </div>
+      </div>
 
       {isTeam && (
         <>
@@ -353,6 +496,7 @@ function SpecialistDrawer({ open, agent, onClose }) {
     </Drawer>
   );
 }
+
 
 /* ════════════════════════════════════════════════════════════════ */
 /* CANVAS (Phase 3 placeholder, but designed)                        */
@@ -653,4 +797,169 @@ function CanvasNode({ node, color, refCb, active, dim, dragging, index, onPointe
   );
 }
 
-Object.assign(window, { BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView });
+/* ════════════════════════════════════════════════════════════════ */
+/* LIBRARY — every development + upload, grouped by brief,            */
+/* filtered by output type, with per-output actions.                 */
+
+function Library({ go }) {
+  const [kind, setKind] = useBrState("all");
+  const [toast, setToast] = useBrState(null);
+  const [menuFor, setMenuFor] = useBrState(null);
+  const isTeam = useIsTeam();
+
+  const outputs = window.CI_OUTPUTS;
+  const kinds = window.CI_OUTPUT_KINDS;
+  const briefs = window.CI_BRIEFS;
+
+  const flash = (msg) => {
+    setToast(msg);
+    clearTimeout(window.__libToast);
+    window.__libToast = setTimeout(() => setToast(null), 2400);
+  };
+
+  const filtered = kind === "all" ? outputs : outputs.filter(o => o.kind === kind);
+  const groups = briefs
+    .map(b => ({ brief: b, items: filtered.filter(o => o.briefId === b.id) }))
+    .filter(g => g.items.length);
+  const countFor = (k) => (k === "all" ? outputs.length : outputs.filter(o => o.kind === k).length);
+
+  return (
+    <div style={{padding:"24px 36px 80px"}}>
+      <PageHeader
+        eyebrow="Workspace"
+        title="Library"
+        sub="Every development and upload Brandolph has produced, organised by brief. Download it, reuse it, add it to another project, hand it to the team, or send it back to Brandolph to revise."
+        right={<span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-faint)"}}>{outputs.length} items · {briefs.length} briefs</span>}
+      />
+
+      {/* Type filter */}
+      <div style={{display:"flex", gap:6, flexWrap:"wrap", marginBottom:24}}>
+        <button onClick={() => setKind("all")}
+          className={"pill" + (kind === "all" ? " pill--dark" : "")}
+          style={{cursor:"pointer", height:30, padding:"0 12px"}}>All · {countFor("all")}</button>
+        {kinds.map(k => {
+          const n = countFor(k.key);
+          if (!n) return null;
+          return (
+            <button key={k.key} onClick={() => setKind(k.key)}
+              className={"pill" + (kind === k.key ? " pill--dark" : "")}
+              style={{cursor:"pointer", height:30, padding:"0 12px"}}>{k.label} · {n}</button>
+          );
+        })}
+      </div>
+
+      {/* Grouped by brief */}
+      <div style={{display:"flex", flexDirection:"column", gap:32}}>
+        {groups.map(g => (
+          <section key={g.brief.id}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:14}}>
+              <div style={{display:"flex", alignItems:"baseline", gap:10}}>
+                <h3 style={{margin:0, fontSize:17, letterSpacing:"-0.005em"}}>{g.brief.title}</h3>
+                <button className="btn btn--link" style={{fontSize:12}} onClick={() => go("brief-detail/" + g.brief.id)}>Open brief →</button>
+              </div>
+              <span style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.08em", textTransform:"uppercase"}}>{g.items.length} {g.items.length === 1 ? "output" : "outputs"}</span>
+            </div>
+            <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(340px, 1fr))", gap:14}}>
+              {g.items.map(o => (
+                <LibraryOutput key={o.id} o={o} go={go} flash={flash} isTeam={isTeam}
+                  briefs={briefs} menuOpen={menuFor === o.id}
+                  onMenu={() => setMenuFor(menuFor === o.id ? null : o.id)}
+                  closeMenu={() => setMenuFor(null)} />
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position:"fixed", bottom:28, left:"50%", transform:"translateX(-50%)", zIndex:60,
+          background:"var(--c-inverse)", color:"#fff", borderRadius:10,
+          padding:"10px 16px", fontSize:13, boxShadow:"var(--shadow-lg)",
+          display:"flex", alignItems:"center", gap:8, animation:"fade 200ms ease",
+        }}>
+          <Icon name="check" size={14} /> {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LibraryOutput({ o, go, flash, isTeam, briefs, menuOpen, onMenu, closeMenu }) {
+  const agent = window.CI_AGENTS.find(a => a.id === o.agentId);
+  const isUpload = o.kind === "upload";
+
+  const download = () => {
+    const blob = new Blob([`${o.type}\n\n${o.body}\n\n— ${o.meta}`], { type:"text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = o.type.replace(/[^a-z0-9]+/gi, "-").toLowerCase().replace(/^-|-$/g, "") + ".txt";
+    a.click();
+    URL.revokeObjectURL(url);
+    flash("Downloaded " + o.type);
+  };
+
+  const Action = ({ icon, label, onClick, primary }) => (
+    <button onClick={onClick}
+      className={"btn btn--sm " + (primary ? "btn--ghost" : "btn--ghost")}
+      style={{height:28, padding:"0 9px", fontSize:11.5, gap:5}}>
+      <Icon name={icon} size={13} /> {label}
+    </button>
+  );
+
+  return (
+    <div className="card" style={{padding:16, display:"flex", flexDirection:"column", gap:10, position:"relative"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8}}>
+        <span className="eyebrow eyebrow--yellow" style={{maxWidth:"70%"}}>{o.type}</span>
+        {o.status && <StatusPill status={o.status} />}
+      </div>
+
+      <p style={{
+        margin:0, fontSize:13.5, lineHeight:1.5, color:"var(--c-dim)",
+        display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden",
+      }}>{o.body}</p>
+
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:8,
+        fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.03em"}}>
+        <span>{isUpload ? "Client upload" : (agent ? agent.name : "Brandolph")}</span>
+        <span>{o.meta}</span>
+      </div>
+
+      {/* Actions */}
+      <div style={{display:"flex", flexWrap:"wrap", gap:6, paddingTop:10, borderTop:"1px dashed var(--c-line-2)"}}>
+        <Action icon="download" label="Download" onClick={download} primary />
+        {!isUpload && <Action icon="refresh" label="Reuse" onClick={() => flash("Saved as a starting point for a new brief")} />}
+        <div style={{position:"relative"}}>
+          <Action icon="plus" label="Add to project" onClick={onMenu} />
+          {menuOpen && (
+            <>
+              <div onClick={closeMenu} style={{position:"fixed", inset:0, zIndex:40}} />
+              <div style={{
+                position:"absolute", top:"calc(100% + 4px)", left:0, zIndex:41, minWidth:220,
+                background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:10,
+                boxShadow:"var(--shadow-lg)", padding:6,
+              }}>
+                <div className="eyebrow" style={{padding:"6px 8px"}}>Add to project</div>
+                {briefs.filter(b => b.id !== o.briefId).map(b => (
+                  <button key={b.id} onClick={() => { closeMenu(); flash("Added to “" + b.title + "”"); }}
+                    style={{display:"block", width:"100%", textAlign:"left", border:"none", background:"transparent",
+                      padding:"8px 8px", borderRadius:7, fontSize:13, color:"var(--c-ink)", cursor:"pointer"}}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--neutral-50)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    {b.title}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        {!isUpload && <Action icon="craft" label="Send to polish" onClick={() => { flash("Sent to Human craft for finishing"); go("craft"); }} />}
+        {!isUpload && <Action icon="sparkles" label="Revise" onClick={() => flash("Brandolph is revising this — check back shortly")} />}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, Library });

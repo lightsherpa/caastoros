@@ -115,12 +115,14 @@ function Confidence({ value }) {
   );
 }
 
-/* Agent card — atomic L2 unit. Used in assembly, directory, brief outputs. */
-function AgentCard({ agentId, compact = false, onClick }) {
+/* Specialist card — atomic L2 unit. Used in assembly, directory, brief outputs. */
+function AgentCard({ agentId, compact = false, onClick, showCaps = false }) {
   const a = window.CI_AGENTS.find(x => x.id === agentId);
   if (!a) return null;
   const isTeam = useIsTeam();
+  const soon = a.status === "soon";
   const accent = isTeam ? window.CI_MODELS[a.model].color : (window.CI_DEPT_COLORS[a.dept] || "var(--neutral-400)");
+  const caps = (window.CI_DEPT_META[a.dept] || {}).capabilities || [];
   return (
     <div
       className="agent-card"
@@ -134,6 +136,7 @@ function AgentCard({ agentId, compact = false, onClick }) {
         cursor: onClick ? "pointer" : "default",
         transition: "border-color 140ms ease, transform 120ms ease",
         display:"flex", flexDirection:"column", gap: 4,
+        opacity: soon ? 0.62 : 1,
       }}
       onMouseEnter={e => onClick && (e.currentTarget.style.borderColor = "var(--neutral-300)")}
       onMouseLeave={e => onClick && (e.currentTarget.style.borderColor = "var(--c-line)")}
@@ -149,13 +152,23 @@ function AgentCard({ agentId, compact = false, onClick }) {
       {!compact && (
         <div style={{ color:"var(--c-dim)", fontSize: 12.5, lineHeight: 1.45 }}>{a.job}</div>
       )}
+      {showCaps && !compact && caps.length > 0 && (
+        <div style={{display:"flex", flexWrap:"wrap", gap:4, marginTop:6}}>
+          {caps.slice(0, 3).map(c => (
+            <span key={c} style={{
+              fontFamily:"var(--font-mono)", fontSize:9.5, color:"var(--c-faint)",
+              border:"1px solid var(--c-line)", borderRadius:6, padding:"1px 6px", letterSpacing:"0.02em",
+            }}>{c}</span>
+          ))}
+        </div>
+      )}
       <div style={{
         marginTop: 8, paddingTop: 8,
         borderTop: "1px dashed var(--c-line-2)",
         display:"flex", justifyContent:"space-between", alignItems:"center",
       }}>
         {isTeam ? <ModelChip modelKey={a.model} /> : <span className="eyebrow">Specialist</span>}
-        {a.status === "soon" ? (
+        {soon ? (
           <span className="pill" style={{height:18, padding:"0 8px", fontSize: 9.5}}>Coming soon</span>
         ) : (
           <LayerTag layer="L2" />
@@ -190,7 +203,7 @@ function OutputCard({ output }) {
         fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)",
         letterSpacing:"0.04em",
       }}>
-        <span>{agent ? agent.name : "Agent"} · {agent ? agent.code : ""}</span>
+        <span>{agent ? agent.name : "Specialist"} · {agent ? agent.code : ""}</span>
         <span>{output.meta}</span>
       </div>
     </div>

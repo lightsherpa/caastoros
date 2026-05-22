@@ -110,6 +110,22 @@ window.CI_DEPT_COLORS = {
   "AI Discovery & Ops":      "var(--orange-600)",
 };
 
+/* Department-level metadata — capabilities, typical turnaround, and the
+   subscription tier each department unlocks from. Specialists inherit
+   this for the directory (capability chips, "best for", tier, SLA)
+   without bloating all 33 records; per-specialist `job` is the blurb. */
+window.CI_DEPT_META = {
+  "CMO Suite":          { capabilities:["Brief sharpening","Positioning","Refusals","Audience read"], bestFor:"Shaping the request before any work runs", turnaround:"instant", tierFrom:"02" },
+  "Concept":            { capabilities:["Territories","Naming","Big idea","Campaign lines"],          bestFor:"Finding the angle a campaign hangs on",   turnaround:"~3 min",  tierFrom:"01" },
+  "Copy":               { capabilities:["Long-form","Conversion","Email","Subject lines"],            bestFor:"Words that carry the voice and convert",  turnaround:"~2 min",  tierFrom:"00" },
+  "Design":             { capabilities:["Key visuals","Layout","Identity","Image gen"],               bestFor:"Turning a concept into something you can see", turnaround:"~5 min", tierFrom:"01" },
+  "Web & Email":        { capabilities:["Landing pages","Email build","Sequences","Components"],       bestFor:"Shipping the page or the send, built",    turnaround:"~4 min",  tierFrom:"01" },
+  "AI Discovery & Ops": { capabilities:["Research","SEO / AEO","Brand QA","Model routing"],            bestFor:"Finding signal and keeping work on-brand", turnaround:"~2 min", tierFrom:"00" },
+};
+
+/* Subscription tier labels (for "unlocks from" copy). */
+window.CI_TIERS = { "00":"Free", "01":"Studio", "02":"Brandolph", "03":"Suite" };
+
 /* Briefs ------------------------------------------------------------ */
 window.CI_BRIEFS = [
   {
@@ -203,36 +219,124 @@ window.CI_BRIEFS = [
 ];
 
 /* Example agent outputs tied to briefs ----------------------------- */
+/* Output `kind` drives the Library type filter. Labels in CI_OUTPUT_KINDS. */
+window.CI_OUTPUT_KINDS = [
+  { key:"copy",     label:"Copy" },
+  { key:"page",     label:"Web page" },
+  { key:"email",    label:"Email" },
+  { key:"longform", label:"Long-form" },
+  { key:"image",    label:"Image" },
+  { key:"deck",     label:"Deck" },
+  { key:"social",   label:"Social" },
+  { key:"qa",       label:"QA" },
+  { key:"upload",   label:"Uploads" },
+];
+
 window.CI_OUTPUTS = [
+  /* ── Pricing relaunch ── */
   {
-    id:"o1", briefId:"b-pricing-relaunch",
-    type:"PRICING PAGE · HERO", agentId:"a12",
+    id:"o1", briefId:"b-pricing-relaunch", kind:"page",
+    type:"PRICING PAGE · HERO", agentId:"a12", status:"approved",
     body:"Stay for the year, and the coffee stays the price. Annual takes 1 in 12 off the bill — but the point isn't the dollar; the point is the decision to commit to a slower Tuesday on purpose.",
     meta:"38 words · est. 9.4 readability"
   },
   {
-    id:"o2", briefId:"b-pricing-relaunch",
-    type:"EMAIL 1 · ANNOUNCE", agentId:"a13",
+    id:"o2", briefId:"b-pricing-relaunch", kind:"email",
+    type:"EMAIL 1 · ANNOUNCE", agentId:"a13", status:"in-production",
     body:"Annual is now an option. It isn't cheaper because we ran the numbers and got generous; it's cheaper because we asked you to commit to something. Annual subscribers told us they don't want flexibility — they want the bag on the kitchen counter on the same day each month.",
     meta:"247 words · 3-part sequence"
   },
   {
-    id:"o3", briefId:"b-pricing-relaunch",
-    type:"SUBJECT LINES · ×6", agentId:"a14",
+    id:"o3", briefId:"b-pricing-relaunch", kind:"copy",
+    type:"SUBJECT LINES · ×6", agentId:"a14", status:"approved",
     body:"01 · There's a slower Tuesday in here  ·  02 · Annual is now an option  ·  03 · A small case for committing  ·  04 · One-in-twelve, on us  ·  05 · The Tuesday plan  ·  06 · Re: that subscription",
     meta:"6 variants · A/B intent split"
   },
   {
-    id:"o4", briefId:"b-pricing-relaunch",
-    type:"BRAND CONSISTENCY QA", agentId:"a24",
+    id:"o4", briefId:"b-pricing-relaunch", kind:"qa",
+    type:"BRAND CONSISTENCY QA", agentId:"a24", status:"approved",
     body:"Pass. No use of 'unlock' or 'limited'. Annual price respects 11.4× formula. Provenance (Honduras) referenced once in Email 1 paragraph 3, in line with mandatory. Voice drift index 0.14 (target ≤0.20).",
     meta:"1 page · QA gate green"
   },
   {
-    id:"o5", briefId:"b-honduras-microlot",
-    type:"LONG-FORM · ESSAY OPENER", agentId:"a15",
+    id:"o6", briefId:"b-pricing-relaunch", kind:"image",
+    type:"PRICING HERO · KEY VISUAL", agentId:"a18", status:"in-production",
+    body:"A single bag on a sunlit kitchen counter, Tuesday-morning light. Annual band wraps the lower third in warm amber. No price on the visual — the price lives in the copy.",
+    meta:"1600×900 · 3 crops · Flux 2"
+  },
+
+  /* ── Honduras single-origin ── */
+  {
+    id:"o5", briefId:"b-honduras-microlot", kind:"longform",
+    type:"LONG-FORM · ESSAY OPENER", agentId:"a15", status:"review",
     body:"Don José grew this. He has 1.4 hectares and the inheritance of a name that, in his town, you don't introduce because everyone knows it already. We don't need to tell you the elevation or the variety. We need to tell you that the coffee is named after the person, and that's where you'll start.",
     meta:"1,840 words · editorial register"
+  },
+  {
+    id:"o7", briefId:"b-honduras-microlot", kind:"image",
+    type:"BAG LABEL · FRONT", agentId:"a20", status:"draft",
+    body:"Hand-set serial number, Don José's signature reproduced under the lot code. Kraft stock, single-colour amber. The label is the provenance — nothing decorative.",
+    meta:"label dieline · print-ready"
+  },
+  {
+    id:"o8", briefId:"b-honduras-microlot", kind:"social",
+    type:"INSTAGRAM · CAROUSEL ×4", agentId:"a14", status:"draft",
+    body:"Slide 1: the name. Slide 2: the hectares. Slide 3: the cup. Slide 4: where to get it. No 'link in bio' energy — it reads like a short letter.",
+    meta:"4 frames · caption + alt text"
+  },
+
+  /* ── Summer Tuesdays ── */
+  {
+    id:"o9", briefId:"b-summer-tuesdays", kind:"copy",
+    type:"TERRITORY · ×3 CONCEPTS", agentId:"a06", status:"draft",
+    body:"01 · 'The slow afternoon, on purpose.'  02 · 'Iced, but make it a ritual.'  03 · 'Summer is when we earn the slow Tuesday back.' — recommend 03, it ladders to the BIO positioning.",
+    meta:"3 territories · 1 recommended"
+  },
+  {
+    id:"o10", briefId:"b-summer-tuesdays", kind:"image",
+    type:"CAMPAIGN HERO · KV", agentId:"a18", status:"draft",
+    body:"Cold brew sweating on a shaded balcony table, afternoon shadow long across the wood. Editorial, not stocky. Amber type lockup bottom-left.",
+    meta:"1920×1080 · 2 ratios"
+  },
+  {
+    id:"o11", briefId:"b-summer-tuesdays", kind:"email",
+    type:"TEASER · PRE-LAUNCH", agentId:"a13", status:"draft",
+    body:"Something slower is coming for the warm months. Not a sale. A reason to keep the Tuesday even when the city speeds up. Watch this space — or don't, and we'll tell you when it lands.",
+    meta:"96 words · single send"
+  },
+
+  /* ── Investor deck ── */
+  {
+    id:"o12", briefId:"b-investor-deck", kind:"deck",
+    type:"DECK · 12-SLIDE OUTLINE", agentId:"a09", status:"shipped",
+    body:"Cold open on the retention curve, not the team slide. Problem framed as 'subscription coffee churns because it's a commodity relationship.' The bet: provenance + ritual = a brand, not a SKU.",
+    meta:"12 slides · narrative spine"
+  },
+  {
+    id:"o13", briefId:"b-investor-deck", kind:"copy",
+    type:"ONE-LINER · ×5", agentId:"a02", status:"shipped",
+    body:"'We sell the Tuesday, not the bag.' · 'Coffee with a name attached.' · 'The anti-commodity subscription.' · 'Provenance you can taste, ritual you can keep.' · 'A brand, not a SKU.'",
+    meta:"5 lines · for cover + cold email"
+  },
+  {
+    id:"o14", briefId:"b-investor-deck", kind:"image",
+    type:"MARKET MAP · DIAGRAM", agentId:"a18", status:"review",
+    body:"2×2 with 'commodity ↔ provenance' on x and 'transactional ↔ ritual' on y. Competitors clustered bottom-left; Vinilo alone top-right. Clean, no gradient soup.",
+    meta:"vector · light + dark variants"
+  },
+
+  /* ── Client uploads (reference material the brand brought in) ── */
+  {
+    id:"u1", briefId:"b-honduras-microlot", kind:"upload", source:"upload",
+    type:"UPLOAD · FARM PHOTOS", agentId:null, status:"draft",
+    body:"12 photos from Don José's farm — harvest, drying beds, the signature on the lot ledger. Source material for the bag label and the essay.",
+    meta:"12 images · 48 MB · client upload"
+  },
+  {
+    id:"u2", briefId:"b-pricing-relaunch", kind:"upload", source:"upload",
+    type:"UPLOAD · BRAND GUIDELINES", agentId:null, status:"draft",
+    body:"Vinilo brand book v2 (PDF). Type, colour, the 11.4× pricing formula, the forbidden-words list Brandolph QAs against.",
+    meta:"PDF · 18 pp · client upload"
   },
 ];
 
