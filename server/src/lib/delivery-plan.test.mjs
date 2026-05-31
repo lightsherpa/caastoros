@@ -1,7 +1,7 @@
 // server/src/lib/delivery-plan.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizePlan, wrapLegacy, estimateCr, MAX_COUNT } from "./delivery-plan.js";
+import { normalizePlan, wrapLegacy, estimateCr, MAX_COUNT, MAX_GROUPS } from "./delivery-plan.js";
 
 test("normalizePlan fills parts/crew from taxonomy and clamps count", () => {
   const out = normalizePlan({
@@ -67,4 +67,10 @@ test("wrapLegacy with non-array input yields an empty plan", () => {
   const out = wrapLegacy("a12");
   assert.deepEqual(out.deliverableGroups, []);
   assert.deepEqual(out.proposedSpecialists, []);
+});
+
+test("normalizePlan caps groups at MAX_GROUPS (cost guardrail)", () => {
+  const many = Array.from({ length: MAX_GROUPS + 2 }, () => ({ type: "email", count: 1 }));
+  const out = normalizePlan({ deliverableGroups: many });
+  assert.equal(out.deliverableGroups.length, MAX_GROUPS);
 });
