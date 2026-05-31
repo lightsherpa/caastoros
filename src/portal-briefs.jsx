@@ -1,85 +1,427 @@
 import React from "react";
+import { apiFetch, supabase } from "./lib/supabase-browser.js";
 const { AgentCard, BrandolphDot, Drawer, Icon, ModelChip, OutputCard, PageHeader, Reveal, StatusPill, useIsTeam, PinButton, usePins } = window;
+const { useState: useBrState, useEffect: useBrEffect } = React;
+
+/* useLiveBriefs — fetches real briefs + their runs + outputs from
+   Supabase via RLS (workspace auto-filtered). Each brief now carries
+   the actual runs (spec_id, model_used, cost) and outputs (body text,
+   QA status) that were persisted by POST /api/runs/stream in P3. */
+function useLiveBriefs() {
+  const [state, setState] = useBrState({ briefs: [], cert: null, brand: null, loading: true, error: null });
+
+  const reload = React.useCallback(async () => {
+    try {
+      /* Resolve current brand. Prefer the workspace switcher's selection;
+         fall back to the first brand if none picked. RLS scopes the
+         results to the user's workspaces, so even an unknown id can't
+         leak data. */
+      const wantedId = window.getCurrentBrandId?.();
+      let brand = null;
+      if (wantedId) {
+        const { data } = await supabase.from("brands").select("id, name").eq("id", wantedId).maybeSingle();
+        brand = data;
+      }
+      if (!brand) {
+        const { data: brands } = await supabase
+          .from("brands").select("id, name").order("created_at", { ascending: true }).limit(1);
+        brand = brands?.[0];
+      }
+      if (!brand) { setState({ briefs: [], cert: null, brand: null, loading: false, error: "No brand" }); return; }
+
+      /* Joined select pulls everything in one round-trip */
+      const { data: briefs, error } = await supabase
+        .from("briefs")
+        .select(`
+          id, title, type, payload, mode, status, created_at,
+          runs ( id, specialist_id, spec_version, bio_version, model_used, status, cost_usd, prompt_tokens, completion_tokens, ended_at,
+                 outputs ( id, kind, body, status, rationale ) )
+        `)
+        .eq("brand_id", brand.id)
+        .order("created_at", { ascending: false });
+      if (error) { setState({ briefs: [], cert: null, brand, loading: false, error: error.message }); return; }
+
+      /* Cert state for the active BIO — drives the footer chip */
+      const { data: bio } = await supabase
+        .from("bios").select("version, certified, certified_by, certified_at")
+        .eq("brand_id", brand.id).eq("certified", true)
+        .order("version", { ascending: false }).limit(1).maybeSingle();
+      let cert = null;
+      if (bio) {
+        let byName = "your Brand Steward";
+        if (bio.certified_by) {
+          const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
+          byName = tm?.first_name || byName;
+        }
+        cert = { version: bio.version, byName, at: bio.certified_at };
+      }
+
+      setState({ briefs: briefs || [], cert, brand, loading: false, error: null });
+    } catch (e) {
+      setState((s) => ({ ...s, loading: false, error: e?.message || String(e) }));
+    }
+  }, []);
+
+  useBrEffect(() => { reload(); }, [reload]);
+  /* Refetch when the user picks a different brand from the dock switcher. */
+  useBrEffect(() => {
+    const onChange = () => reload();
+    window.addEventListener("brand:changed", onChange);
+    return () => window.removeEventListener("brand:changed", onChange);
+  }, [reload]);
+  return { ...state, reload };
+}
+
+function shortDate(iso) {
+  if (!iso) return "";
+  try { return new Date(iso).toLocaleDateString(undefined, { day:"numeric", month:"short" }); } catch { return ""; }
+}
+function specialistName(id) {
+  const a = window.CI_AGENTS?.find((x) => x.id === id);
+  return a?.name || id;
+}
+
+/* Strip generic-AI artifacts from a body of text for human-readable
+   display in the Library. Render-time cleanup — body.text is preserved
+   for audit. Handles markdown headings, **bold**, hedging openers,
+   "FLAG BEFORE I X / Pausing before I draft" tics, list bullets that
+   should be prose, trailing AI sign-offs. */
+function humanize(raw) {
+  if (!raw) return "";
+  let t = String(raw);
+
+  // Drop leading markdown headings — keep stripping while a heading
+  // sits at the top. Iterative so we catch "## A\n## B\nBody" chains
+  // that the single-regex form sometimes misses.
+  for (let i = 0; i < 8; i++) {
+    const next = t.replace(/^\s*#{1,6}[ \t]+[^\n]*\n+/, "");
+    if (next === t) break;
+    t = next;
+  }
+  // Strip any remaining ## / ### markers anywhere — keep the words.
+  t = t.replace(/^[ \t]*#{1,6}[ \t]+/gm, "");
+  // Drop ALL-CAPS section banners like "REFUSAL & REDIRECT\n" / "THE CONFLICT\n".
+  t = t.replace(/^[ \t]*([A-Z][A-Z &/—\-]{4,})\s*\n+/gm, "");
+  // Drop "Pausing before I draft" / "Flag before I ship" / "Here's the…" openers.
+  t = t.replace(/^\s*(?:flag(?:\s+before)?|pausing(?:\s+before)?|before\s+i|let me|here'?s|i'?ll|i'?m going to)[^\n.?!]*[.?!]?\s*\n+/i, "");
+  // Strip ** bold ** markers (keep the word).
+  t = t.replace(/\*\*(.+?)\*\*/g, "$1");
+  // Strip trailing AI sign-offs.
+  t = t.replace(/\n+\s*(?:let me know if|happy to (?:iterate|adjust|refine)|hope this helps|please let me know)[^\n]*$/i, "");
+  // Collapse 3+ blank lines.
+  t = t.replace(/\n{3,}/g, "\n\n");
+  return t.trim();
+}
+
+/* Find the operator's original request inside a legacy "composedBrief"
+   blob (which used to wrap sections in "## SHARPENED BRIEF" /
+   "## ORIGINAL REQUEST" / "## CLARIFICATIONS" markdown headings).
+   Returns "" if no ## ORIGINAL REQUEST section is present, in which
+   case the caller should use other fallbacks. */
+function extractOriginalRequest(composedText) {
+  if (!composedText) return "";
+  const m = String(composedText).match(/##\s*ORIGINAL\s+REQUEST\s*\n+([\s\S]*?)(?=\n##|$)/i);
+  return m ? m[1].trim() : "";
+}
+
+/* Brief title — the editorial heading shown in the Library + Canvas
+   for each brief. Priority:
+     1. The Sharpener's title field (new briefs).
+     2. The operator's RAW request extracted from a legacy
+        composedBrief blob (the "## ORIGINAL REQUEST" section).
+     3. payload.request if it's plain text (no markdown noise).
+     4. The first sentence of the sharpened brief.
+     5. briefs.title column (last-resort fallback).
+   Never returns ## headings or the multi-paragraph composedBrief. */
+function briefTitle(brief) {
+  if (!brief) return "(untitled)";
+  const p = brief.payload || {};
+
+  // 1. Sharpener-emitted title (new briefs after the title-field rollout)
+  const sharpenerTitle = p.title && humanize(String(p.title)).split("\n")[0].trim();
+  if (sharpenerTitle && sharpenerTitle.length >= 3) return shorten(sharpenerTitle);
+
+  // 2. Legacy composed-brief: pull the operator's original ask
+  const original = extractOriginalRequest(p.request) || extractOriginalRequest(brief.title);
+  if (original) return shorten(humanize(original).split("\n")[0]);
+
+  // 3–5. Other fallbacks
+  const fallbacks = [p.sharpenedBrief, p.request, brief.title, brief.request];
+  for (const c of fallbacks) {
+    if (!c) continue;
+    const cleaned = humanize(String(c)).split("\n")[0].trim();
+    if (cleaned && cleaned.length >= 3) return shorten(cleaned);
+  }
+  return "(untitled brief)";
+}
+
+function shorten(s, max = 72) {
+  if (!s) return "";
+  // Take the first sentence if there is one, else cap at max chars.
+  const firstSentence = s.split(/(?<=[.!?])\s/)[0];
+  const chosen = firstSentence || s;
+  return chosen.length > max ? chosen.slice(0, max - 1).trim() + "…" : chosen;
+}
 /* Briefs library + Brief detail + Specialists directory + Canvas. */
 
-const { useState: useBrState } = React;
+/* ─── Specialist run streaming ────────────────────────────────────
+   Parses SSE from POST /api/runs/stream. The endpoint is the P3 kernel
+   — composes the four-layer prompt, calls the routed model, runs Voice
+   QA, and persists runs + outputs + qa_results + ledger rows. */
+async function streamSpecialistRun({ specialistId, briefText, brandId, briefId, briefMeta, modelOverride, revisionFeedback, deliverableSpec, onToken, onProgress, onQa, onDone, onError, __body }) {
+  /* __body is the per-call escape hatch — any extra fields the caller
+     wants to send (e.g. modelOverride for re-runs) get merged. */
+  const body = { specialistId, briefText, brandId, briefId, briefMeta, modelOverride, revisionFeedback, deliverableSpec, ...(__body || {}) };
+  const res = await apiFetch("/api/runs/stream", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    onError({ message: err.error || `HTTP ${res.status}` });
+    return;
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const events = buf.split("\n\n");
+    buf = events.pop() || "";
+    for (const ev of events) {
+      const lines = ev.split("\n");
+      const eventLine = lines.find((l) => l.startsWith("event:"));
+      const dataLine  = lines.find((l) => l.startsWith("data:"));
+      if (!dataLine) continue;
+      const eventType = eventLine?.slice(6).trim();
+      let data;
+      try { data = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
+      if (eventType === "token")         onToken && onToken(data);
+      else if (eventType === "progress") onProgress && onProgress(data);
+      else if (eventType === "qa")       onQa && onQa(data);
+      else if (eventType === "done")     onDone && onDone(data);
+      else if (eventType === "error")    onError && onError(data);
+    }
+  }
+}
+
+/* useBrState/useBrEffect declared at top of file */
 
 /* ════════════════════════════════════════════════════════════════ */
 /* BRIEFS LIBRARY                                                    */
 
+function relativeBucket(iso) {
+  if (!iso) return "Older";
+  const now = new Date();
+  const then = new Date(iso);
+  const diff = now - then;
+  const day = 86_400_000;
+  /* Bucket boundaries: today, yesterday, this week, this month, older */
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (then.getTime() >= startToday) return "Today";
+  if (then.getTime() >= startToday - day) return "Yesterday";
+  if (diff < 7 * day)  return "This week";
+  if (diff < 30 * day) return "This month";
+  return "Older";
+}
+
 function BriefsLibrary({ go }) {
-  const [filter, setFilter] = useBrState("all");
-  const filtered = filter === "all" ? window.CI_BRIEFS : window.CI_BRIEFS.filter(b => b.status === filter);
+  const { briefs, cert, brand, loading, error, reload } = useLiveBriefs();
+  const [query, setQuery]     = useBrState("");
+  const [statusF, setStatusF] = useBrState("all");        /* all | approved | flagged */
+  const [specF, setSpecF]     = useBrState("all");
+
+  /* Click a brief → save the briefId to sessionStorage and open the
+     Canvas. Canvas is the moat surface; the dropdown was redundant. */
+  const openBrief = (briefId) => {
+    try { sessionStorage.setItem("ci_run_context", JSON.stringify({ mode: "view", briefId, ts: Date.now() })); } catch (e) {}
+    go("canvas");
+  };
+
+  const totalRuns = briefs.reduce((acc, b) => acc + (b.runs?.length || 0), 0);
+  const totalCredits = briefs.reduce((acc, b) => acc + (b.runs || []).reduce((s, r) => {
+    const a = window.CI_AGENTS?.find((x) => x.id === r.specialist_id);
+    return s + (a?.cr || 0);
+  }, 0), 0);
+
+  /* Specialist filter options — only specialists that appear in any brief */
+  const specialistsInUse = React.useMemo(() => {
+    const ids = new Set();
+    briefs.forEach((b) => (b.runs || []).forEach((r) => r.specialist_id && ids.add(r.specialist_id)));
+    return [...ids];
+  }, [briefs]);
+
+  /* Filter pass */
+  const q = query.trim().toLowerCase();
+  const filtered = briefs.filter((b) => {
+    if (q) {
+      /* Search across: the derived editorial title, the operator's
+         original request (extracted from any legacy composedBrief),
+         and the raw payload as a last resort. */
+      const haystack = [
+        briefTitle(b),
+        extractOriginalRequest(b.payload?.request),
+        b.payload?.request,
+        b.title,
+      ].filter(Boolean).join(" ").toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    const runs = b.runs || [];
+    if (specF !== "all" && !runs.some((r) => r.specialist_id === specF)) return false;
+    if (statusF !== "all") {
+      const anyMatch = runs.some((r) => (r.outputs || []).some((o) => (statusF === "approved" ? o.status === "approved" : o.status !== "approved")));
+      if (!anyMatch) return false;
+    }
+    return true;
+  });
+
+  /* Date-bucket grouping */
+  const buckets = ["Today", "Yesterday", "This week", "This month", "Older"];
+  const grouped = buckets
+    .map((label) => ({ label, items: filtered.filter((b) => relativeBucket(b.created_at) === label) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <div style={{padding:"24px 36px 60px"}}>
       <PageHeader
-        eyebrow="Workspace · Vinilo"
+        eyebrow={brand ? `Workspace · ${brand.name}` : "Workspace"}
         title="Briefs"
-        sub="The CMO-grade briefs Brandolph has produced. Each one is auditable against the BIO, with the specialists that executed it on record."
+        sub={`Every specialist run on this brand — auditable against the certified BIO. ${totalRuns} run${totalRuns === 1 ? "" : "s"} on record · ${totalCredits} cr spent.`}
         right={<>
-          <button className="btn btn--ghost">Filter <Icon name="filter" size={14} /></button>
-          <a href="#/home" className="btn btn--primary">Brief Brandolph <Icon name="plus" size={14} /></a>
+          <button className="btn btn--ghost btn--sm" onClick={reload}><Icon name="refresh" size={13} /> Reload</button>
+          <a href="#/specialists" className="btn btn--primary">Run a specialist <Icon name="plus" size={14} /></a>
         </>}
       />
 
-      <div style={{display:"flex", gap: 6, marginBottom: 20, flexWrap:"wrap"}}>
-        {[
-          ["all","All", window.CI_BRIEFS.length],
-          ["draft","Draft", window.CI_BRIEFS.filter(b => b.status === "draft").length],
-          ["approved","Approved", window.CI_BRIEFS.filter(b => b.status === "approved").length],
-          ["in-production","In production", window.CI_BRIEFS.filter(b => b.status === "in-production").length],
-          ["shipped","Shipped", window.CI_BRIEFS.filter(b => b.status === "shipped").length],
-        ].map(([k, l, n]) => (
-          <button key={k} onClick={() => setFilter(k)} className={"pill" + (filter === k ? " pill--dark" : "")} style={{cursor:"pointer", border:"1px solid", height: 28, padding:"0 12px"}}>
-            {l} · {n}
-          </button>
-        ))}
+      {error && (
+        <div className="card" style={{padding:"10px 14px", marginBottom: 14, borderLeft:"3px solid var(--pink-500)", fontSize: 13}}>
+          {error}
+        </div>
+      )}
+
+      {/* Filter row — search + status pills + specialist select */}
+      <div className="card" style={{padding: 12, marginBottom: 18, display:"flex", gap: 10, alignItems:"center", flexWrap:"wrap"}}>
+        <div style={{position:"relative", flex:"1 1 220px", minWidth: 220}}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search briefs…"
+            style={{
+              width:"100%", height: 32, padding:"0 10px 0 32px",
+              border:"1px solid var(--c-line)", borderRadius: 8,
+              fontSize: 13, fontFamily:"inherit", background:"var(--c-bg)", color:"var(--c-ink)",
+              outline:"none",
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+          <span style={{position:"absolute", left: 10, top:"50%", transform:"translateY(-50%)", color:"var(--c-faint)", pointerEvents:"none"}}>
+            <Icon name="filter" size={13} />
+          </span>
+        </div>
+        <div style={{display:"flex", gap: 4}}>
+          {[["all","All"],["approved","Approved"],["flagged","Flagged"]].map(([k, l]) => (
+            <button key={k} onClick={() => setStatusF(k)}
+              className={"pill" + (statusF === k ? " pill--dark" : "")}
+              style={{cursor:"pointer", height: 28, padding:"0 12px"}}>{l}</button>
+          ))}
+        </div>
+        {specialistsInUse.length > 0 && (
+          <select value={specF} onChange={(e) => setSpecF(e.target.value)}
+            style={{height: 30, padding:"0 10px", border:"1px solid var(--c-line)", borderRadius: 8, fontSize: 12.5, fontFamily:"inherit", background:"var(--c-bg)", color:"var(--c-ink)"}}>
+            <option value="all">All specialists</option>
+            {specialistsInUse.map((id) => <option key={id} value={id}>{specialistName(id)}</option>)}
+          </select>
+        )}
+        <span style={{marginLeft:"auto", fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>
+          {filtered.length} of {briefs.length}
+        </span>
       </div>
 
-      <div className="card" style={{padding: 0, overflow:"hidden"}}>
-        <table style={{width:"100%", borderCollapse:"collapse", fontSize: 13.5}}>
-          <thead>
-            <tr style={{background:"var(--c-bg)", borderBottom:"1px solid var(--c-line)"}}>
-              {["Brief", "SMP", "Status", "Specialists", "Credits", "Created"].map((h, i) => (
-                <th key={h} style={{textAlign: i === 4 ? "right" : "left", padding:"12px 18px", fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight: 500}}>{h}</th>
-              ))}
-              <th></th>
-            </tr>
-          </thead>
-          <tbody className="stagger">
-            {filtered.map((b, i) => (
-              <tr key={b.id} style={{borderBottom: i < filtered.length - 1 ? "1px solid var(--c-line)" : "none", cursor:"pointer"}}
-                onClick={() => go("board/" + b.id)}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--neutral-50)"}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-              >
-                <td style={{padding:"16px 18px"}}>
-                  <div style={{fontWeight: 500, color:"var(--c-ink)", marginBottom: 2}}>{b.title}</div>
-                  <div style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>{b.type}</div>
-                </td>
-                <td style={{padding:"16px 18px", maxWidth: 360}}>
-                  <span style={{fontStyle:"italic", fontFamily:"Georgia, serif", color:"var(--c-dim)"}}>"{b.smp}"</span>
-                </td>
-                <td style={{padding:"16px 18px"}}><StatusPill status={b.status} /></td>
-                <td style={{padding:"16px 18px"}}>
-                  <div style={{display:"flex", gap:3}}>
-                    {b.agents.slice(0, 5).map(aid => {
-                      const a = window.CI_AGENTS.find(x => x.id === aid);
-                      if (!a) return null;
-                      const accent = window.CI_DEPT_COLORS[a.dept] || "var(--neutral-400)";
-                      return <span key={aid} title={`${a.name} · ${a.dept}`} className="modelchip__dot" style={{width:11, height:11, background: accent, border:"1.5px solid #fff", outline:"1px solid var(--c-line)"}} />;
-                    })}
-                    {b.agents.length > 5 && <span style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", marginLeft: 4}}>+{b.agents.length - 5}</span>}
-                  </div>
-                </td>
-                <td style={{padding:"16px 18px", textAlign:"right"}}><span className="credit">{b.credits || "—"} {b.credits ? "cr" : ""}</span></td>
-                <td style={{padding:"16px 18px", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{b.createdAt}</td>
-                <td style={{padding:"16px 14px", color:"var(--c-faint)"}}><Icon name="arrow" size={14} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {!loading && briefs.length === 0 && (
+        <div className="card" style={{padding:"56px 32px", textAlign:"center", maxWidth: 540, margin:"40px auto"}}>
+          <h2 style={{
+            margin:"0 0 14px", fontFamily:"Georgia, serif", fontStyle:"italic",
+            fontSize: 28, lineHeight: 1.2, letterSpacing:"-0.005em", fontWeight: 400, color:"var(--c-ink)",
+          }}>
+            No briefs on the table yet.
+          </h2>
+          <p style={{margin:"0 0 22px", fontSize: 14, color:"var(--c-dim)", lineHeight: 1.6}}>
+            Brandolph is waiting on the first one. Type what you need into the launchpad — even a sentence — and he'll sharpen it, name the tension, and assemble the smallest crew that earns it.
+          </p>
+          <div style={{display:"flex", gap: 10, justifyContent:"center"}}>
+            <a href="#/home" className="btn btn--primary">
+              <Icon name="sparkles" size={13} /> Start the first brief
+            </a>
+            <a href="#/specialists" className="btn btn--ghost btn--sm">Browse specialists</a>
+          </div>
+        </div>
+      )}
+
+      {/* Date-bucketed brief cards */}
+      <div style={{display:"flex", flexDirection:"column", gap: 26}}>
+        {grouped.map((g) => (
+          <section key={g.label}>
+            <div className="eyebrow" style={{marginBottom: 10, color:"var(--c-faint)"}}>{g.label} · {g.items.length}</div>
+            <div style={{display:"flex", flexDirection:"column", gap: 8}}>
+              {g.items.map((b) => {
+                const runs    = b.runs || [];
+                const credits = runs.reduce((s, r) => {
+                  const a = window.CI_AGENTS?.find((x) => x.id === r.specialist_id);
+                  return s + (a?.cr || 0);
+                }, 0);
+                const flagged = runs.some((r) => (r.outputs || []).some((o) => o.status !== "approved"));
+                const reqText = briefTitle(b);
+                const specs   = [...new Set(runs.map((r) => r.specialist_id))];
+
+                return (
+                  <button key={b.id} onClick={() => openBrief(b.id)} className="card" style={{
+                    width:"100%", textAlign:"left", padding: "12px 16px",
+                    border:"1px solid var(--c-line)",
+                    borderLeft: `3px solid ${flagged ? "var(--pink-500)" : "var(--green-500)"}`,
+                    cursor:"pointer",
+                    display:"flex", alignItems:"center", gap: 14,
+                    transition:"transform 100ms ease, box-shadow 100ms ease",
+                  }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 18px rgba(0,0,0,0.06)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = ""; }}>
+                    <div style={{flex: 1, minWidth: 0}}>
+                      <div style={{fontSize: 13.5, color:"var(--c-ink)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                        {reqText}
+                      </div>
+                      <div style={{display:"flex", gap: 10, marginTop: 4, fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.04em", alignItems:"center"}}>
+                        <span>{b.mode || "auto"}</span>
+                        <span>·</span>
+                        <span>{runs.length} run{runs.length === 1 ? "" : "s"}</span>
+                        <span>·</span>
+                        <span>{credits} cr</span>
+                        {specs.length > 0 && (<>
+                          <span>·</span>
+                          <span>{specs.map(specialistName).slice(0, 3).join(" · ")}{specs.length > 3 ? ` +${specs.length - 3}` : ""}</span>
+                        </>)}
+                      </div>
+                    </div>
+                    <span className="pill" style={{
+                      height: 20, padding:"0 9px", fontSize: 10,
+                      background: flagged ? "var(--pink-50, rgba(244,143,177,0.12))" : "var(--green-50, rgba(127,163,122,0.16))",
+                      color: flagged ? "var(--pink-700, var(--pink-500))" : "var(--green-600)",
+                    }}>{flagged ? "flagged" : "approved"}</span>
+                    <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", minWidth: 50, textAlign:"right"}}>
+                      {shortDate(b.created_at)}
+                    </span>
+                    <Icon name="arrow" size={14} />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+        {!loading && grouped.length === 0 && briefs.length > 0 && (
+          <div style={{padding: 28, textAlign:"center", color:"var(--c-faint)", fontSize: 13}}>
+            No briefs match the current filters.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -230,7 +572,9 @@ function SpecialistsDirectory({ go }) {
   const [sort, setSort] = useBrState("dept");
   const [view, setView] = useBrState("grid");
 
-  const all = window.CI_AGENTS;
+  /* Hide internal-only specs (BIO Compiler, Audit & Ledger) — those are
+     infrastructure run by Brandolph, not user-pickable specialists. */
+  const all = window.CI_AGENTS.filter(a => !a.internal);
   const live = all.filter(a => a.status === "live").length;
   const soon = all.length - live;
   const pins = usePins();
@@ -454,8 +798,138 @@ function composeSpecialistPrompt(a, isTeam, specArg) {
   return L.join("\n");
 }
 
+/* TryPanel — fires a real specialist run via /api/runs/stream and
+   renders streaming output + QA verdict + the moat-defining cert
+   attribution footer. Used inline at the top of SpecialistDrawer. */
+function TryPanel({ agent, onClose }) {
+  const [brief, setBrief]       = useBrState("");
+  const [running, setRunning]   = useBrState(false);
+  const [output, setOutput]     = useBrState("");
+  const [qa, setQa]             = useBrState(null);
+  const [done, setDone]         = useBrState(null);
+  const [error, setError]       = useBrState(null);
+
+  const reset = () => { setOutput(""); setQa(null); setDone(null); setError(null); };
+
+  const run = async () => {
+    if (!brief.trim() || running) return;
+    reset(); setRunning(true);
+    await streamSpecialistRun({
+      specialistId: agent.id,
+      briefText: brief.trim(),
+      onToken:  ({ text }) => setOutput((o) => o + text),
+      onQa:     (data) => setQa(data),
+      onDone:   (data) => setDone(data),
+      onError:  ({ message }) => setError(message),
+    });
+    setRunning(false);
+  };
+
+  return (
+    <div style={{
+      background: "var(--c-bg)",
+      border: "1px solid var(--c-line)",
+      borderRadius: 12, padding: 16, marginBottom: 18,
+    }}>
+      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 10}}>
+        <div className="eyebrow eyebrow--yellow">Try {agent.name}</div>
+        {(output || done || error) && (
+          <button type="button" className="btn btn--link" style={{fontSize:11}} onClick={reset}>Reset</button>
+        )}
+      </div>
+
+      {/* Brief composer — locked once a run is in flight or done */}
+      <textarea
+        value={brief}
+        onChange={(e) => setBrief(e.target.value)}
+        onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run(); e.stopPropagation(); }}
+        disabled={running || !!done}
+        rows={3}
+        placeholder={`Write a brief for ${agent.name}. ${agent.job}`}
+        style={{
+          width: "100%", padding: "10px 12px", borderRadius: 8,
+          border: "1px solid var(--c-line)", background: "var(--c-card)",
+          fontFamily: "inherit", fontSize: 13.5, color: "var(--c-ink)",
+          lineHeight: 1.5, resize: "vertical", outline: "none",
+          boxSizing: "border-box",
+        }}
+      />
+
+      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginTop: 10}}>
+        <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>
+          {running ? "Running…" : done ? "Done" : `~${agent.cr} cr · ⌘+↵ to run`}
+        </span>
+        <button
+          onClick={run}
+          disabled={!brief.trim() || running || !!done}
+          className="btn btn--primary btn--sm">
+          {running ? <><BrandolphDot state="thinking" size={11} /> Streaming…</> : done ? "Ran" : <>Run <Icon name="arrow" size={13} /></>}
+        </button>
+      </div>
+
+      {/* Streaming output */}
+      {(output || running) && (
+        <div style={{
+          marginTop: 14, padding: 14, borderRadius: 10,
+          background: "var(--c-card)", border: "1px solid var(--c-line)",
+        }}>
+          <p style={{
+            margin: 0, fontFamily: "Georgia, 'Times New Roman', serif",
+            fontStyle: "italic", color: "var(--c-ink)",
+            fontSize: 15.5, lineHeight: 1.55, whiteSpace: "pre-wrap",
+          }}>
+            {output}{running && !done ? <span style={{opacity:0.4}}>▎</span> : null}
+          </p>
+
+          {/* Attribution footer — fires the moat chip ONCE we have done event */}
+          {done && (
+            <div style={{
+              marginTop: 12, paddingTop: 10,
+              borderTop: "1px dashed var(--c-line-2)",
+              display: "flex", justifyContent: "space-between", gap: 8,
+              fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--c-faint)",
+              letterSpacing: "0.04em",
+            }}>
+              <span>
+                Composed by <span style={{color:"var(--c-ink)"}}>{done.spec?.name || agent.name}</span> ·
+                BIO v{done.brand?.bioVersion}
+                {done.brand?.certifiedBy
+                  ? <> · <span style={{color:"var(--green-600)"}}>certified</span></>
+                  : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+              </span>
+              <span>{agent.cr ?? "?"} cr</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* QA verdict pill */}
+      {qa && (
+        <div style={{
+          marginTop: 10, padding: "8px 12px", borderRadius: 8,
+          background: qa.passed ? "var(--green-50, rgba(127,163,122,0.12))" : "var(--pink-50, rgba(244,143,177,0.12))",
+          color: qa.passed ? "var(--green-600)" : "var(--pink-700, var(--pink-500))",
+          fontSize: 12, display:"flex", justifyContent:"space-between", alignItems:"center", gap: 10,
+        }}>
+          <span><strong>Voice QA</strong> · {qa.passed ? "passed" : "flagged"} · {qa.voice_match}/100</span>
+          {qa.violations?.length > 0 && <span style={{fontStyle:"italic", textAlign:"right"}}>{qa.violations.join(" · ")}</span>}
+        </div>
+      )}
+
+      {error && (
+        <div style={{marginTop: 10, padding:"8px 12px", background:"var(--pink-50, rgba(244,143,177,0.12))", color:"var(--pink-700, var(--pink-500))", borderRadius: 8, fontSize: 12}}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SpecialistDrawer({ open, agent, onClose }) {
   const [showPrompt, setShowPrompt] = useBrState(false);
+  const [showTry, setShowTry] = useBrState(false);
+  /* Reset try-panel state when the drawer closes or specialist changes */
+  React.useEffect(() => { setShowTry(false); }, [agent?.id, open]);
   if (!agent) return null;
   const isTeam = useIsTeam();
   const m = window.CI_MODELS[agent.model];
@@ -469,9 +943,15 @@ function SpecialistDrawer({ open, agent, onClose }) {
       footer={<>
         <PinButton kind="specialists" id={agent.id} size={18} style={{marginRight:"auto"}} />
         <button className="btn btn--ghost" onClick={onClose}>Close</button>
-        <button className="btn btn--primary">Add to next assembly · {agent.cr} cr</button>
+        {agent.status === "live" && !showTry && (
+          <button className="btn btn--primary" onClick={() => setShowTry(true)}>
+            Try {agent.name} · {agent.cr} cr <Icon name="arrow" size={13} />
+          </button>
+        )}
       </>}>
       <div style={{ background: accent, height: 6, borderRadius: 4, marginBottom: 18 }} />
+
+      {showTry && agent.status === "live" && <TryPanel agent={agent} onClose={() => setShowTry(false)} />}
 
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 18}}>
         {isTeam ? <ModelChip modelKey={agent.model} /> : (
@@ -775,12 +1255,48 @@ function InteractiveCanvas({ nodeData, edges, onNodeClick, renderNode, height = 
         backgroundPosition:`${view.x}px ${view.y}px`,
       }} />
 
-      {/* Floating controls */}
+      {/* Floating controls — toolbarExtra (state + page actions) on the
+          left, zoom + export controls grouped on the right with a thin
+          divider between so they read as separate concerns. */}
       <div onPointerDown={stop} style={{position:"absolute", top: 16, right: 18, zIndex: 5, display:"flex", gap: 8, alignItems:"center"}}>
         {toolbarExtra}
-        <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.06em"}}>{Math.round(view.scale * 100)}%</span>
-        <button className="btn btn--ghost btn--sm" onClick={fitView}>Fit view</button>
-        <button className="btn btn--ghost btn--sm" onClick={exportLayout}>Export</button>
+        {toolbarExtra && controls && <span style={{width: 1, height: 20, background:"var(--c-line)", margin:"0 4px"}} aria-hidden="true" />}
+        {controls && (
+          <div style={{
+            display:"flex", alignItems:"center", gap: 2,
+            background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius: 999,
+            padding: 2, boxShadow:"0 1px 0 rgba(0,0,0,0.02)",
+          }}>
+            <button className="btn btn--ghost btn--icon"
+              onClick={() => setView((v) => ({ ...v, scale: Math.max(0.25, v.scale * 0.85) }))}
+              aria-label="Zoom out" title="Zoom out"
+              style={{height: 26, width: 26, borderRadius: 999}}>
+              <span style={{fontFamily:"var(--font-mono)", fontSize: 14, lineHeight: 1, color:"var(--c-ink)"}}>−</span>
+            </button>
+            <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-dim)", letterSpacing:"0.04em", minWidth: 40, textAlign:"center"}}>
+              {Math.round(view.scale * 100)}%
+            </span>
+            <button className="btn btn--ghost btn--icon"
+              onClick={() => setView((v) => ({ ...v, scale: Math.min(3, v.scale * 1.18) }))}
+              aria-label="Zoom in" title="Zoom in"
+              style={{height: 26, width: 26, borderRadius: 999}}>
+              <span style={{fontFamily:"var(--font-mono)", fontSize: 14, lineHeight: 1, color:"var(--c-ink)"}}>+</span>
+            </button>
+            <span style={{width: 1, height: 16, background:"var(--c-line)", margin:"0 2px"}} aria-hidden="true" />
+            <button className="btn btn--ghost btn--sm" onClick={fitView}
+              title="Fit all nodes in view"
+              style={{height: 26, padding:"0 10px", borderRadius: 999, fontSize: 11.5}}>
+              Fit
+            </button>
+          </div>
+        )}
+        {controls && (
+          <button className="btn btn--ghost btn--icon" onClick={exportLayout}
+            aria-label="Export canvas as image" title="Export canvas as image"
+            style={{height: 30, width: 30}}>
+            <Icon name="download" size={13} />
+          </button>
+        )}
       </div>
 
       {/* Stage — everything in canvas-space, transformed as one */}
@@ -866,8 +1382,1110 @@ function InteractiveCanvas({ nodeData, edges, onNodeClick, renderNode, height = 
 }
 
 /* Standalone demo canvas (kept for deep-links; no longer a nav item). */
-function CanvasView() {
+/* ── BriefRunCanvas — the assembly + run UX. Reads run context from
+   sessionStorage (set by HomeCreate on `Proceed to assembly`) and
+   renders BIO → Brief → Specialists as fixed-height compact nodes
+   that DON'T grow during streaming (so they never stack/overlap).
+   Each specialist has a progress bar; clicking opens a notepad
+   drawer where the user can read/edit/copy the output. */
+/* Canvas header — the "what am I looking at" overview that anchors
+   every node graph below. Title (Sharpener-generated), the tension in
+   a single line, an expandable Sharpened brief, a chip-row of the crew
+   by department, and the refusals as small badges. Designed to feel
+   like the brief, not a status bar. */
+function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreakdown = [], totalCr, completed, running }) {
+  const [expanded, setExpanded] = useBrState(false);
+  const stateColor = completed ? "var(--green-600)" : running ? "var(--yellow-700)" : "var(--neutral-500)";
+  const stateLabel = completed ? "Run complete" : running ? "Running" : "Crew assembled";
+  return (
+    <div style={{
+      padding:"14px 36px 12px", borderBottom:"1px solid var(--c-line)",
+      background:"var(--c-card)", position:"relative", zIndex: 2,
+    }}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 18, marginBottom: 8}}>
+        <div style={{minWidth: 0, flex: 1}}>
+          <div style={{display:"flex", alignItems:"center", gap: 10, marginBottom: 4}}>
+            <span style={{
+              fontFamily:"var(--font-mono)", fontSize: 10, color: stateColor,
+              letterSpacing:"0.12em", textTransform:"uppercase", fontWeight: 600,
+            }}>{stateLabel}</span>
+            {totalCr != null && (
+              <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
+                · {totalCr} cr
+              </span>
+            )}
+          </div>
+          <h1 style={{
+            margin: 0, fontFamily:"Georgia, serif", fontStyle:"italic",
+            fontSize: 22, lineHeight: 1.2, letterSpacing:"-0.005em", fontWeight: 400, color:"var(--c-ink)",
+            overflow:"hidden", textOverflow:"ellipsis", display:"-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient:"vertical",
+          }}>{title || "(untitled brief)"}</h1>
+          {tension && (
+            <p style={{
+              margin:"6px 0 0", fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5,
+              overflow:"hidden", textOverflow:"ellipsis", display:"-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient:"vertical",
+            }}>
+              <span style={{color:"var(--c-faint)", fontFamily:"var(--font-mono)", fontSize: 10, marginRight: 6, letterSpacing:"0.08em", textTransform:"uppercase"}}>Tension</span>
+              {tension}
+            </p>
+          )}
+        </div>
+
+        {/* Crew composition — chips by department */}
+        <div style={{display:"flex", gap: 5, flexShrink: 0, alignItems:"center", flexWrap:"wrap", maxWidth: 460, justifyContent:"flex-end"}}>
+          {deptBreakdown.map(([dept, count]) => {
+            const color = window.CI_DEPT_COLORS?.[dept] || "var(--neutral-500)";
+            return (
+              <span key={dept} style={{
+                display:"inline-flex", alignItems:"center", gap: 5, height: 22, padding:"0 9px", borderRadius: 999,
+                background:"var(--c-bg)", border: "1px solid var(--c-line)",
+                fontFamily:"var(--font-mono)", fontSize: 10, fontWeight: 500, color:"var(--c-ink)", letterSpacing:"0.02em",
+              }}>
+                <span style={{width: 6, height: 6, borderRadius:"50%", background: color, display:"inline-block"}} />
+                {dept}
+                <span style={{color:"var(--c-faint)"}}>· {count}</span>
+              </span>
+            );
+          })}
+          {(sharpenedBrief || refusals.length > 0) && (
+            <button onClick={() => setExpanded((e) => !e)}
+              className="btn btn--ghost btn--sm"
+              style={{height: 22, padding:"0 8px", fontSize: 10.5, fontFamily:"var(--font-mono)", letterSpacing:"0.04em"}}>
+              {expanded ? "Hide brief" : "Show brief"}
+              <span style={{display:"inline-block", marginLeft: 4, transform: expanded ? "rotate(180deg)" : "none", transition:"transform 160ms ease"}}>▾</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Expandable details — sharpened brief + refusals */}
+      {expanded && (sharpenedBrief || refusals.length > 0) && (
+        <div style={{
+          marginTop: 12, paddingTop: 12, borderTop: "1px dashed var(--c-line-2)",
+          display:"grid", gridTemplateColumns: refusals.length > 0 ? "1fr 280px" : "1fr",
+          gap: 20, animation:"routeFadeIn 200ms cubic-bezier(.2,.8,.2,1) both",
+        }}>
+          {sharpenedBrief && (
+            <div>
+              <div className="eyebrow" style={{marginBottom: 6}}>Brandolph's sharpened brief</div>
+              <p style={{margin: 0, fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 13.5, lineHeight: 1.6, color:"var(--c-ink)"}}>
+                {sharpenedBrief}
+              </p>
+            </div>
+          )}
+          {refusals.length > 0 && (
+            <div>
+              <div className="eyebrow" style={{marginBottom: 6}}>Hard refusals for this brief</div>
+              <div style={{display:"flex", flexDirection:"column", gap: 4}}>
+                {refusals.slice(0, 6).map((r, i) => (
+                  <div key={i} style={{fontSize: 11.5, color:"var(--c-dim)", lineHeight: 1.45, paddingLeft: 12, position:"relative"}}>
+                    <span style={{position:"absolute", left: 0, color:"var(--pink-500)"}}>×</span>
+                    {r}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BriefRunCanvas({ context, onClear, go }) {
+  const [nodes, setNodes]         = useBrState(() => buildInitialRunNodes(context));
+  const [edges, setEdges]         = useBrState(() => buildInitialRunEdges(context));
+  const [running, setRunning]     = useBrState(false);
+  const [completed, setCompleted] = useBrState(false);
+  const [err, setErr]             = useBrState(null);
+  const [totalCost, setTotalCost] = useBrState(0);
+  const [openId, setOpenId]       = useBrState(null);            /* selected specialist id for the notepad drawer */
+  const [editedText, setEditedText] = useBrState({});            /* per-spec text overrides from the notepad */
+  const [briefId, setBriefId]       = useBrState(null);          /* surfaced so the notepad can fire re-runs */
+
+  const specs = (context.specialistIds || []).map((id) => window.CI_AGENTS.find((a) => a.id === id)).filter(Boolean);
+
+  /* Live cert state for the moat footer */
+  const [cert, setCert] = useBrState(null);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const wantedId = window.getCurrentBrandId?.();
+        let brandId = wantedId;
+        if (!brandId) {
+          const { data: brands } = await supabase.from("brands").select("id").order("created_at", { ascending: true }).limit(1);
+          brandId = brands?.[0]?.id;
+        }
+        if (!brandId) return;
+        const { data: bio } = await supabase.from("bios").select("certified_by, certified_at, version")
+          .eq("brand_id", brandId).eq("certified", true).order("version", { ascending: false }).limit(1).maybeSingle();
+        if (bio?.certified_by) {
+          const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
+          setCert({ byName: tm?.first_name || "your Steward", at: bio.certified_at });
+        }
+      } catch (e) { /* non-fatal */ }
+    })();
+  }, []);
+
+  /* Compact, fixed-height node renderer. Specialist cards never grow
+     beyond their reserved Y slot, so they can never stack/overlap.
+     Image specialists get a thumbnail preview inside the card once
+     the asset_url lands. The full output lives in the notepad drawer
+     (opened on click). */
+  const renderNode = (node) => {
+    const isSpecialist = node.kind === "specialist";
+    const isImage = isSpecialist && node.assetUrl;
+    const state = node.state || node.kind;
+    const stateColor = {
+      bio:        "var(--yellow-500)",
+      brief:      "var(--neutral-900)",
+      queued:     "var(--neutral-300)",
+      running:    "var(--yellow-500)",
+      done:       "var(--green-500)",
+      flagged:    "var(--pink-500)",
+      failed:     "var(--pink-500)",
+    }[state] || "var(--neutral-300)";
+
+    /* Progress percentage during streaming — calibrated against the
+       spec's credit estimate (≈ 100 tokens / cr). Caps at 95 % until
+       the done event lands so the bar never finishes prematurely. */
+    let pct = 0;
+    if (isSpecialist) {
+      if (state === "done" || state === "flagged" || state === "failed") pct = 100;
+      else if (state === "running") {
+        const maxTokens = (node.cr || 8) * 100;
+        const got = node.tokenCount || 0;
+        pct = Math.min(95, Math.round((got / maxTokens) * 100));
+      }
+    }
+
+    const clickable = isSpecialist && (state === "done" || state === "flagged" || state === "running");
+
+    return (
+      <div className={"cv-node cv-node--" + state} style={{
+        background: "var(--c-card)",
+        border: "1px solid var(--c-line)",
+        borderLeft: `3px solid ${stateColor}`,
+        borderRadius: 10, padding: "12px 14px",
+        boxShadow: "var(--shadow-md)",
+        height: isSpecialist ? 116 : 104,                  /* fixed height — no stacking */
+        boxSizing: "border-box", overflow: "hidden",
+        animation: state === "running" ? "runPulse 1.6s ease-in-out infinite" : undefined,
+        cursor: clickable ? "pointer" : "default",
+      }}
+      onClick={(e) => { if (clickable) { e.stopPropagation(); setOpenId(node.specId); } }}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 4}}>
+          <div className="eyebrow" style={{fontSize: 9, color: stateColor}}>
+            {(node.eyebrow || node.kind).toUpperCase()}
+            {state === "running" && " · streaming"}
+            {state === "done"    && " · done"}
+            {state === "flagged" && " · flagged"}
+            {state === "failed"  && " · failed"}
+          </div>
+          {isSpecialist && state !== "queued" && (
+            <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>{node.cr ?? "?"} cr</span>
+          )}
+        </div>
+        <div style={{fontSize: 13.5, fontWeight: 500, color:"var(--c-ink)", lineHeight: 1.3, marginBottom: 6, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+          {node.title}
+        </div>
+        {isSpecialist && (
+          <>
+            {/* Image thumbnail OR progress bar */}
+            {isImage ? (
+              <div style={{
+                height: 48, marginTop: 4, marginBottom: 6, borderRadius: 6, overflow:"hidden",
+                background:"var(--neutral-50)",
+                backgroundImage: `url("${node.assetUrl}")`,
+                backgroundSize:"cover", backgroundPosition:"center",
+              }} />
+            ) : (
+              <div style={{
+                height: 4, background:"var(--neutral-50)", borderRadius: 999,
+                marginTop: 6, marginBottom: 8, overflow:"hidden",
+              }}>
+                <div style={{
+                  height:"100%", width: pct + "%", borderRadius: 999,
+                  background: state === "flagged" || state === "failed" ? "var(--pink-500)" : stateColor,
+                  transition:"width 240ms ease",
+                }} />
+              </div>
+            )}
+            <div style={{display:"flex", justifyContent:"space-between", fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
+              <span>{node.sub}</span>
+              {clickable
+                ? <span style={{color:"var(--c-dim)"}}>open ↗</span>
+                : <span>{state === "queued" ? `${node.cr || "?"} cr` : ""}</span>}
+            </div>
+          </>
+        )}
+        {!isSpecialist && node.sub && (
+          <div style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.04em", lineHeight: 1.45, marginTop: 4}}>
+            {node.sub.length > 70 ? node.sub.slice(0, 70) + "…" : node.sub}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const runAssembly = async () => {
+    if (running || completed) return;
+    setRunning(true); setErr(null);
+    let sharedBriefId = null;
+
+    for (const agent of specs) {
+      setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
+        ? { ...n, state: "running", tokenCount: 0, outputText: "", sub: "streaming…" } : n));
+
+      let text = "";
+      let qa   = null;
+      let done = null;
+      let local_err = null;
+      let tokenCount = 0;
+      /* briefMeta only matters on the FIRST call — it's how the new
+         brief row gets its real title + sharpener payload. Subsequent
+         calls in the same assembly already have a briefId. */
+      const briefMeta = sharedBriefId ? undefined : {
+        title:          context.title || "",
+        sharpenedBrief: context.sharpenedBrief || "",
+        tension:        context.tension || "",
+        rawBrief:       context.rawBrief || "",
+        refusals:       context.refusals || [],
+      };
+      await streamSpecialistRun({
+        specialistId: agent.id,
+        briefText:    context.composedBrief,
+        briefId:      sharedBriefId,
+        briefMeta,
+        onToken: ({ text: t }) => {
+          text += t;
+          tokenCount += 1;
+          setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
+            ? { ...n, outputText: text, tokenCount } : n));
+        },
+        onProgress: ({ stage, pct }) => {
+          /* Image specialists emit `progress` instead of `token`. We
+             surface the stage label as the sub-line and drive the
+             progress bar via a synthetic tokenCount so the same UI
+             affordance works for both text and image runs. */
+          const p = Math.max(0, Math.min(100, Number(pct) || 0));
+          setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
+            ? { ...n, sub: stage || "rendering…", tokenCount: Math.round((p / 100) * (n.cr || 14) * 100) }
+            : n));
+        },
+        onQa:    (data) => { qa = data; },
+        onDone:  (data) => {
+          done = data;
+          if (!sharedBriefId && data.briefId) { sharedBriefId = data.briefId; setBriefId(data.briefId); }
+        },
+        onError: ({ message }) => { local_err = message; },
+      });
+
+      if (local_err) {
+        setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
+          ? { ...n, state: "failed", sub: local_err.slice(0, 60) } : n));
+        setErr(`${agent.name}: ${local_err}`);
+        break;
+      }
+
+      const passed = qa?.passed !== false;
+      const cost   = done?.usage?.total_cost_usd ?? 0;
+      setTotalCost((c) => c + cost);
+
+      const assetUrl = done?.output?.asset_url || null;
+      setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
+        ? {
+            ...n,
+            state: passed ? "done" : "flagged",
+            outputText: text,
+            assetUrl,
+            cost,
+            qa,
+            done,
+            sub: assetUrl
+              ? `${qa?.brand_match ?? "?"}/100 · ${passed ? "approved" : "flagged"}`
+              : `${qa?.voice_match ?? "?"}/100 · ${passed ? "approved" : "flagged"}`,
+          }
+        : n));
+    }
+
+    setRunning(false);
+    setCompleted(true);
+  };
+
+  /* Selected specialist node + its run output for the notepad drawer */
+  const opened = openId && nodes.find((n) => n.specId === openId);
+  const openedAgent = openId && specs.find((a) => a.id === openId);
+
+  /* Department breakdown for the canvas header — chips that show
+     "Strategy 1 · Concept 2 · Copy 1 · Visual 1" at a glance. */
+  const deptBreakdown = (() => {
+    const map = new Map();
+    for (const s of specs) {
+      const d = s?.dept || "Other";
+      map.set(d, (map.get(d) || 0) + 1);
+    }
+    return Array.from(map.entries());
+  })();
+
+  return (
+    <>
+      <CanvasHeader
+        title={context.title || context.sharpenedBrief?.split(/(?<=[.!?])\s/)[0] || context.rawBrief?.slice(0, 90) || "Brief"}
+        tension={context.tension}
+        sharpenedBrief={context.sharpenedBrief}
+        refusals={context.refusals || []}
+        deptBreakdown={deptBreakdown}
+        totalCr={context.totalCr}
+        completed={completed}
+        running={running}
+      />
+      <InteractiveCanvas
+        nodeData={nodes}
+        edges={edges}
+        renderNode={renderNode}
+        exportName="run-canvas"
+        onNodeClick={(node) => {
+          /* InteractiveCanvas uses setPointerCapture on the wrapper which
+             swallows any inner onClick — node clicks MUST come through here. */
+          if (!node || node.kind !== "specialist" || !node.specId) return;
+          const st = node.state;
+          if (st === "running" || st === "done" || st === "flagged") setOpenId(node.specId);
+        }}
+        helper={
+          running     ? "Running the crew… each card streams its progress. Click any to open the full output."
+          : completed ? `Run complete · ${context.totalCr} cr spent. Click any specialist to verify, edit, or copy its output.`
+          : "Crew assembled. Hit Run when you're ready."
+        }
+        toolbarExtra={
+          <>
+            {err && <span style={{fontSize: 11, color:"var(--pink-500)", marginRight: 10}}>{err}</span>}
+            {completed && (
+              <>
+                {/* Run-complete state badge — visual confirmation of "done", separate from any action */}
+                <span style={{
+                  display:"inline-flex", alignItems:"center", gap: 6, height: 28, padding:"0 10px",
+                  borderRadius: 999, background:"var(--green-50, rgba(127,163,122,0.16))",
+                  color:"var(--green-600)", fontFamily:"var(--font-mono)", fontSize: 10.5,
+                  letterSpacing:"0.08em", textTransform:"uppercase", fontWeight: 600,
+                }}>
+                  <Icon name="check" size={11} /> Run complete
+                </span>
+                {/* Actions — clearly buttons, not state */}
+                <a href="#/library" className="btn btn--primary btn--sm" style={{height: 28}}>
+                  Open Library <Icon name="arrow" size={12} />
+                </a>
+                <button className="btn btn--ghost btn--sm" onClick={() => { onClear(); go("home"); }} style={{height: 28}}>
+                  <Icon name="plus" size={12} /> New brief
+                </button>
+              </>
+            )}
+          </>
+        }
+      />
+
+      {/* Prominent floating RUN button — the moment of action. Sits
+          center-bottom above the canvas helper, impossible to miss. */}
+      {!completed && (
+        <button
+          onClick={runAssembly}
+          disabled={running}
+          style={{
+            position:"fixed",
+            bottom: 64, left:"50%", transform:"translateX(-50%)",
+            zIndex: 50,
+            height: 60, padding:"0 36px",
+            borderRadius: 999,
+            border:"none", cursor: running ? "default" : "pointer",
+            background: running ? "var(--neutral-900)" : "var(--yellow-500)",
+            color: running ? "#fff" : "var(--c-ink)",
+            fontFamily:"var(--font-sans)", fontWeight: 600, fontSize: 16, letterSpacing:"-0.005em",
+            boxShadow:"0 16px 36px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.08)",
+            display:"inline-flex", alignItems:"center", gap: 12,
+            transition: running ? "none" : "transform 140ms ease, box-shadow 140ms ease",
+          }}
+          onMouseEnter={(e) => { if (!running) { e.currentTarget.style.transform = "translateX(-50%) translateY(-2px)"; e.currentTarget.style.boxShadow = "0 22px 44px rgba(0,0,0,0.22), 0 6px 14px rgba(0,0,0,0.1)"; } }}
+          onMouseLeave={(e) => { if (!running) { e.currentTarget.style.transform = "translateX(-50%)"; e.currentTarget.style.boxShadow = "0 16px 36px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.08)"; } }}
+        >
+          {running ? (
+            <><BrandolphDot state="thinking" size={11} /> &nbsp;Running the crew…</>
+          ) : (
+            <><span style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17}}>Run</span> the assembly · {context.totalCr} cr <Icon name="arrow" size={16} /></>
+          )}
+        </button>
+      )}
+
+      {/* Notepad drawer — verify, edit, copy, save the specialist's output.
+          Edits persist via PATCH /api/outputs/:id into body.edited_text. */}
+      {opened && openedAgent && (
+        <SpecialistNotepad
+          agent={openedAgent}
+          node={opened}
+          cert={cert}
+          context={context}
+          briefId={briefId}
+          brandId={context.brandId}
+          onRerun={() => {
+            /* The re-run created a new run row on the same brief. We
+               don't auto-replace the canvas node — the user can refresh
+               or open the brief in view mode to see the new version. */
+          }}
+          outputId={opened.done?.outputId || null}
+          baselineText={opened.outputText || ""}
+          editedText={editedText[openId] ?? opened.outputText ?? ""}
+          onEdit={(text) => setEditedText((prev) => ({ ...prev, [openId]: text }))}
+          onSaved={(saved) => {
+            /* Update the node's outputText so subsequent diffs aren't dirty */
+            setNodes((prev) => prev.map((n) => n.id === "spec-" + opened.specId
+              ? { ...n, outputText: saved.body?.edited_text || saved.body?.text || n.outputText }
+              : n));
+          }}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/* Curated re-run alternatives. Text specialists get text models; image
+   specialists get image models. The cost-default already picked the
+   right one — these are for "escalate to premium" or "try cheaper". */
+const TEXT_RERUN_OPTIONS = [
+  { route: "anthropic/claude-opus-4-7",            label: "Opus 4.7",            note: "Premium — deepest reasoning" },
+  { route: "anthropic/claude-sonnet-4-6",          label: "Sonnet 4.6",          note: "Balanced workhorse" },
+  { route: "anthropic/claude-haiku-4-5-20251001",  label: "Haiku 4.5",           note: "Fast + cheap" },
+  { route: "openrouter/google/gemini-2.5-pro",     label: "Gemini Pro",          note: "Long-context synthesis" },
+  { route: "openrouter/google/gemini-2.5-flash",   label: "Gemini Flash",        note: "Cheapest" },
+];
+const IMAGE_RERUN_OPTIONS = [
+  { route: "vendor/fal/flux-1.1-pro",  label: "Flux 1.1 Pro",   note: "Premium hero quality" },
+  { route: "vendor/fal/flux-schnell",  label: "Flux Schnell",   note: "Fast draft (13× cheaper)" },
+  { route: "vendor/fal/recraft-v3",    label: "Recraft V3",     note: "Vector / illustration" },
+];
+
+/* Notepad drawer — full output, editable, copyable, saveable. Edits
+   land in outputs.body.edited_text (not the original body.text) so the
+   AI's original output stays intact for audit. */
+function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onClose, outputId, baselineText, onSaved, briefId, brandId, onRerun }) {
+  const [copied, setCopied]     = useBrState(false);
+  const [saving, setSaving]     = useBrState(false);
+  const [savedAt, setSavedAt]   = useBrState(null);
+  const [saveErr, setSaveErr]   = useBrState(null);
+  const [rerunOpen, setRerunOpen] = useBrState(false);
+  const [reviseOpen, setReviseOpen] = useBrState(false);
+  const [reviseText, setReviseText] = useBrState("");
+  const [rerunState, setRerunState] = useBrState(null);  /* { running, model, error, output } */
+  const passed   = node.state === "done";
+  const stateColor = passed ? "var(--green-500)" : node.state === "flagged" ? "var(--pink-500)" : "var(--yellow-500)";
+  const assetUrl = node.assetUrl || node.done?.output?.asset_url || null;
+  const isImage  = !!assetUrl;
+  const rerunOptions = isImage ? IMAGE_RERUN_OPTIONS : TEXT_RERUN_OPTIONS;
+  const currentRoute = node.done?.usage?.model || node.run?.model_used || "";
+
+  const dirty = !isImage && (editedText || "") !== (baselineText || "");
+
+  const fireRerun = async ({ modelOverride, revisionFeedback, label }) => {
+    if (!briefId || !agent?.id) return;
+    setRerunState({ running: true, model: label || modelOverride, error: null, output: "" });
+    let text = "";
+    let done = null;
+    let err = null;
+    await streamSpecialistRun({
+      specialistId: agent.id,
+      briefText:    context.composedBrief || context.rawBrief || "",
+      briefId,
+      brandId,
+      onToken: ({ text: t }) => {
+        text += t;
+        setRerunState((s) => ({ ...s, output: text }));
+      },
+      onProgress: ({ stage, pct }) => {
+        setRerunState((s) => ({ ...s, output: `${stage}… ${pct ?? ""}%` }));
+      },
+      onDone: (data) => { done = data; },
+      onError: ({ message }) => { err = message; },
+      __body: { modelOverride, revisionFeedback },   // see streamSpecialistRun
+    });
+    if (err) {
+      setRerunState({ running: false, model: label || modelOverride, error: err, output: text });
+      return;
+    }
+    setRerunState({ running: false, model: label || modelOverride, error: null, output: text, done });
+    onRerun && onRerun({ modelOverride, revisionFeedback, done, text });
+  };
+
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(editedText); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
+  };
+
+  const save = async () => {
+    if (!outputId || !dirty || saving) return;
+    setSaving(true); setSaveErr(null);
+    try {
+      const res = await apiFetch(`/api/outputs/${outputId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ text: editedText }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setSavedAt(new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
+      onSaved && onSaved(json.output);
+    } catch (e) {
+      setSaveErr(e?.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Drawer
+      open={true}
+      onClose={onClose}
+      title={agent.name}
+      eyebrow={`${agent.code} · ${agent.dept}`}
+      width={620}
+      footer={<>
+        <button className="btn btn--ghost" onClick={onClose}>Close</button>
+        {isImage ? (
+          <a className="btn btn--primary btn--sm" href={assetUrl} target="_blank" rel="noreferrer" download>
+            <Icon name="files" size={13} /> Download
+          </a>
+        ) : (
+          <>
+            <button className="btn btn--ghost btn--sm" onClick={copy}>
+              <Icon name="files" size={13} /> {copied ? "Copied" : "Copy"}
+            </button>
+            <button className="btn btn--primary btn--sm" disabled={!outputId || !dirty || saving} onClick={save}
+              title={!outputId ? "Output not persisted yet" : !dirty ? "No changes" : "Save edit to DB"}>
+              {saving ? "Saving…" : savedAt ? `Saved · ${savedAt}` : dirty ? "Save edit" : "Saved"}
+            </button>
+          </>
+        )}
+      </>}
+    >
+      <div style={{ background: stateColor, height: 4, borderRadius: 4, marginBottom: 14 }} />
+
+      {/* Brief context — what the specialist was asked to do */}
+      <div className="eyebrow" style={{marginBottom: 6}}>The brief</div>
+      <p style={{margin: 0, marginBottom: 18, fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5}}>
+        {context.rawBrief}
+      </p>
+      {context.sharpenedBrief && (
+        <>
+          <div className="eyebrow" style={{marginBottom: 6}}>Sharpened (a02)</div>
+          <p style={{margin: 0, marginBottom: 18, fontSize: 13, color:"var(--c-ink)", lineHeight: 1.55, fontStyle:"italic", fontFamily:"Georgia, serif"}}>
+            {context.sharpenedBrief}
+          </p>
+        </>
+      )}
+
+      {/* QA verdict */}
+      {node.qa && (
+        <div style={{
+          padding: "8px 12px", marginBottom: 14, borderRadius: 8, fontSize: 12,
+          background: passed ? "var(--green-50, rgba(127,163,122,0.16))" : "var(--pink-50, rgba(244,143,177,0.12))",
+          color: passed ? "var(--green-600)" : "var(--pink-700, var(--pink-500))",
+          display:"flex", justifyContent:"space-between",
+        }}>
+          {/* Image runs use brand_match (a24 vision QA); text runs use voice_match (a18). */}
+          {(() => {
+            const isImageQa = node.qa.kind === "image_a24" || typeof node.qa.brand_match === "number";
+            const label = isImageQa ? "Brand QA" : "Voice QA";
+            const score = isImageQa ? node.qa.brand_match : node.qa.voice_match;
+            return (
+              <>
+                <strong>{label} · {passed ? "approved" : "flagged"} · {score}/100</strong>
+                {node.qa.violations?.length > 0 && <span style={{fontStyle:"italic", textAlign:"right"}}>{node.qa.violations.join(" · ")}</span>}
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Output — image preview OR editable textarea. Image specialists
+          (a19/a20/a21) yield an asset_url; text specialists yield text
+          that lands in body.edited_text on save (body.text stays for audit). */}
+      <div className="eyebrow" style={{marginBottom: 6, display:"flex", justifyContent:"space-between"}}>
+        <span>
+          Output {isImage ? "· image" : "· editable"}
+          {dirty && <span style={{color:"var(--yellow-700)"}}> · unsaved</span>}
+        </span>
+        {!isImage && (
+          <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>
+            {editedText.length} chars
+          </span>
+        )}
+      </div>
+      {saveErr && (
+        <div style={{marginBottom: 8, padding:"6px 10px", background:"var(--pink-50, rgba(244,143,177,0.12))", color:"var(--pink-700, var(--pink-500))", borderRadius: 6, fontSize: 12}}>
+          {saveErr}
+        </div>
+      )}
+      {isImage ? (
+        <a href={assetUrl} target="_blank" rel="noreferrer"
+           style={{display:"block", borderRadius: 10, overflow:"hidden", border:"1px solid var(--c-line)"}}>
+          <img src={assetUrl} alt={agent.name}
+               style={{display:"block", width:"100%", height:"auto"}} />
+        </a>
+      ) : (
+        <textarea
+          value={editedText}
+          onChange={(e) => onEdit(e.target.value)}
+          onKeyDown={(e) => e.stopPropagation()}
+          rows={Math.max(8, Math.min(24, editedText.split("\n").length + 2))}
+          style={{
+            width:"100%", padding: 14, borderRadius: 10,
+            border: "1px solid var(--c-line)", background: "var(--c-bg)",
+            fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+            fontSize: 15, lineHeight: 1.65, color:"var(--c-ink)",
+            resize:"vertical", outline:"none", boxSizing:"border-box",
+          }}
+        />
+      )}
+
+      {/* ─── Iteration loop · re-run with another model + revise with feedback ─── */}
+      {briefId && (
+        <div style={{
+          marginTop: 18, paddingTop: 14, borderTop: "1px dashed var(--c-line-2)",
+          display:"flex", flexDirection:"column", gap: 10,
+        }}>
+          <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
+            <button className="btn btn--ghost btn--sm"
+              onClick={() => { setRerunOpen(o => !o); setReviseOpen(false); }}
+              disabled={rerunState?.running}>
+              <Icon name="refresh" size={13} /> Re-run with…
+            </button>
+            <button className="btn btn--ghost btn--sm"
+              onClick={() => { setReviseOpen(o => !o); setRerunOpen(false); }}
+              disabled={rerunState?.running}>
+              <Icon name="edit" size={13} /> Revise with feedback
+            </button>
+          </div>
+
+          {/* Re-run dropdown */}
+          {rerunOpen && (
+            <div className="card" style={{padding: 8, display:"flex", flexDirection:"column", gap: 2, animation:"cvPopIn 160ms cubic-bezier(.2,.8,.2,1)"}}>
+              {rerunOptions.map((opt) => {
+                const isCurrent = currentRoute && (currentRoute === opt.route || opt.route.endsWith(currentRoute));
+                return (
+                  <button key={opt.route}
+                    onClick={() => { setRerunOpen(false); fireRerun({ modelOverride: opt.route, label: opt.label }); }}
+                    disabled={isCurrent}
+                    style={{
+                      display:"flex", justifyContent:"space-between", alignItems:"center",
+                      width:"100%", padding:"8px 10px", borderRadius: 7,
+                      border:"none", background:"transparent",
+                      cursor: isCurrent ? "default" : "pointer", textAlign:"left",
+                      opacity: isCurrent ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = "var(--neutral-50)"; }}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                    <div>
+                      <div style={{fontSize: 13, fontWeight: 500, color:"var(--c-ink)"}}>{opt.label}{isCurrent && <span style={{color:"var(--c-faint)", fontWeight: 400}}> · current</span>}</div>
+                      <div style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>{opt.note}</div>
+                    </div>
+                    <Icon name="arrow" size={12} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Revise feedback */}
+          {reviseOpen && (
+            <div className="card" style={{padding: 12, animation:"cvPopIn 160ms cubic-bezier(.2,.8,.2,1)"}}>
+              <textarea
+                value={reviseText}
+                onChange={(e) => setReviseText(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                rows={3}
+                placeholder="What's not landing? e.g. 'too clinical — push toward editorial' or 'change the hero from coffee to a single ceramic vessel'"
+                style={{
+                  width:"100%", padding: 10, borderRadius: 8,
+                  border: "1px solid var(--c-line)", background: "var(--c-bg)",
+                  fontFamily: "inherit", fontSize: 13, lineHeight: 1.5,
+                  color:"var(--c-ink)", resize:"vertical", outline:"none", boxSizing:"border-box",
+                }}
+              />
+              <div style={{display:"flex", justifyContent:"flex-end", gap: 8, marginTop: 8}}>
+                <button className="btn btn--ghost btn--sm" onClick={() => { setReviseOpen(false); setReviseText(""); }}>Cancel</button>
+                <button className="btn btn--primary btn--sm"
+                  disabled={!reviseText.trim() || rerunState?.running}
+                  onClick={() => { const fb = reviseText.trim(); setReviseOpen(false); setReviseText(""); fireRerun({ revisionFeedback: fb, label: "with revision" }); }}>
+                  Re-run with feedback
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Re-run progress / result */}
+          {rerunState && (
+            <div className="card" style={{padding: 12, background: rerunState.error ? "var(--pink-50, rgba(244,143,177,0.08))" : "var(--c-bg)"}}>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 8}}>
+                <div className="eyebrow">
+                  Re-run · {rerunState.model || "?"}
+                  {rerunState.running && <span style={{marginLeft: 6, color:"var(--yellow-700)"}}>· running…</span>}
+                  {!rerunState.running && rerunState.error && <span style={{marginLeft: 6, color:"var(--pink-500)"}}>· failed</span>}
+                  {!rerunState.running && !rerunState.error && <span style={{marginLeft: 6, color:"var(--green-600)"}}>· done</span>}
+                </div>
+                {!rerunState.running && (
+                  <button className="btn btn--ghost btn--sm" onClick={() => setRerunState(null)} aria-label="Dismiss"><Icon name="close" size={11} /></button>
+                )}
+              </div>
+              {rerunState.error ? (
+                <div style={{fontSize: 12.5, color:"var(--pink-700, var(--pink-500))"}}>{rerunState.error}</div>
+              ) : (
+                <div style={{
+                  fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic",
+                  fontSize: 14, lineHeight: 1.55, color:"var(--c-ink)",
+                  whiteSpace: "pre-wrap", maxHeight: 200, overflowY:"auto",
+                }}>
+                  {rerunState.output || (rerunState.running ? "Calling…" : "(empty)")}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Attribution footer — client view: NEVER show $ costs, only credits. */}
+      <div style={{
+        marginTop: 14, padding: "10px 12px", borderTop: "1px dashed var(--c-line-2)",
+        display:"flex", justifyContent:"space-between",
+        fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.04em",
+      }}>
+        <span>
+          Composed by <span style={{color:"var(--c-ink)"}}>{agent.name}</span> ·
+          BIO v{node.done?.brand?.bioVersion ?? "?"}
+          {cert
+            ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span></>
+            : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+        </span>
+        <span>{agent.cr ?? "?"} cr</span>
+      </div>
+    </Drawer>
+  );
+}
+
+/* Initial node layout: BIO (left) → Brief (middle) → Specialists (right
+   column). Specialist nodes are FIXED-HEIGHT (116px) and laid out 140px
+   apart so they can never stack or overlap regardless of streaming
+   output length. Full output lives in the notepad drawer (click to open). */
+function buildInitialRunNodes(ctx) {
+  const specs = (ctx.specialistIds || []).map((id) => window.CI_AGENTS.find((a) => a.id === id)).filter(Boolean);
+  const rowH  = 140;                           /* fixed 116px node + 24px gap */
+  const cols  = { bio: 40, brief: 360, spec: 760 };
+  const totalSpecH = Math.max(specs.length, 1) * rowH;
+  const midY = totalSpecH / 2 + 40;
+
+  const nodes = [
+    { id: "bio",   x: cols.bio,   y: midY - 52, w: 260, kind: "bio",   eyebrow: "BIO",
+      title: "Brand Intelligence Object", sub: "Certified canon · the source for every output" },
+    { id: "brief", x: cols.brief, y: midY - 52, w: 280, kind: "brief", eyebrow: "BRIEF",
+      title: shorten(ctx.title || humanize(ctx.sharpenedBrief || "") || humanize(ctx.rawBrief || "") || "Brief", 90),
+      sub: ctx.tension ? `Tension · ${ctx.tension.slice(0, 70)}` : "L1 · Brandolph" },
+  ];
+
+  specs.forEach((a, i) => {
+    nodes.push({
+      id: "spec-" + a.id,
+      specId: a.id,
+      x: cols.spec,
+      y: 40 + i * rowH,
+      w: 340,
+      kind: "specialist",
+      eyebrow: `${a.code} · ${a.dept}`,
+      title: a.name,
+      sub: `Queued · ${a.cr} cr`,
+      cr: a.cr,
+      state: "queued",
+      tokenCount: 0,
+    });
+  });
+
+  return nodes;
+}
+
+function buildInitialRunEdges(ctx) {
+  const specs = (ctx.specialistIds || []);
+  const edges = [{ from: "bio", to: "brief", fromSide: "right", toSide: "left" }];
+  specs.forEach((id) => {
+    edges.push({ from: "brief", to: "spec-" + id, fromSide: "right", toSide: "left" });
+  });
+  return edges;
+}
+
+function CanvasView({ go }) {
+  /* Read context off sessionStorage. Two modes:
+       mode:"run"  → assembled crew ready to run (from HomeCreate handoff)
+       mode:"view" → existing brief opened from BriefsLibrary; loads runs/outputs from DB
+     Anything else → original placeholder canvas. */
+  const [ctx, setCtx] = useBrState(() => {
+    try {
+      const raw = sessionStorage.getItem("ci_run_context");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
+
+  const clearCtx = () => {
+    try { sessionStorage.removeItem("ci_run_context"); } catch {}
+    setCtx(null);
+  };
+
+  if (ctx?.mode === "view" && ctx.briefId) {
+    return <BriefViewCanvas briefId={ctx.briefId} onClear={clearCtx} go={go} />;
+  }
+  if (ctx && Array.isArray(ctx.specialistIds) && ctx.specialistIds.length > 0) {
+    return <BriefRunCanvas context={ctx} onClear={clearCtx} go={go} />;
+  }
   return <InteractiveCanvas nodeData={CANVAS_NODES} edges={CANVAS_EDGES} exportName="vinilo-canvas" />;
+}
+
+/* ── BriefViewCanvas — loads an existing brief's runs/outputs from DB
+   and renders the same node graph as a completed assembly. Reuses the
+   notepad drawer for verify/edit/copy. */
+function BriefViewCanvas({ briefId, onClear, go }) {
+  const [state, setState] = useBrState({ loading: true, brief: null, runs: [], cert: null, error: null });
+  const [openId, setOpenId]       = useBrState(null);
+  const [editedText, setEditedText] = useBrState({});
+
+  useBrEffect(() => {
+    (async () => {
+      try {
+        const { data: brief, error: bErr } = await supabase
+          .from("briefs").select("id, title, payload, mode, created_at, brand_id")
+          .eq("id", briefId).maybeSingle();
+        if (bErr || !brief) { setState({ loading: false, brief: null, runs: [], cert: null, error: bErr?.message || "Brief not found" }); return; }
+
+        const { data: runs } = await supabase
+          .from("runs").select("id, specialist_id, bio_version, status, outputs ( id, kind, body, status, rationale )")
+          .eq("brief_id", briefId).order("started_at", { ascending: true });
+
+        const { data: bio } = await supabase
+          .from("bios").select("certified_by, certified_at, version")
+          .eq("brand_id", brief.brand_id).eq("certified", true)
+          .order("version", { ascending: false }).limit(1).maybeSingle();
+        let cert = null;
+        if (bio?.certified_by) {
+          const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
+          cert = { byName: tm?.first_name || "your Steward", at: bio.certified_at, version: bio.version };
+        }
+
+        setState({ loading: false, brief, runs: runs || [], cert, error: null });
+      } catch (e) {
+        setState({ loading: false, brief: null, runs: [], cert: null, error: e?.message || String(e) });
+      }
+    })();
+  }, [briefId]);
+
+  if (state.loading) {
+    return <div style={{padding: 60, textAlign:"center", color:"var(--c-faint)"}}>Loading brief…</div>;
+  }
+  if (state.error || !state.brief) {
+    return (
+      <div style={{padding: 60, textAlign:"center"}}>
+        <p style={{color:"var(--c-dim)", marginBottom: 16}}>{state.error || "Brief not found."}</p>
+        <button className="btn btn--primary" onClick={() => { onClear(); go("briefs"); }}>Back to briefs</button>
+      </div>
+    );
+  }
+
+  /* Build canvas nodes from real DB data. Show edited_text if present
+     (the user's save from a prior session); fall back to AI's original. */
+  const specs = state.runs.map((r) => {
+    const a = window.CI_AGENTS.find((x) => x.id === r.specialist_id);
+    const out = r.outputs?.[0];
+    const passed = out?.status === "approved";
+    const body  = out?.body || {};
+    const text  = body.edited_text || body.text || (typeof out?.body === "string" ? out.body : "");
+    return {
+      run: r,
+      agent: a,
+      output: out,
+      passed,
+      text,
+    };
+  });
+
+  const rowH = 140;
+  const totalSpecH = Math.max(specs.length, 1) * rowH;
+  const midY = totalSpecH / 2 + 40;
+
+  const nodes = [
+    { id: "bio",   x: 40,  y: midY - 52, w: 260, kind: "bio",   eyebrow: "BIO",
+      title: "Brand Intelligence Object", sub: state.cert ? `Certified by ${state.cert.byName}` : "Certified canon" },
+    { id: "brief", x: 360, y: midY - 52, w: 280, kind: "brief", eyebrow: "BRIEF",
+      title: briefTitle(state.brief),
+      sub: `${state.runs.length} runs · ${shortDate(state.brief.created_at)}` },
+    ...specs.map((s, i) => {
+      const assetUrl = s.output?.body?.asset_url || null;
+      return {
+        id: "spec-" + (s.agent?.id || s.run.specialist_id),
+        specId: s.agent?.id || s.run.specialist_id,
+        x: 760,
+        y: 40 + i * rowH,
+        w: 340,
+        kind: "specialist",
+        eyebrow: s.agent ? `${s.agent.code} · ${s.agent.dept}` : s.run.specialist_id,
+        title: s.agent?.name || s.run.specialist_id,
+        sub: assetUrl
+          ? `image · ${s.passed ? "approved" : "flagged"}`
+          : `${s.passed ? "approved" : "flagged"}${s.output?.kind ? " · " + s.output.kind : ""}`,
+        cr: s.agent?.cr || 0,
+        state: s.passed ? "done" : "flagged",
+        outputText: s.text,
+        assetUrl,
+        tokenCount: 1000,                         /* full progress bar */
+        qa: null,
+        done: { brand: { bioVersion: s.run.bio_version }, output: assetUrl ? { asset_url: assetUrl } : null },
+      };
+    }),
+  ];
+
+  const edges = [
+    { from: "bio", to: "brief", fromSide: "right", toSide: "left" },
+    ...specs.map((s) => ({ from: "brief", to: "spec-" + (s.agent?.id || s.run.specialist_id), fromSide: "right", toSide: "left" })),
+  ];
+
+  const renderNode = (node) => {
+    const isSpec = node.kind === "specialist";
+    const stColor = {
+      bio: "var(--yellow-500)", brief: "var(--neutral-900)",
+      done: "var(--green-500)", flagged: "var(--pink-500)",
+    }[node.state || node.kind] || "var(--neutral-300)";
+    return (
+      <div className={"cv-node cv-node--" + (node.state || node.kind)} style={{
+        background:"var(--c-card)", border:"1px solid var(--c-line)",
+        borderLeft:`3px solid ${stColor}`, borderRadius: 10, padding:"12px 14px",
+        boxShadow:"var(--shadow-md)",
+        height: isSpec ? 116 : 104, boxSizing:"border-box", overflow:"hidden",
+        cursor: isSpec ? "pointer" : "default",
+      }}
+      onClick={(e) => { if (isSpec) { e.stopPropagation(); setOpenId(node.specId); } }}>
+        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 4}}>
+          <div className="eyebrow" style={{fontSize: 9, color: stColor}}>
+            {(node.eyebrow || node.kind).toUpperCase()} · {node.state === "flagged" ? "flagged" : "done"}
+          </div>
+          {isSpec && <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>{node.cr} cr</span>}
+        </div>
+        <div style={{fontSize: 13.5, fontWeight: 500, color:"var(--c-ink)", lineHeight: 1.3, marginBottom: 6, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{node.title}</div>
+        {isSpec && (<>
+          {node.assetUrl ? (
+            <div style={{
+              height: 48, marginTop: 4, marginBottom: 6, borderRadius: 6, overflow:"hidden",
+              background:"var(--neutral-50)",
+              backgroundImage: `url("${node.assetUrl}")`,
+              backgroundSize:"cover", backgroundPosition:"center",
+            }} />
+          ) : (
+            <div style={{height: 4, background:"var(--neutral-50)", borderRadius: 999, marginTop: 6, marginBottom: 8, overflow:"hidden"}}>
+              <div style={{height:"100%", width:"100%", background: stColor, borderRadius:999}} />
+            </div>
+          )}
+          <div style={{display:"flex", justifyContent:"space-between", fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
+            <span>{node.sub}</span>
+            <span style={{color:"var(--c-dim)"}}>open ↗</span>
+          </div>
+        </>)}
+        {!isSpec && node.sub && (
+          <div style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.04em", lineHeight: 1.45, marginTop: 4}}>
+            {node.sub.length > 70 ? node.sub.slice(0, 70) + "…" : node.sub}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const opened = openId && specs.find((s) => (s.agent?.id || s.run.specialist_id) === openId);
+
+  const viewDeptBreakdown = (() => {
+    const map = new Map();
+    for (const s of specs) {
+      const d = s?.agent?.dept || "Other";
+      map.set(d, (map.get(d) || 0) + 1);
+    }
+    return Array.from(map.entries());
+  })();
+  const anyFlagged = specs.some((s) => !s.passed);
+  const totalCr = specs.reduce((sum, s) => sum + (s.agent?.cr || 0), 0);
+
+  return (
+    <>
+      <CanvasHeader
+        title={briefTitle(state.brief)}
+        tension={state.brief.payload?.tension}
+        sharpenedBrief={state.brief.payload?.sharpenedBrief}
+        refusals={state.brief.payload?.refusals || []}
+        deptBreakdown={viewDeptBreakdown}
+        totalCr={totalCr}
+        completed={!anyFlagged}
+        running={false}
+      />
+      <InteractiveCanvas
+        nodeData={nodes}
+        edges={edges}
+        renderNode={renderNode}
+        exportName={"brief-" + briefId.slice(0, 8)}
+        onNodeClick={(node) => {
+          if (node?.kind === "specialist" && node.specId) setOpenId(node.specId);
+        }}
+        helper={`${specs.length} runs on this brief. Click any specialist to verify, edit, or copy its output.`}
+        toolbarExtra={
+          <>
+            <button className="btn btn--ghost btn--sm" onClick={() => { onClear(); go("briefs"); }} style={{height: 28}}>
+              ← Briefs
+            </button>
+            <a href="#/home" className="btn btn--primary btn--sm" style={{height: 28}}>
+              <Icon name="plus" size={12} /> New brief
+            </a>
+          </>
+        }
+      />
+      {opened && opened.agent && (
+        <SpecialistNotepad
+          agent={opened.agent}
+          node={{
+            outputText: opened.text,
+            assetUrl: opened.output?.body?.asset_url || null,
+            cr: opened.agent.cr,
+            qa: null,
+            done: {
+              brand: { bioVersion: opened.run.bio_version },
+              output: opened.output?.body?.asset_url ? { asset_url: opened.output.body.asset_url } : null,
+            },
+            run: { model_used: opened.run.model_used },
+            state: opened.passed ? "done" : "flagged",
+          }}
+          cert={state.cert}
+          context={{
+            rawBrief:       humanize(extractOriginalRequest(state.brief.payload?.request) || state.brief.payload?.request || state.brief.title || ""),
+            sharpenedBrief: humanize(state.brief.payload?.sharpenedBrief || ""),
+            composedBrief:  state.brief.payload?.request || "",
+          }}
+          briefId={state.brief.id}
+          brandId={state.brief.brand_id}
+          onRerun={() => {
+            /* New run lands in DB — the parent's useEffect refetches on
+               openId close. For now, the user can close + reopen. */
+          }}
+          outputId={opened.output?.id || null}
+          baselineText={opened.text || ""}
+          editedText={editedText[openId] ?? opened.text ?? ""}
+          onEdit={(text) => setEditedText((prev) => ({ ...prev, [openId]: text }))}
+          onSaved={(saved) => {
+            /* Re-fetch via mutating the spec entry in local state */
+            setState((s) => ({
+              ...s,
+              runs: s.runs.map((r) => r.id === opened.run.id
+                ? { ...r, outputs: (r.outputs || []).map((o) => o.id === opened.output.id ? { ...o, body: saved.body } : o) }
+                : r),
+            }));
+          }}
+          onClose={() => setOpenId(null)}
+        />
+      )}
+    </>
+  );
 }
 
 /* Build a brief's logic graph: BIO → brief → specialist → output(s). */
@@ -1366,95 +2984,380 @@ function CanvasNode({ node, color, refCb, active, dim, dragging, index, onPointe
 /* filtered by output type, with per-output actions.                 */
 
 function Library({ go }) {
-  const [kind, setKind] = useBrState("all");
-  const [toast, setToast] = useBrState(null);
-  const [menuFor, setMenuFor] = useBrState(null);
-  const isTeam = useIsTeam();
-  const pins = usePins();
+  /* Live Library — real outputs flattened from the briefs/runs join.
+     Each item carries its brief context, the specialist, the BIO version,
+     and the cert state so we can render the moat attribution footer on
+     every card. */
+  const { briefs, cert, brand, loading, error, reload } = useLiveBriefs();
+  const [kind, setKind]     = useBrState("all");
+  const [query, setQuery]   = useBrState("");
+  const [selected, setSelected] = useBrState(null);    /* full-content drawer */
 
-  const outputs = window.CI_OUTPUTS;
-  const kinds = window.CI_OUTPUT_KINDS;
-  const briefs = window.CI_BRIEFS;
+  /* Flatten: one entry per output, with brief/run context attached.
+     Prefer edited_text (the user's notepad save) over the original
+     AI body.text, so the Library reflects the most recent human pass. */
+  const items = React.useMemo(() => {
+    const list = [];
+    for (const b of briefs) {
+      for (const r of (b.runs || [])) {
+        for (const o of (r.outputs || [])) {
+          const body = o.body || {};
+          const text = body.edited_text || body.text || (typeof o.body === "string" ? o.body : "");
+          const assetUrl = body.asset_url || null;
+          list.push({
+            id: o.id,
+            kind: o.kind || "output",
+            status: o.status,
+            rationale: o.rationale,
+            text,
+            assetUrl,
+            edited: !!body.edited_text,                 /* surfaced as a chip in the UI */
+            brief: { id: b.id, request: b.payload?.request || b.title, title: b.payload?.title || b.title, mode: b.mode, created_at: b.created_at, payload: b.payload || {} },
+            run: { id: r.id, specialist_id: r.specialist_id, bio_version: r.bio_version, completion_tokens: r.completion_tokens, ended_at: r.ended_at },
+          });
+        }
+      }
+    }
+    return list.sort((a, b) => new Date(b.run.ended_at || 0) - new Date(a.run.ended_at || 0));
+  }, [briefs]);
 
-  const flash = (msg) => {
-    setToast(msg);
-    clearTimeout(window.__libToast);
-    window.__libToast = setTimeout(() => setToast(null), 2400);
+  const kinds = [...new Set(items.map((i) => i.kind))];
+
+  const q = query.trim().toLowerCase();
+  const filtered = items.filter((i) => {
+    if (kind !== "all" && i.kind !== kind) return false;
+    if (q) {
+      const text = `${i.text} ${i.brief.request || ""}`.toLowerCase();
+      if (!text.includes(q)) return false;
+    }
+    return true;
+  });
+
+  /* Group filtered items by brief. Briefs are the org unit; outputs are
+     children. Sort briefs by most-recent activity, sort outputs within a
+     brief by completion time (newest first). */
+  const briefGroups = React.useMemo(() => {
+    const groups = new Map();
+    for (const o of filtered) {
+      const key = o.brief.id;
+      if (!groups.has(key)) {
+        groups.set(key, { brief: o.brief, items: [], latest: 0 });
+      }
+      const g = groups.get(key);
+      g.items.push(o);
+      const t = new Date(o.run.ended_at || 0).getTime();
+      if (t > g.latest) g.latest = t;
+    }
+    return Array.from(groups.values())
+      .map((g) => ({ ...g, items: g.items.sort((a, b) => new Date(b.run.ended_at || 0) - new Date(a.run.ended_at || 0)) }))
+      .sort((a, b) => b.latest - a.latest);
+  }, [filtered]);
+
+  const openBriefInCanvas = (briefId) => {
+    try { sessionStorage.setItem("ci_run_context", JSON.stringify({ mode: "view", briefId, ts: Date.now() })); } catch {}
+    go("canvas");
   };
 
-  const filtered = kind === "all" ? outputs
-    : kind === "pinned" ? outputs.filter(o => pins.has("outputs", o.id))
-    : outputs.filter(o => o.kind === kind);
-  const groups = briefs
-    .map(b => ({ brief: b, items: filtered.filter(o => o.briefId === b.id) }))
-    .filter(g => g.items.length);
-  const countFor = (k) => k === "all" ? outputs.length
-    : k === "pinned" ? outputs.filter(o => pins.has("outputs", o.id)).length
-    : outputs.filter(o => o.kind === k).length;
+  /* Collapse state — first brief expanded by default, the rest collapsed
+     so the page lands quiet. Toggle via header click. */
+  const [collapsed, setCollapsed] = useBrState(() => new Set());
+  React.useEffect(() => {
+    if (briefGroups.length > 1) {
+      const initial = new Set(briefGroups.slice(1).map((g) => g.brief.id));
+      setCollapsed(initial);
+    }
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [briefGroups.length]);
+  const toggleCollapsed = (id) => setCollapsed((s) => {
+    const next = new Set(s);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const allCollapsed = briefGroups.length > 0 && briefGroups.every((g) => collapsed.has(g.brief.id));
+  const expandAll  = () => setCollapsed(new Set());
+  const collapseAll = () => setCollapsed(new Set(briefGroups.map((g) => g.brief.id)));
+
+  const countFor = (k) => k === "all" ? items.length : items.filter((i) => i.kind === k).length;
 
   return (
     <div style={{padding:"24px 36px 80px"}}>
       <PageHeader
-        eyebrow="Workspace"
+        eyebrow={brand ? `Workspace · ${brand.name}` : "Workspace"}
         title="Library"
-        sub="Every development and upload Brandolph has produced, organised by brief. Download it, reuse it, add it to another project, hand it to the team, or send it back to Brandolph to revise."
-        right={<span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-faint)"}}>{outputs.length} items · {briefs.length} briefs</span>}
+        sub="Every output your Specialists have produced, with the full content. Click an item to read it in full and copy the body."
+        right={<>
+          <button className="btn btn--ghost btn--sm" onClick={reload}><Icon name="refresh" size={13} /> Reload</button>
+          <span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-faint)"}}>{items.length} items · {briefs.length} briefs</span>
+        </>}
       />
 
-      {/* Type filter */}
-      <div style={{display:"flex", gap:6, flexWrap:"wrap", marginBottom:24}}>
-        <button onClick={() => setKind("all")}
-          className={"pill" + (kind === "all" ? " pill--dark" : "")}
-          style={{cursor:"pointer", height:30, padding:"0 12px"}}>All · {countFor("all")}</button>
-        {countFor("pinned") > 0 && (
-          <button onClick={() => setKind("pinned")}
-            className={"pill" + (kind === "pinned" ? " pill--dark" : " pill--yellow")}
-            style={{cursor:"pointer", height:30, padding:"0 12px"}}>★ Pinned · {countFor("pinned")}</button>
-        )}
-        {kinds.map(k => {
-          const n = countFor(k.key);
-          if (!n) return null;
+      {error && (
+        <div className="card" style={{padding:"10px 14px", marginBottom: 14, borderLeft:"3px solid var(--pink-500)", fontSize: 13}}>
+          {error}
+        </div>
+      )}
+
+      {/* Filter row */}
+      <div className="card" style={{padding: 12, marginBottom: 18, display:"flex", gap: 10, alignItems:"center", flexWrap:"wrap"}}>
+        <div style={{position:"relative", flex:"1 1 220px", minWidth: 220}}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search outputs and briefs…"
+            style={{
+              width:"100%", height: 32, padding:"0 10px 0 32px",
+              border:"1px solid var(--c-line)", borderRadius: 8,
+              fontSize: 13, fontFamily:"inherit", background:"var(--c-bg)", color:"var(--c-ink)",
+              outline:"none",
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+          <span style={{position:"absolute", left: 10, top:"50%", transform:"translateY(-50%)", color:"var(--c-faint)", pointerEvents:"none"}}>
+            <Icon name="filter" size={13} />
+          </span>
+        </div>
+        <div style={{display:"flex", gap: 4, flexWrap:"wrap"}}>
+          <button onClick={() => setKind("all")}
+            className={"pill" + (kind === "all" ? " pill--dark" : "")}
+            style={{cursor:"pointer", height: 28, padding:"0 12px"}}>All · {countFor("all")}</button>
+          {kinds.map((k) => (
+            <button key={k} onClick={() => setKind(k)}
+              className={"pill" + (kind === k ? " pill--dark" : "")}
+              style={{cursor:"pointer", height: 28, padding:"0 12px"}}>{k} · {countFor(k)}</button>
+          ))}
+        </div>
+        <span style={{marginLeft:"auto", fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>
+          {filtered.length} of {items.length}
+        </span>
+      </div>
+
+      {!loading && items.length === 0 && (
+        <div className="card" style={{padding:"56px 32px", textAlign:"center", maxWidth: 540, margin:"40px auto"}}>
+          <h2 style={{
+            margin:"0 0 14px", fontFamily:"Georgia, serif", fontStyle:"italic",
+            fontSize: 28, lineHeight: 1.2, letterSpacing:"-0.005em", fontWeight: 400, color:"var(--c-ink)",
+          }}>
+            The Library is waiting.
+          </h2>
+          <p style={{margin:"0 0 22px", fontSize: 14, color:"var(--c-dim)", lineHeight: 1.6}}>
+            Every output your crew produces lands here — with the brief that asked for it, the BIO version it was judged against, and the Steward who signed the canon. Run a brief and watch it populate.
+          </p>
+          <div style={{display:"flex", gap: 10, justifyContent:"center"}}>
+            <a href="#/home" className="btn btn--primary">
+              <Icon name="sparkles" size={13} /> Start a brief
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Expand/collapse all — small affordance for power users with many briefs */}
+      {briefGroups.length > 1 && (
+        <div style={{display:"flex", justifyContent:"flex-end", marginBottom: 8}}>
+          <button onClick={allCollapsed ? expandAll : collapseAll}
+            className="btn btn--ghost btn--sm"
+            style={{height: 26, fontSize: 11.5, padding:"0 10px"}}>
+            {allCollapsed ? "Expand all" : "Collapse all"}
+          </button>
+        </div>
+      )}
+
+      {/* Briefs are the organizational unit. Each section has a nice
+          editorial title + a chevron to collapse/expand its outputs. */}
+      <div style={{display:"flex", flexDirection:"column", gap: 28}}>
+        {briefGroups.map((group) => {
+          const isCollapsed = collapsed.has(group.brief.id);
+          const title = briefTitle(group.brief);
           return (
-            <button key={k.key} onClick={() => setKind(k.key)}
-              className={"pill" + (kind === k.key ? " pill--dark" : "")}
-              style={{cursor:"pointer", height:30, padding:"0 12px"}}>{k.label} · {n}</button>
+          <section key={group.brief.id}>
+            {/* Click anywhere on the header → toggle. The "Open in canvas"
+                button is stopPropagation'd. */}
+            <header
+              onClick={() => toggleCollapsed(group.brief.id)}
+              style={{
+                display:"flex", justifyContent:"space-between", alignItems:"flex-end",
+                gap: 18, paddingBottom: 12, marginBottom: isCollapsed ? 0 : 14,
+                borderBottom: "1px solid var(--c-line)",
+                cursor: "pointer", userSelect:"none",
+              }}>
+              <div style={{display:"flex", alignItems:"flex-start", gap: 10, minWidth: 0, flex: 1}}>
+                {/* Chevron — rotates 90° when expanded */}
+                <span style={{
+                  display:"inline-flex", alignItems:"center", justifyContent:"center",
+                  width: 18, height: 18, marginTop: 16, color:"var(--c-faint)",
+                  transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)",
+                  transition: "transform 160ms ease",
+                  fontFamily:"var(--font-mono)", fontSize: 12, lineHeight: 1,
+                }}>›</span>
+                <div style={{minWidth: 0, flex: 1}}>
+                  <div className="eyebrow" style={{marginBottom: 6, display:"flex", gap: 10, alignItems:"center"}}>
+                    <span>{shortDate(group.brief.created_at)}</span>
+                    <span style={{color:"var(--c-faint)"}}>·</span>
+                    <span>{group.items.length} {group.items.length === 1 ? "output" : "outputs"}</span>
+                  </div>
+                  <h2 style={{
+                    margin: 0,
+                    fontFamily: "Georgia, 'Times New Roman', serif",
+                    fontStyle: "italic", fontWeight: 400,
+                    fontSize: 22, lineHeight: 1.25, color: "var(--c-ink)",
+                    letterSpacing: "-0.005em",
+                    overflow: "hidden", textOverflow: "ellipsis",
+                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                  }}>{title}</h2>
+                </div>
+              </div>
+              <button onClick={(e) => { e.stopPropagation(); openBriefInCanvas(group.brief.id); }}
+                className="btn btn--ghost btn--sm"
+                style={{height: 30, flexShrink: 0}}>
+                Open in canvas <Icon name="arrow" size={12} />
+              </button>
+            </header>
+
+            {/* Outputs grid for this brief — hidden when collapsed */}
+            {!isCollapsed && (
+            <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(320px, 1fr))", gap: 14}}>
+              {group.items.map((o) => {
+          const passed  = o.status === "approved";
+          const cleaned = humanize(o.text);
+          const preview = cleaned.length > 220 ? cleaned.slice(0, 220) + "…" : cleaned;
+          const agent = window.CI_AGENTS?.find((a) => a.id === o.run.specialist_id);
+          const accent = (agent && window.CI_DEPT_COLORS?.[agent.dept]) || (passed ? "var(--green-500)" : "var(--pink-500)");
+          return (
+            <button key={o.id} onClick={() => setSelected(o)} className="card" style={{
+              padding: 0, textAlign:"left", cursor:"pointer",
+              border: "1px solid var(--c-line)", borderLeft: `3px solid ${accent}`,
+              display:"flex", flexDirection:"column", overflow:"hidden",
+              transition: "transform 120ms ease, box-shadow 120ms ease",
+            }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.06)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = ""; }}>
+              {/* Designed heading: specialist name + kind pill in corner */}
+              <header style={{
+                padding:"14px 16px 10px", borderBottom:"1px solid var(--c-line)",
+                display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 10,
+                background:"var(--c-bg)",
+              }}>
+                <div style={{minWidth: 0, flex: 1}}>
+                  <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17, color:"var(--c-ink)", lineHeight: 1.2, marginBottom: 2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                    {agent?.name || specialistName(o.run.specialist_id)}
+                  </div>
+                  <div style={{fontFamily:"var(--font-mono)", fontSize: 9.5, color:"var(--c-faint)", letterSpacing:"0.1em", textTransform:"uppercase"}}>
+                    {agent?.dept || ""}
+                  </div>
+                </div>
+                <div style={{display:"flex", flexDirection:"column", alignItems:"flex-end", gap: 4}}>
+                  <span className="pill" style={{
+                    height: 22, padding:"0 10px", fontSize: 10.5, letterSpacing:"0.04em",
+                    background: accent, color:"#fff", fontWeight: 500,
+                  }}>{o.kind}</span>
+                  {o.edited && (
+                    <span className="pill" style={{
+                      height: 18, padding:"0 8px", fontSize: 9.5, letterSpacing:"0.04em",
+                      background:"var(--neutral-50)", color:"var(--c-dim)", fontWeight: 500,
+                    }}>edited</span>
+                  )}
+                </div>
+              </header>
+
+              {/* Body — image preview OR editorial type */}
+              {o.assetUrl ? (
+                <div style={{
+                  flex: 1, minHeight: 180, background:"var(--neutral-50)",
+                  backgroundImage: `url("${o.assetUrl}")`,
+                  backgroundSize:"cover", backgroundPosition:"center",
+                }} />
+              ) : (
+                <div style={{padding: 16, flex: 1}}>
+                  <p style={{margin: 0, fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic", color:"var(--c-ink)", fontSize: 14, lineHeight: 1.55, whiteSpace:"pre-wrap"}}>
+                    {preview || <span style={{color:"var(--c-faint)"}}>(empty)</span>}
+                  </p>
+                </div>
+              )}
+
+              {/* Footer — credits only, no $ */}
+              <footer style={{display:"flex", justifyContent:"space-between", padding: "10px 16px", borderTop:"1px dashed var(--c-line-2)", fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
+                <span>BIO v{o.run.bio_version}{cert ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span></> : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}</span>
+                <span style={{color: passed ? "var(--green-600)" : "var(--pink-500)"}}>{passed ? "approved" : "flagged"} · {agent?.cr ?? "?"} cr</span>
+              </footer>
+            </button>
           );
+              })}
+            </div>
+            )}
+          </section>
+        );
         })}
       </div>
 
-      {/* Grouped by brief */}
-      <div style={{display:"flex", flexDirection:"column", gap:32}}>
-        {groups.map(g => (
-          <section key={g.brief.id}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:14}}>
-              <div style={{display:"flex", alignItems:"baseline", gap:10}}>
-                <h3 style={{margin:0, fontSize:17, letterSpacing:"-0.005em"}}>{g.brief.title}</h3>
-                <button className="btn btn--link" style={{fontSize:12}} onClick={() => go("board/" + g.brief.id)}>Open brief →</button>
-              </div>
-              <span style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.08em", textTransform:"uppercase"}}>{g.items.length} {g.items.length === 1 ? "output" : "outputs"}</span>
-            </div>
-            <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(340px, 1fr))", gap:14}}>
-              {g.items.map(o => (
-                <LibraryOutput key={o.id} o={o} go={go} flash={flash} isTeam={isTeam}
-                  briefs={briefs} menuOpen={menuFor === o.id}
-                  onMenu={() => setMenuFor(menuFor === o.id ? null : o.id)}
-                  closeMenu={() => setMenuFor(null)} />
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position:"fixed", bottom:28, left:"50%", transform:"translateX(-50%)", zIndex:60,
-          background:"var(--c-inverse)", color:"#fff", borderRadius:10,
-          padding:"10px 16px", fontSize:13, boxShadow:"var(--shadow-lg)",
-          display:"flex", alignItems:"center", gap:8, animation:"fade 200ms ease",
-        }}>
-          <Icon name="check" size={14} /> {toast}
+      {!loading && briefGroups.length === 0 && items.length > 0 && (
+        <div className="card" style={{padding: 32, textAlign:"center", color:"var(--c-faint)", marginTop: 14}}>
+          No outputs match the current filter.
         </div>
+      )}
+
+      {/* Full-content drawer */}
+      {selected && (
+        <Drawer open={true} onClose={() => setSelected(null)}
+          title={selected.kind} eyebrow={`${specialistName(selected.run.specialist_id)} · BIO v${selected.run.bio_version}`}
+          footer={<>
+            {selected.assetUrl ? (
+              <a className="btn btn--primary btn--sm" href={selected.assetUrl} target="_blank" rel="noreferrer" download>
+                <Icon name="files" size={14} /> Download
+              </a>
+            ) : (
+              <button className="btn btn--ghost btn--sm" onClick={async () => { await navigator.clipboard?.writeText(selected.text); setSelected({ ...selected, _copied: true }); setTimeout(() => setSelected((s) => s && { ...s, _copied: false }), 1500); }}>
+                <Icon name="files" size={14} /> {selected._copied ? "Copied" : "Copy text"}
+              </button>
+            )}
+            {/* Reuse — start a new brief with this output as upstream context */}
+            <button className="btn btn--ghost btn--sm" onClick={() => {
+              const agentName = specialistName(selected.run.specialist_id);
+              const preview = selected.assetUrl
+                ? `[image from ${agentName}]`
+                : (selected.text.length > 600 ? selected.text.slice(0, 600) + "…" : selected.text);
+              const prefill = `Continuing from ${agentName}'s output:\n\n${preview}\n\n— The next ask is: `;
+              try { sessionStorage.setItem("ci_home_prefill", JSON.stringify({ text: prefill, ts: Date.now() })); } catch {}
+              setSelected(null);
+              go("home");
+            }}>
+              <Icon name="refresh" size={14} /> Reuse
+            </button>
+            <button className="btn btn--ghost" onClick={() => setSelected(null)}>Close</button>
+          </>}>
+          <div className="eyebrow" style={{marginBottom: 6}}>Brief</div>
+          <p style={{margin: 0, marginBottom: 18, fontSize: 13.5, color:"var(--c-dim)", lineHeight: 1.55}}>{selected.brief.request || "(no brief text)"}</p>
+          <div className="eyebrow" style={{marginBottom: 6}}>Output</div>
+          {selected.assetUrl ? (
+            <a href={selected.assetUrl} target="_blank" rel="noreferrer"
+               style={{display:"block", borderRadius: 10, overflow:"hidden", border:"1px solid var(--c-line)"}}>
+              <img src={selected.assetUrl} alt={selected.kind} style={{display:"block", width:"100%", height:"auto"}} />
+            </a>
+          ) : (
+            <div style={{
+              padding: 16, background:"var(--c-bg)", border:"1px solid var(--c-line)", borderRadius: 10,
+              fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic",
+              fontSize: 15.5, lineHeight: 1.65, color:"var(--c-ink)", whiteSpace:"pre-wrap",
+            }}>{humanize(selected.text)}</div>
+          )}
+          {selected.rationale && (
+            <>
+              <div className="eyebrow" style={{marginTop: 14, marginBottom: 6}}>QA notes</div>
+              <p style={{margin: 0, fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5, fontStyle:"italic"}}>{selected.rationale}</p>
+            </>
+          )}
+          <div style={{
+            marginTop: 16, padding:"10px 12px",
+            borderTop:"1px dashed var(--c-line-2)",
+            display:"flex", justifyContent:"space-between", gap: 8,
+            fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.04em",
+          }}>
+            <span>
+              Composed by <span style={{color:"var(--c-ink)"}}>{specialistName(selected.run.specialist_id)}</span> ·
+              BIO v{selected.run.bio_version}
+              {cert ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span> · {shortDate(cert.at)}</> : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+            </span>
+            <span>{(window.CI_AGENTS?.find((a) => a.id === selected.run.specialist_id)?.cr) ?? "?"} cr</span>
+          </div>
+        </Drawer>
       )}
     </div>
   );
@@ -1532,7 +3435,7 @@ function LibraryOutput({ o, go, flash, isTeam, briefs, menuOpen, onMenu, closeMe
             </>
           )}
         </div>
-        {!isUpload && <Action icon="craft" label="Send to polish" onClick={() => { flash("Sent to Human craft for finishing"); go("craft"); }} />}
+        {!isUpload && <Action icon="craft" label="Send to polish" onClick={() => { flash("Sent to Humans for finishing"); go("craft"); }} />}
         {!isUpload && <Action icon="sparkles" label="Revise" onClick={() => flash("Brandolph is revising this — check back shortly")} />}
       </div>
     </div>
