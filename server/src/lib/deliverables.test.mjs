@@ -70,3 +70,28 @@ test("parseDeliverables coerces a non-string body to just its value, not the who
   assert.equal(out.deliverables[0].title, "t");
   assert.equal(out.deliverables[0].body, "42");
 });
+
+test("parseDeliverables reads a bare top-level array", () => {
+  const out = parseDeliverables('[{"title":"A","body":"x"},{"title":"B","body":"y"}]');
+  assert.equal(out.malformed, false);
+  assert.equal(out.deliverables.length, 2);
+  assert.equal(out.deliverables[1].body, "y");
+});
+
+test("parseDeliverables accepts alternate array keys + body field names", () => {
+  const out = parseDeliverables('{"captions":[{"caption":"hi there"},{"text":"second"}]}');
+  assert.equal(out.malformed, false);
+  assert.deepEqual(out.deliverables.map((d) => d.body), ["hi there", "second"]);
+});
+
+test("parseDeliverables extracts a JSON block embedded in prose", () => {
+  const out = parseDeliverables('Sure! {"deliverables":[{"body":"clean caption"}]} hope that helps');
+  assert.equal(out.malformed, false);
+  assert.equal(out.deliverables[0].body, "clean caption");
+});
+
+test("parseDeliverables NEVER surfaces raw JSON braces on malformed output", () => {
+  const out = parseDeliverables('{"deliverables": [oops this is not valid json');
+  assert.equal(out.malformed, true);
+  assert.doesNotMatch(out.deliverables[0].body, /[{}\[\]]/);   // the guarantee
+});

@@ -16,26 +16,82 @@ export function maxTokensForDeliverables({ count = 1, baseCr = 8 } = {}) {
   return Math.min(TOKEN_CEILING, 400 + n * perItem);
 }
 
-// Parse the specialist's structured output. Always returns at least one
-// deliverable — on malformed output we wrap the raw text so nothing is lost.
+function tryParse(s) {
+  if (!s) return null;
+  try { return JSON.parse(s); } catch { return null; }
+}
+
+// Slice the first JSON block out of surrounding prose (first { or [ to the
+// matching last } or ]).
+function extractJsonBlock(s) {
+  if (!s) return null;
+  const fObj = s.indexOf("{"), fArr = s.indexOf("[");
+  let start = -1, close = "";
+  if (fArr !== -1 && (fObj === -1 || fArr < fObj)) { start = fArr; close = "]"; }
+  else if (fObj !== -1) { start = fObj; close = "}"; }
+  if (start === -1) return null;
+  const end = s.lastIndexOf(close);
+  if (end <= start) return null;
+  return s.slice(start, end + 1);
+}
+
+// Find a deliverables-like array from the shapes a model might emit:
+// {deliverables:[...]}, a bare [...], or the first array-valued property.
+function pickArray(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== "object") return null;
+  if (Array.isArray(parsed.deliverables)) return parsed.deliverables;
+  for (const v of Object.values(parsed)) {
+    if (Array.isArray(v) && v.length) return v;
+  }
+  return null;
+}
+
+// Last-resort cleaner: pull readable string values out of a JSON-ish blob so a
+// card NEVER shows raw braces/keys. Guarantees the result has no { } [ ] chars.
+function humanizeJsonish(s) {
+  const vals = [];
+  const re = /"(?:body|text|caption|content|copy|title|name|value)"\s*:\s*"((?:[^"\\]|\\.)*)"/gi;
+  let m;
+  while ((m = re.exec(s))) {
+    try { vals.push(JSON.parse(`"${m[1]}"`)); } catch { vals.push(m[1]); }
+  }
+  const out = vals.length
+    ? vals.join(" — ")
+    : s.replace(/\w+\s*:\s*/g, "").replace(/[{}\[\]"]/g, "").replace(/\s*,\s*/g, " ").trim();
+  return out.replace(/[{}\[\]]/g, "").trim();   // hard guarantee: no brackets
+}
+
+function coerceItem(d) {
+  if (typeof d === "string") return { title: "", body: d };
+  if (!d || typeof d !== "object") return { title: "", body: String(d ?? "") };
+  const strBody = [d.body, d.text, d.caption, d.content, d.copy].find((x) => typeof x === "string" && x.trim());
+  let body;
+  if (typeof strBody === "string") body = strBody;
+  else if ("body" in d) body = JSON.stringify(d.body ?? "");   // preserve non-string body value, not the whole element
+  else body = humanizeJsonish(JSON.stringify(d));
+  return {
+    title: typeof d.title === "string" ? d.title : (typeof d.name === "string" ? d.name : ""),
+    body,
+  };
+}
+
+// Parse the specialist's structured output into deliverables. Always returns at
+// least one item, and NEVER surfaces raw JSON — malformed JSON is humanized.
 export function parseDeliverables(rawText) {
   const stripped = String(rawText || "")
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```\s*$/i, "")
     .trim();
-  let parsed = null;
-  try { parsed = JSON.parse(stripped); } catch { parsed = null; }
-  const arr = parsed && Array.isArray(parsed.deliverables) ? parsed.deliverables : null;
-  if (!arr || arr.length === 0) {
-    return { deliverables: [{ title: "", body: stripped }], malformed: true };
+
+  const parsed = tryParse(stripped) ?? tryParse(extractJsonBlock(stripped));
+  const arr = pickArray(parsed);
+  if (arr && arr.length) {
+    return { deliverables: arr.map(coerceItem), malformed: false };
   }
-  const deliverables = arr.map((d) => ({
-    title: typeof d?.title === "string" ? d.title : "",
-    body: typeof d?.body === "string"
-      ? d.body
-      : (typeof d === "string" ? d : JSON.stringify(d?.body ?? "")),
-  }));
-  return { deliverables, malformed: false };
+
+  const body = /^[\[{]/.test(stripped) ? humanizeJsonish(stripped) : stripped;
+  return { deliverables: [{ title: "", body }], malformed: true };
 }
 
 // The strict-JSON instruction injected into the specialist prompt so it
