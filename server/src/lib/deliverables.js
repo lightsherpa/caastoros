@@ -73,6 +73,9 @@ function coerceItem(d) {
   return {
     title: typeof d.title === "string" ? d.title : (typeof d.name === "string" ? d.name : ""),
     body,
+    ...(typeof d.visualDirection === "string" && d.visualDirection.trim()
+      ? { visualDirection: d.visualDirection.trim() }
+      : {}),
   };
 }
 
@@ -96,18 +99,24 @@ export function parseDeliverables(rawText) {
 
 // The strict-JSON instruction injected into the specialist prompt so it
 // returns N complete, platform-fitted deliverables instead of one blob.
-export function buildDeliverableContract({ type, part = "body", count = 1, platform = "generic" } = {}) {
+export function buildDeliverableContract({ type, part = "body", count = 1, platform = "generic", withVisualDirection = false } = {}) {
   const label = typeSpec(type)?.label || "deliverable";
   const ps = platformSpec(platform);
   const lenRule = ps.copyMaxChars
     ? `Keep each ${part} within ~${ps.copyMaxChars} characters.`
     : `Length as the format demands.`;
   const n = Math.max(1, Math.round(Number(count)) || 1);
+  const shape = withVisualDirection
+    ? `{"deliverables":[{"title":"short label","body":"the ${part}","visualDirection":"one art-direction sentence for the paired image: subject, composition, lighting, mood — no text"}]}`
+    : `{"deliverables":[{"title":"short label","body":"the ${part}"}]}`;
+  const vdRule = withVisualDirection
+    ? ` For each item also write a single "visualDirection" sentence describing the image that should accompany it (subject, composition, lighting, mood) — never instruct text in the image.`
+    : ``;
   return [
     `Return STRICT JSON only — no preamble, no markdown fences:`,
-    `{"deliverables":[{"title":"short label","body":"the ${part}"}]}`,
+    shape,
     `Produce exactly ${n} distinct, complete ${label} deliverable(s) for ${ps.label}.`,
-    `Each must stand on its own and be ready to ship. Tone: ${ps.tone}. ${lenRule}`,
+    `Each must stand on its own and be ready to ship. Tone: ${ps.tone}. ${lenRule}${vdRule}`,
     `Do not number them in the body. Do not add any commentary outside the JSON.`,
   ].join(" ");
 }

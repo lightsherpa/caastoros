@@ -95,3 +95,24 @@ test("parseDeliverables NEVER surfaces raw JSON braces on malformed output", () 
   assert.equal(out.malformed, true);
   assert.doesNotMatch(out.deliverables[0].body, /[{}\[\]]/);   // the guarantee
 });
+
+test("buildDeliverableContract adds a visualDirection field when withVisualDirection", () => {
+  const c = buildDeliverableContract({ type: "ad", part: "primary text", count: 2, platform: "meta_feed", withVisualDirection: true });
+  assert.match(c, /visualDirection/);
+});
+
+test("buildDeliverableContract omits visualDirection by default", () => {
+  const c = buildDeliverableContract({ type: "ad", part: "body", count: 1, platform: "generic" });
+  assert.doesNotMatch(c, /visualDirection/);
+});
+
+test("parseDeliverables preserves a visualDirection field on each item", () => {
+  const raw = JSON.stringify({ deliverables: [{ title: "A", body: "buy now", visualDirection: "warm stone still life" }] });
+  const { deliverables } = parseDeliverables(raw);
+  assert.equal(deliverables[0].visualDirection, "warm stone still life");
+});
+
+test("parseDeliverables leaves visualDirection undefined when absent", () => {
+  const { deliverables } = parseDeliverables(JSON.stringify({ deliverables: [{ title: "A", body: "x" }] }));
+  assert.equal(deliverables[0].visualDirection, undefined);
+});
