@@ -9,12 +9,19 @@
 // write on a brief.
 // ─────────────────────────────────────────────────────────────────────
 
-export function composeImagePrompt({ spec, brand, bio, refusals = [], brief, sourceText = null }) {
+export function composeImagePrompt({ spec, brand, bio, refusals = [], brief, sourceText = null, artDirection = null }) {
   const v = bio?.visual || {};
   const lines = [];
 
   /* Lead with the task — what to depict. */
   lines.push(String(brief || "").trim());
+
+  /* When a paired copy specialist supplied explicit art direction, it
+     becomes the dominant instruction — the image IS the scene the copy
+     was written for. Still text-free (the copy lives on its own card). */
+  if (artDirection) {
+    lines.push(`Art direction (follow precisely): ${String(artDirection).trim()} Do not render any text in the image.`);
+  }
 
   /* When this image illustrates a specific copy deliverable (a social post
      caption, a blog hero), depict its subject — never typeset the words. */
