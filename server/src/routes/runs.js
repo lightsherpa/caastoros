@@ -128,7 +128,7 @@ app.post("/stream", requireAuth, async (c) => {
         brief: effectiveBriefText,
         priorOutputs,
         deliverableContract: isDeliverableText
-          ? buildDeliverableContract({ type: dlv.type, part: dlv.part, count: Number(dlv.count), platform: dlv.platform })
+          ? buildDeliverableContract({ type: dlv.type, part: dlv.part, count: Number(dlv.count), platform: dlv.platform, withVisualDirection: !!dlv.withVisualDirection })
           : null,
       });
 
@@ -140,6 +140,7 @@ app.post("/stream", requireAuth, async (c) => {
         refusals: brandBio.refusals,
         brief: effectiveBriefText,
         sourceText: dlv?.sourceText || null,
+        artDirection: dlv?.artDirection || null,
       })
     : null;
 
