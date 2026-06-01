@@ -26,3 +26,8 @@ test("gpt-image-2 payload defaults size to landscape_16_9", () => {
 test("isImageRoute recognizes the gpt-image-2 route", () => {
   assert.equal(isImageRoute("vendor/fal/gpt-image-2"), true);
 });
+
+test("gpt-image-2 carries a longer per-route timeout than the 90s default", () => {
+  // gpt-image-2 "high" completes in ~90-100s; the 90s default times out on it.
+  assert.ok(FAL_ROUTES["vendor/fal/gpt-image-2"].timeout_ms > 90_000);
+});

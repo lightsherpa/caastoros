@@ -60,6 +60,7 @@ export const FAL_ROUTES = {
       output_format: "png",
     }),
     cost_estimate_usd: 0.07,   // token-priced model; placeholder until real numbers land
+    timeout_ms: 180_000,       // gpt-image-2 "high" runs ~90-100s; 90s default is too tight
   },
 };
 
@@ -113,7 +114,7 @@ export async function* generate({ route, prompt, size }) {
 
   /* Poll the status URL. fal returns IN_QUEUE → IN_PROGRESS → COMPLETED. */
   const started = Date.now();
-  const timeoutMs = 90_000;
+  const timeoutMs = cfg.timeout_ms || 90_000;   // per-route override; slow models (gpt-image-2) need more headroom
   let pct = 15;
   while (Date.now() - started < timeoutMs) {
     await new Promise((r) => setTimeout(r, 1500));
