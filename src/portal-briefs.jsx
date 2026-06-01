@@ -1399,7 +1399,7 @@ function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreak
   const stateLabel = completed ? "Run complete" : running ? "Running" : "Crew assembled";
   return (
     <div style={{
-      padding:"14px max(36px, calc(100% - 1136px)) 12px 36px", borderBottom:"1px solid var(--c-line)",
+      padding:"14px 36px 12px", borderBottom:"1px solid var(--c-line)",
       background:"var(--c-card)", position:"relative", zIndex: 2,
     }}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 18, marginBottom: 8}}>
