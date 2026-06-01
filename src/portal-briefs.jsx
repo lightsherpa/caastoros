@@ -2469,6 +2469,7 @@ function CanvasView({ go }) {
 function BriefViewCanvas({ briefId, onClear, go }) {
   const [state, setState] = useBrState({ loading: true, brief: null, runs: [], cert: null, error: null });
   const [openId, setOpenId]       = useBrState(null);
+  const [openDeliverable, setOpenDeliverable] = useBrState(null);   /* clicked deliverable card → drawer */
   const [editedText, setEditedText] = useBrState({});
 
   useBrEffect(() => {
@@ -2512,64 +2513,99 @@ function BriefViewCanvas({ briefId, onClear, go }) {
     );
   }
 
-  /* Build canvas nodes from real DB data. Show edited_text if present
-     (the user's save from a prior session); fall back to AI's original. */
-  const specs = state.runs.map((r) => {
-    const a = window.CI_AGENTS.find((x) => x.id === r.specialist_id);
-    const out = r.outputs?.[0];
-    const passed = out?.status === "approved";
-    const body  = out?.body || {};
-    const text  = body.edited_text || body.text || (typeof out?.body === "string" ? out.body : "");
+  /* Group runs by specialist — a specialist can have MANY runs (e.g. a
+     per-slot image specialist runs once per card), so build ONE node per
+     specialist (no duplicate React keys) and collect all its outputs. */
+  const bySpec = new Map();
+  for (const r of state.runs) {
+    const id = r.specialist_id;
+    if (!bySpec.has(id)) bySpec.set(id, { id, agent: window.CI_AGENTS.find((a) => a.id === id), runs: [], outputs: [], firstRun: r });
+    const e = bySpec.get(id);
+    e.runs.push(r);
+    (r.outputs || []).forEach((o) => e.outputs.push(o));
+  }
+  const specs = [...bySpec.values()].map((e) => {
+    const primary = e.outputs[0] || null;
+    const body = primary?.body || {};
+    const text = body.edited_text || body.text || (typeof primary?.body === "string" ? primary.body : "");
+    const passed = e.outputs.length === 0 || e.outputs.every((o) => o.status !== "flagged");
+    return { ...e, output: primary, passed, text };
+  });
+
+  /* Saved image asset_urls across the brief, in order — paired one per card. */
+  const imageUrls = state.runs.flatMap((r) => (r.outputs || []).map((o) => o.body?.asset_url).filter(Boolean));
+  let imgIdx = 0;
+
+  const rowH = 140;
+  const specNodes = specs.map((s, i) => {
+    const assetUrl = s.output?.body?.asset_url || null;
+    const imgCount = s.outputs.filter((o) => o.body?.asset_url).length;
     return {
-      run: r,
-      agent: a,
-      output: out,
-      passed,
-      text,
+      id: "spec-" + s.id, specId: s.id,
+      x: 760, y: 40 + i * rowH, w: 340, kind: "specialist",
+      eyebrow: s.agent ? `${s.agent.code} · ${s.agent.dept}` : s.id,
+      title: s.agent?.name || s.id,
+      sub: imgCount > 1 ? `${imgCount} images · approved`
+           : `${s.passed ? "approved" : "flagged"}${s.output?.kind ? " · " + s.output.kind : ""}`,
+      cr: s.agent?.cr || 0,
+      state: s.passed ? "done" : "flagged",
+      outputText: s.text, assetUrl, tokenCount: 1000, qa: null,
+      done: { brand: { bioVersion: s.firstRun.bio_version }, output: assetUrl ? { asset_url: assetUrl } : null },
     };
   });
 
-  const rowH = 140;
-  const totalSpecH = Math.max(specs.length, 1) * rowH;
-  const midY = totalSpecH / 2 + 40;
+  /* Reconstruct deliverable child cards from the stored {deliverables} output. */
+  const cardNodes = [];
+  const cardEdges = [];
+  specs.forEach((s) => {
+    const dOut = s.outputs.find((o) => o.body?.kind === "deliverables" && Array.isArray(o.body.deliverables));
+    const specNode = specNodes.find((n) => n.id === "spec-" + s.id);
+    if (!dOut || !specNode) return;
+    const items = dOut.body.deliverables.map((d) => ({
+      title: d.title, body: d.body,
+      assetUrl: d.asset_url || d.assetUrl || imageUrls[imgIdx++] || null,
+      platform: d.platform, status: d.status, qa: d.qa,
+    }));
+    const { cardNodes: cards } = buildDeliverableCluster(specNode, items, specNode.y);
+    cardNodes.push(...cards);
+    cards.forEach((c) => cardEdges.push({ from: specNode.id, to: c.id, fromSide: "right", toSide: "left" }));
+  });
 
+  const briefY = 40 + (Math.max(specs.length, 1) - 1) * rowH / 2;
   const nodes = [
-    { id: "bio",   x: 40,  y: midY - 52, w: 260, kind: "bio",   eyebrow: "BIO",
+    { id: "bio",   x: 40,  y: briefY, w: 260, kind: "bio",   eyebrow: "BIO",
       title: "Brand Intelligence Object", sub: state.cert ? `Certified by ${state.cert.byName}` : "Certified canon" },
-    { id: "brief", x: 360, y: midY - 52, w: 280, kind: "brief", eyebrow: "BRIEF",
+    { id: "brief", x: 360, y: briefY, w: 280, kind: "brief", eyebrow: "BRIEF",
       title: briefTitle(state.brief),
       sub: `${state.runs.length} runs · ${shortDate(state.brief.created_at)}` },
-    ...specs.map((s, i) => {
-      const assetUrl = s.output?.body?.asset_url || null;
-      return {
-        id: "spec-" + (s.agent?.id || s.run.specialist_id),
-        specId: s.agent?.id || s.run.specialist_id,
-        x: 760,
-        y: 40 + i * rowH,
-        w: 340,
-        kind: "specialist",
-        eyebrow: s.agent ? `${s.agent.code} · ${s.agent.dept}` : s.run.specialist_id,
-        title: s.agent?.name || s.run.specialist_id,
-        sub: assetUrl
-          ? `image · ${s.passed ? "approved" : "flagged"}`
-          : `${s.passed ? "approved" : "flagged"}${s.output?.kind ? " · " + s.output.kind : ""}`,
-        cr: s.agent?.cr || 0,
-        state: s.passed ? "done" : "flagged",
-        outputText: s.text,
-        assetUrl,
-        tokenCount: 1000,                         /* full progress bar */
-        qa: null,
-        done: { brand: { bioVersion: s.run.bio_version }, output: assetUrl ? { asset_url: assetUrl } : null },
-      };
-    }),
+    ...specNodes,
+    ...cardNodes,
   ];
 
   const edges = [
     { from: "bio", to: "brief", fromSide: "right", toSide: "left" },
-    ...specs.map((s) => ({ from: "brief", to: "spec-" + (s.agent?.id || s.run.specialist_id), fromSide: "right", toSide: "left" })),
+    ...specs.map((s) => ({ from: "brief", to: "spec-" + s.id, fromSide: "right", toSide: "left" })),
+    ...cardEdges,
   ];
 
   const renderNode = (node) => {
+    if (node.kind === "deliverable") {
+      const flagged = node.status === "flagged";
+      const sc = flagged ? "var(--pink-500)" : "var(--green-500)";
+      return (
+        <div className="cv-node" style={{ background:"var(--c-card)", border:"1px solid var(--c-line)", borderLeft:`3px solid ${sc}`, borderRadius: 10, overflow:"hidden", boxShadow:"var(--shadow-md)", width:"100%", height: node.h || 172, boxSizing:"border-box", display:"flex", flexDirection:"column", cursor:"pointer" }}>
+          {node.assetUrl && <div style={{ height: 90, backgroundImage:`url("${node.assetUrl}")`, backgroundSize:"cover", backgroundPosition:"center" }} />}
+          <div style={{ padding:"10px 12px", flex:1, minHeight:0, display:"flex", flexDirection:"column" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 4 }}>
+              <span className="eyebrow" style={{ fontSize: 9, color: sc }}>{(node.platform || "generic").toUpperCase()} · {flagged ? "FLAGGED" : "READY"}</span>
+            </div>
+            {node.title && <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 4, color:"var(--c-ink)" }}>{node.title}</div>}
+            <div style={{ fontSize: 12, lineHeight: 1.45, color:"var(--c-dim)", flex:1, overflow:"hidden" }}>{node.body}</div>
+            {node.specialistName && <div style={{ marginTop: 8, fontSize: 9.5, color:"var(--c-faint)", fontFamily:"var(--font-mono)" }}>by {node.specialistName}</div>}
+          </div>
+        </div>
+      );
+    }
     const isSpec = node.kind === "specialist";
     const stColor = {
       bio: "var(--yellow-500)", brief: "var(--neutral-900)",
@@ -2618,7 +2654,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
     );
   };
 
-  const opened = openId && specs.find((s) => (s.agent?.id || s.run.specialist_id) === openId);
+  const opened = openId && specs.find((s) => s.id === openId);
 
   const viewDeptBreakdown = (() => {
     const map = new Map();
@@ -2649,6 +2685,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         renderNode={renderNode}
         exportName={"brief-" + briefId.slice(0, 8)}
         onNodeClick={(node) => {
+          if (node?.kind === "deliverable") { setOpenDeliverable(node); return; }
           if (node?.kind === "specialist" && node.specId) setOpenId(node.specId);
         }}
         helper={`${specs.length} runs on this brief. Click any specialist to verify, edit, or copy its output.`}
@@ -2672,10 +2709,10 @@ function BriefViewCanvas({ briefId, onClear, go }) {
             cr: opened.agent.cr,
             qa: null,
             done: {
-              brand: { bioVersion: opened.run.bio_version },
+              brand: { bioVersion: opened.firstRun.bio_version },
               output: opened.output?.body?.asset_url ? { asset_url: opened.output.body.asset_url } : null,
             },
-            run: { model_used: opened.run.model_used },
+            run: { model_used: opened.firstRun.model_used },
             state: opened.passed ? "done" : "flagged",
           }}
           cert={state.cert}
@@ -2698,13 +2735,16 @@ function BriefViewCanvas({ briefId, onClear, go }) {
             /* Re-fetch via mutating the spec entry in local state */
             setState((s) => ({
               ...s,
-              runs: s.runs.map((r) => r.id === opened.run.id
+              runs: s.runs.map((r) => r.id === opened.firstRun.id
                 ? { ...r, outputs: (r.outputs || []).map((o) => o.id === opened.output.id ? { ...o, body: saved.body } : o) }
                 : r),
             }));
           }}
           onClose={() => setOpenId(null)}
         />
+      )}
+      {openDeliverable && (
+        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} />
       )}
     </>
   );
