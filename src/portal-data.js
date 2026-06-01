@@ -73,7 +73,7 @@ window.CI_AGENTS = [
   { id:"a09", code:"L2-09", dept:"Concept", name:"The Pull-Quote",       job:"Editorial pull quotes. The line that ends up on the wall.",                                              model:"sonnet",   cr:4,  status:"live" },
   { id:"a10", code:"L2-10", dept:"Concept", name:"The Reframer",         job:"Takes a tired concept and gives it a new spine.",                                                         model:"sonnet",     cr:6,  status:"live" },
   { id:"a11", code:"L2-11", dept:"Concept", name:"The Anti-Brief",       job:"Writes the brief you should refuse to do. Useful sanity.",                                                model:"sonnet",     cr:5,  status:"live" },
-  { id:"a35", code:"L2-35", dept:"Concept", name:"The Mood Board",       job:"Four-frame visual exploration before final art — the way an art director walks a CMO through direction.", model:"fluxSchnell",     cr:14, status:"live" },
+  { id:"a35", code:"L2-35", dept:"Concept", name:"The Mood Board",       job:"Imagery tiles + palette + type composed into a real mood board — the way an art director walks a CMO through direction.", model:"fluxSchnell",     cr:14, status:"live" },
   { id:"a36", code:"L2-36", dept:"Concept", name:"Campaign Architect",   job:"The big idea — one campaign spine that holds 10+ outputs together.",                                     model:"opus",     cr:9,  status:"live" },
 
   // Copy (11) — added Headlines, Ad Copy, Product Copy, Press & Bio
@@ -281,12 +281,12 @@ window.CI_SPECIALIST_SPECS = {
 
   /* ── Concept ─────────────────────────────────────────────── */
   a35: {
-    role: "an art director who walks a CMO through a visual direction before any final art runs",
-    objective: "Produce a 4-frame mood board (single composite image) that lets the operator see the territory, not just read it.",
-    method: ["Read the BIO visual + concept territory", "Compose four contrasting frames into one image (2×2 grid)", "Each frame nudges a different facet of the territory", "Include 1-line caption-style intent on each (rendered as text in the image if the model supports it)"],
-    outputContract: "One 1:1 image with 4 frames in a 2×2 grid. Brand-on-palette. No final-art polish — these are direction, not deliverables.",
-    voice: "Restrained. Cinematic. The image speaks; you don't decorate it.",
-    refusals: ["Won't render a polished hero — that's a20's job, not yours."],
+    role: "an art director assembling a brand mood board from imagery tiles plus the brand's palette and type",
+    objective: "Produce a set of cohesive imagery/texture tiles (one art direction) that, combined with the brand palette and type, reads as a real mood board — direction, not final art.",
+    method: ["Read the BIO visual + concept territory", "Generate distinct but cohesive imagery tiles (texture, scene, detail, material)", "Hold one palette + lens + mood across every tile", "Leave room for swatches + type — the board is composed, not a single frame"],
+    outputContract: "3–4 cohesive imagery tiles (no text), on-palette, composed by the app with brand swatches + type into a board.",
+    voice: "Restrained. Cinematic. The board speaks; you don't decorate it.",
+    refusals: ["Won't render a polished hero — that's a20's job.", "Won't bake text into the tiles."],
   },
   a36: {
     role: "a campaign architect who finds the single spine 10+ outputs hang on",

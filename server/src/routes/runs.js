@@ -457,7 +457,12 @@ app.post("/stream", requireAuth, async (c) => {
           usage: { ...usage, total_cost_usd: totalCost, qa_cost_usd: qaCost },
           qa,
           output: isImage
-            ? { kind: outputKind, asset_url: imageResult?.asset_url, width: imageResult?.width, height: imageResult?.height, status: qa.passed ? "approved" : "flagged" }
+            ? { kind: outputKind, asset_url: imageResult?.asset_url, width: imageResult?.width, height: imageResult?.height, status: qa.passed ? "approved" : "flagged",
+                bio_visual: {
+                  palette: brandBio.bio?.visual?.palette || [],
+                  type:    brandBio.bio?.visual?.type || null,
+                  imagery: brandBio.bio?.visual?.imagery || [],
+                } }
             : isDeliverableText
             ? { kind: "deliverables", type: dlv.type, part: dlv.part, platform: dlv.platform || "generic", deliverables, status: qa.passed ? "approved" : "flagged" }
             : { text: output, status: qa.passed ? "approved" : "flagged" },
