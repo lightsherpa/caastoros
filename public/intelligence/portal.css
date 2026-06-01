@@ -215,7 +215,29 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
   border-radius: 18px;
   box-shadow: var(--shadow-lg);
 }
-.app-dock__logo { display: flex; align-items: baseline; gap: 6px; padding: 6px 10px 14px; }
+.app-dock__logo {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px 14px; width: 100%;
+  border: none; background: transparent; text-align: left;
+  font: inherit; color: inherit;
+  border-radius: 10px;
+}
+.app-dock__logo[disabled] { cursor: default; }
+.app-dock__logo--linked { cursor: pointer; }
+.app-dock__logo--linked:hover { background: var(--neutral-50); }
+.app-dock__logo--linked:hover .app-dock__back {
+  background: var(--neutral-900);
+  color: #fff;
+  transform: translateX(-1px);
+}
+.app-dock__back {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 6px;
+  background: var(--neutral-50);
+  color: var(--c-dim);
+  flex-shrink: 0;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
 .app-dock__os { font-family: var(--font-mono); font-weight: 700; font-size: 17px; color: var(--c-ink); letter-spacing: 0.02em; align-self: center; }
 .app-dock__items { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 .app-dock__section { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-faint); padding: 14px 12px 6px; }
@@ -227,12 +249,149 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
   transition: background 140ms ease, color 140ms ease;
 }
 .app-dock__item:hover { background: var(--neutral-50); color: var(--c-ink); }
-.app-dock__item--active { background: var(--neutral-50); color: var(--c-ink); font-weight: 600; }
+.app-dock__item--active {
+  background: var(--neutral-50);
+  color: var(--c-ink);
+  font-weight: 600;
+}
 .app-dock__item--active .app-dock__icon { color: var(--accent); }
-.app-dock__icon { width: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.app-dock__item:not(.app-dock__item--active):hover { transform: translateX(2px); }
+.app-dock__icon {
+  width: 22px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 220ms cubic-bezier(.34,1.56,.64,1);
+}
+.app-dock__item:hover .app-dock__icon { transform: scale(1.12) rotate(-3deg); }
+.app-dock__item--active .app-dock__icon { transform: scale(1.05); }
 .app-dock__logout { margin-top: 4px; }
+.app-dock__logo .brand-logo {
+  transition: transform 360ms cubic-bezier(.34,1.56,.64,1);
+}
+.app-dock__logo:hover .brand-logo { transform: rotate(-6deg) scale(1.04); }
 @media (min-width: 1400px) {
   .app { min-width: 0; }
+}
+
+/* ─── Workspace switcher (under the logo, inside the dock) ─── */
+.ws-switcher { position: relative; padding: 2px 8px 12px; }
+.ws-switcher--ghost { height: 44px; }
+.ws-switcher__trigger {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 9px; border-radius: 10px;
+  border: 1px solid var(--c-line); background: var(--c-card);
+  font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--c-ink);
+  cursor: pointer; text-align: left;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 220ms ease;
+}
+.ws-switcher__trigger:hover {
+  border-color: var(--c-line-2);
+  background: var(--neutral-50);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.04);
+}
+.ws-switcher__trigger--open {
+  border-color: var(--neutral-900);
+  background: var(--neutral-50);
+}
+.ws-switcher__chip {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: var(--neutral-900);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: 0;
+  flex-shrink: 0;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.18);
+}
+.ws-switcher__chip--sm { width: 22px; height: 22px; font-size: 11px; border-radius: 6px; }
+.ws-switcher__name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13px; color: var(--c-ink);
+}
+.ws-switcher__chev {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--c-faint);
+  transition: transform 220ms ease, color 160ms ease;
+}
+.ws-switcher__trigger--open .ws-switcher__chev { transform: rotate(180deg); color: var(--c-ink); }
+.ws-switcher__menu {
+  position: absolute; top: calc(100% - 6px); left: 8px; right: 8px;
+  z-index: 60;
+  background: var(--c-card);
+  border: 1px solid var(--c-line);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+  animation: wsPopIn 180ms cubic-bezier(.2,.8,.2,1) both;
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 60vh; overflow-y: auto;
+}
+@keyframes wsPopIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.ws-switcher__option {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 8px; border-radius: 8px;
+  border: none; background: transparent; cursor: pointer; text-align: left;
+  color: var(--c-ink);
+  transition: background 120ms ease;
+}
+.ws-switcher__option:hover { background: var(--neutral-50); }
+.ws-switcher__option--active {
+  background: var(--neutral-50);
+}
+.ws-switcher__option--active .ws-switcher__name { font-weight: 600; }
+.ws-switcher__tick { margin-left: auto; color: var(--green-600); display: inline-flex; }
+
+/* ─── Route view fade-in on every navigation ─── */
+.route-view {
+  animation: routeFadeIn 280ms cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes routeFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+
+
+/* Shell mode — workspace mode collapses dock + shrinks topbar for
+   focus surfaces (brief-detail, canvas, board). Hover-reveal returns
+   the labels. Driven by `[data-shell-mode]` on <html>, set by the
+   useShellMode hook in portal-shell.jsx.
+   Per modes-templates-steward-plan.md rev 2 §7. */
+.app, .app-dock, .topbar, .topbar__title {
+  transition: padding-left 180ms ease, width 180ms ease, height 180ms ease, font-size 180ms ease, top 180ms ease, padding 180ms ease;
+}
+
+/* Standalone workspace-mode logo — fixed top-left, sits to the left
+   of the yellow topbar (the dock starts BELOW the logo). Hidden in
+   default mode where the in-dock logo handles branding. */
+.workspace-logo {
+  position: fixed;
+  top: 6px; left: 16px;
+  width: 28px; height: 28px;
+  display: flex;
+  align-items: center; justify-content: center;
+  z-index: 50;
+  pointer-events: none;
+}
+.workspace-logo img { width: 24px; height: 24px; display: block; }
+
+/* Workspace mode keeps the full dock — the previous 44px collapse
+   was disjointed. The standalone WorkspaceLogo is also hidden so the
+   in-dock logo handles branding consistently across every route. */
+.workspace-logo { display: none !important; }
+
+/* OutputCard hover-reveal debug attribution (client portal).
+   The strategic chip (`certified by {steward}`) leads in the public
+   client footer; the debug footer (adds `routed via {model}` + `run id`)
+   appears in a tooltip card on hover so debugging is one mouse-hover
+   away without leaking vendor identity to the client.
+   Per modes-templates-steward-plan.md rev 2 §5.5 / §9. */
+.output-card:hover .output-card__debug-tip,
+.output-card:focus-within .output-card__debug-tip {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 /* Brandolph console responsive rails -------------------------------- */
@@ -418,6 +577,11 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 .bf-button:active { transform: translateY(0) scale(0.94); }
 .bf-button--open { transform: rotate(-4deg) scale(0.92); }
 
+/* Hide the Brandolph mascot whenever a drawer is open — drawer covers
+   the bottom-right corner and the mascot's z-index would otherwise sit
+   on top of the drawer's sticky footer (Close / Try buttons). */
+body:has(.drawer) .bf-button { display: none; }
+
 .bf-button__ping {
   position: absolute; top: -4px; right: -6px;
   min-width: 22px; height: 22px;
@@ -564,14 +728,22 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
   animation: fade 200ms ease;
 }
 .drawer {
-  position: fixed; top: 0; right: 0; bottom: 0;
-  width: 520px; max-width: 90vw;
+  /* Floating card on the right — sized to content but never taller than
+     the viewport (minus 32px breathing room). The middle scroll area
+     only kicks in when content overflows, so short drawers stay short
+     and don't leave an empty band above the sticky footer. Brandolph's
+     mascot sits outside the drawer footprint, no overlap. */
+  position: fixed; top: 16px; right: 16px;
+  width: 520px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
   background: var(--bg-canvas);
-  border-left: 1px solid var(--c-line);
+  border: 1px solid var(--c-line);
+  border-radius: 16px;
   z-index: 81;
   display: flex; flex-direction: column;
   animation: slideR 240ms cubic-bezier(.2,.8,.2,1);
   box-shadow: var(--shadow-xl);
+  overflow: hidden;
 }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideR { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -609,6 +781,18 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 .b-typing { display: inline-flex; align-items: center; gap: 8px; }
 .b-typing__label { font-size: 13px; font-style: italic; color: var(--c-faint); }
 
+.b-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  background: currentColor;
+  opacity: 0.55;
+  margin-left: 2px;
+  vertical-align: -2px;
+  animation: bCaret 1s steps(2) infinite;
+}
+@keyframes bCaret { 50% { opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   .b-line { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
@@ -641,6 +825,23 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 /* Node-detail floating popover */
 @keyframes cvPopIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .card[style*="cvPopIn"] { animation: none !important; } }
+
+/* Canvas node fade-in — animationDelay on each node staggers the assembly */
+.cv-node {
+  animation: cvPopIn 320ms cubic-bezier(.2,.8,.2,1) both;
+}
+@media (prefers-reduced-motion: reduce) { .cv-node { animation: none !important; opacity: 1 !important; } }
+
+/* Run-canvas — specialist node pulses while streaming */
+@keyframes runPulse {
+  0%, 100% { box-shadow: var(--shadow-md), 0 0 0 0 rgba(248,192,54,0.0); }
+  50%      { box-shadow: var(--shadow-md), 0 0 0 6px rgba(248,192,54,0.18); }
+}
+.cv-node--running { /* applied alongside .cv-node when state=running */ }
+.cv-node--done    { /* placeholder for future "done" flash */ }
+@media (prefers-reduced-motion: reduce) {
+  .cv-node--running { animation: none !important; }
+}
 
 /* ── Board launcher dock — hover-expand overlay ───────────────── */
 .board-dock {
@@ -770,3 +971,13 @@ a.card:active, button.card:active { transform: translateY(0); }
 @media (prefers-reduced-motion: reduce) {
   .stagger > * { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
+
+/* ── Mood Board card ──────────────────────────────────────────── */
+.moodboard { display: flex; flex-direction: column; gap: 8px; padding: 8px; }
+.moodboard-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.moodboard-tile { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
+.moodboard-swatches { display: flex; gap: 4px; }
+.moodboard-swatch { width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(0,0,0,.1); }
+.moodboard-type { font-size: 13px; opacity: .8; }
+.moodboard-keywords { display: flex; flex-wrap: wrap; gap: 4px; }
+.moodboard-kw { font-size: 11px; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,.06); }

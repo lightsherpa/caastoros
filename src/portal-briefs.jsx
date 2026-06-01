@@ -1492,6 +1492,34 @@ function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreak
   );
 }
 
+function MoodBoardCard({ tiles = [], bioVisual = null }) {
+  const palette = bioVisual?.palette || [];
+  const imagery = bioVisual?.imagery || [];
+  const typeName = bioVisual?.type?.heading || bioVisual?.type?.name || null;
+  return (
+    <div className="moodboard">
+      <div className="moodboard-tiles">
+        {tiles.map((url, i) => (
+          <img key={i} src={url} alt="" className="moodboard-tile" />
+        ))}
+      </div>
+      {palette.length > 0 && (
+        <div className="moodboard-swatches">
+          {palette.map((p, i) => (
+            <span key={i} className="moodboard-swatch" style={{ background: p.hex || "#ccc" }} title={`${p.name || ""} ${p.hex || ""}`.trim()} />
+          ))}
+        </div>
+      )}
+      {typeName && <div className="moodboard-type">{typeName}</div>}
+      {imagery.length > 0 && (
+        <div className="moodboard-keywords">
+          {imagery.slice(0, 4).map((k, i) => <span key={i} className="moodboard-kw">{k}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BriefRunCanvas({ context, onClear, go }) {
   const [nodes, setNodes]         = useBrState(() => buildInitialRunNodes(context));
   const [edges, setEdges]         = useBrState(() => buildInitialRunEdges(context));
@@ -1547,6 +1575,18 @@ function BriefRunCanvas({ context, onClear, go }) {
           }}>
             {node.label} · {node.count} deliverable{node.count > 1 ? "s" : ""}
           </div>
+        </div>
+      );
+    }
+
+    if (node.kind === "moodboard") {
+      return (
+        <div className="cv-node" style={{
+          background: "var(--c-card)", border: "1px solid var(--c-line)",
+          borderLeft: "3px solid var(--green-500)", borderRadius: 10, overflow: "hidden",
+          boxShadow: "var(--shadow-md)", width: "100%", boxSizing: "border-box",
+        }}>
+          <MoodBoardCard tiles={node.tiles || []} bioVisual={node.bioVisual || null} />
         </div>
       );
     }
@@ -1714,6 +1754,33 @@ function BriefRunCanvas({ context, onClear, go }) {
           ? { ...n, state: "queued", sub: "pairs with the copy cluster" } : n));
         continue;
       }
+      // Mood board: fan into cohesive imagery tiles, then compose a board.
+      if (agent.code === "L2-35") {
+        const FACETS = ["texture & material close-up", "environmental scene", "product-in-context detail"];
+        const tiles = [];
+        let bioVisual = null;
+        for (let i = 0; i < FACETS.length; i++) {
+          setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
+            ? { ...n, state: "running", sub: `rendering tile ${i + 1}/${FACETS.length}…` } : n));
+          await streamSpecialistRun({
+            specialistId: agent.id,
+            briefText: `${context.rawBrief || context.title || ""} — mood board tile: ${FACETS[i]}`,
+            briefId: sharedBriefId,
+            onProgress: () => {},
+            onDone: (img) => {
+              if (!sharedBriefId && img?.briefId) { sharedBriefId = img.briefId; setBriefId(img.briefId); }
+              const url = img?.output?.asset_url || null;
+              if (url) tiles.push(url);
+              if (!bioVisual && img?.output?.bio_visual) bioVisual = img.output.bio_visual;
+            },
+            onError: () => {},
+          });
+        }
+        setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
+          ? { ...n, state: "done", kind: "moodboard", tiles, bioVisual, sub: `${tiles.length} tiles · board` } : n));
+        continue; // skip the generic single-image handling for this specialist
+      }
+
       setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
         ? { ...n, state: "running", tokenCount: 0, outputText: "", sub: "streaming…" } : n));
 
