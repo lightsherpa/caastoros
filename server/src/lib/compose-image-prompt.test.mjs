@@ -36,5 +36,5 @@ test("without artDirection there is no art-direction line", () => {
 
 test("artDirection still forbids rendering text", () => {
   const p = composeImagePrompt({ ...base, artDirection: "A pastel still life." });
-  assert.match(p, /real-world plausibility/i);
+  assert.match(p, /do not render any text/i);
 });
