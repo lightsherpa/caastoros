@@ -2015,30 +2015,21 @@ function DeliverableDrawer({ node, onClose }) {
     URL.revokeObjectURL(url);
   };
   return (
-    <div onPointerDown={(e) => e.stopPropagation()} style={{
-      position: "fixed", top: 0, right: 0, height: "100vh", width: 440, zIndex: 60,
-      background: "var(--c-card)", borderLeft: "1px solid var(--c-line)",
-      boxShadow: "-16px 0 40px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column",
-    }}>
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--c-line)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <span className="eyebrow" style={{ fontSize: 10, color: stateColor, letterSpacing: "0.06em" }}>
-            {(node.platform || "generic").toUpperCase()} · {flagged ? "FLAGGED" : "READY"}{node.qa?.voice_match != null ? ` · ${node.qa.voice_match}/100` : ""}
-          </span>
-          <button onClick={onClose} aria-label="Close" style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 18, lineHeight: 1, color: "var(--c-dim)" }}>✕</button>
-        </div>
-        <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--c-ink)", margin: 0, lineHeight: 1.3 }}>{node.title}</h2>
-        {node.specialistName && <div style={{ marginTop: 6, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--c-faint)", letterSpacing: "0.03em" }}>by {node.specialistName}</div>}
-      </div>
-      <div className="scroll" style={{ flex: 1, overflowY: "auto", padding: 20 }}>
-        {node.assetUrl && <img src={node.assetUrl} alt="" style={{ width: "100%", borderRadius: 10, marginBottom: 16, display: "block" }} />}
-        <div style={{ fontSize: 14, lineHeight: 1.65, color: "var(--c-ink)", whiteSpace: "pre-wrap" }}>{node.body}</div>
-      </div>
-      <div style={{ padding: "12px 20px", borderTop: "1px solid var(--c-line)", display: "flex", gap: 8 }}>
-        <button className="btn btn--primary btn--sm" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
+    <Drawer
+      open={true}
+      onClose={onClose}
+      title={node.title}
+      eyebrow={`${(node.platform || "generic").toUpperCase()} · ${flagged ? "FLAGGED" : "READY"}${node.qa?.voice_match != null ? ` · ${node.qa.voice_match}/100` : ""}${node.specialistName ? ` · by ${node.specialistName}` : ""}`}
+      width={560}
+      footer={<>
+        <button className="btn btn--ghost" onClick={onClose}>Close</button>
         <button className="btn btn--ghost btn--sm" onClick={exportOne}>Export</button>
-      </div>
-    </div>
+        <button className="btn btn--primary btn--sm" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
+      </>}
+    >
+      {node.assetUrl && <img src={node.assetUrl} alt="" style={{ width: "100%", borderRadius: 10, marginBottom: 16, display: "block" }} />}
+      <div style={{ fontSize: 14, lineHeight: 1.65, color: "var(--c-ink)", whiteSpace: "pre-wrap" }}>{node.body}</div>
+    </Drawer>
   );
 }
 
