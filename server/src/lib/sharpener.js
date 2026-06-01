@@ -64,7 +64,7 @@ OUTPUT — STRICT JSON ONLY, no preamble, no fences:
   "tension": "one-sentence diagnosis of the strategic tension. Plain prose. No 'The tension is:' framing.",
   "sharpenedBrief": "2–3 sentences a CMO would say out loud over coffee. No bullet lists. No 'Here's what we need to do:'. Start with the work, not a meta-comment about it.",
   "questions": [
-    { "q": "the question, posed directly", "why": "the BIO field this connects to, quoted or paraphrased" }
+    { "q": "the question, posed directly", "solvingFor": "one plain sentence naming what this question RESOLVES for the brief — the fork it settles and what changes depending on the answer. Strategic framing, NOT a restatement of the question or the BIO citation.", "why": "the BIO field this connects to, quoted or paraphrased" }
   ],
   "deliveryPlan": {
     "deliverableGroups": [

@@ -797,6 +797,7 @@ function HomeCreate({ tweaks, go }) {
   /* a02 Sharpener state — real per-brief output from /api/briefs/sharpen. */
   const [sharp, setSharp]       = useBState({ loading: false, data: null, error: null });
   const [answers, setAnswers]   = useBState({});            /* { 0: "...", 1: "...", 2: "..." } */
+  const [qStep, setQStep]       = useBState(0);             /* sharpening wizard: current question index */
 
   /* Resolve the actual assembly — Sharpener's proposed specialists take
      precedence; fall back to the mock density-based pick filtered to
@@ -830,6 +831,7 @@ function HomeCreate({ tweaks, go }) {
     setPhase("sharpening");
     setSharp({ loading: true, data: null, error: null });
     setAnswers({});
+    setQStep(0);
     setTimeout(() => reviewRef.current?.scrollIntoView({ behavior:"smooth", block:"nearest" }), 80);
     try {
       const res = await apiFetch("/api/briefs/sharpen", {
@@ -1136,41 +1138,62 @@ function HomeCreate({ tweaks, go }) {
                         </div>
                       )}
 
-                      {(sharp.data.questions || []).length > 0 && (
-                        <>
-                          <div className="eyebrow" style={{marginBottom: 10}}>
-                            {sharp.data.questions.length} {sharp.data.questions.length === 1 ? "question" : "questions"} a CMO would want answered
-                          </div>
-                          <div style={{display:"flex", flexDirection:"column", gap: 14, marginBottom: 18}}>
-                            {sharp.data.questions.map((q, i) => (
-                              <div key={i}>
-                                <div style={{display:"flex", gap: 10, marginBottom: 6}}>
-                                  <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.04em", minWidth: 22}}>{String(i + 1).padStart(2, "0")}</span>
-                                  <div style={{flex: 1}}>
-                                    <div style={{fontSize: 14, fontWeight: 500, color:"var(--c-ink)", lineHeight: 1.4, marginBottom: 4}}>{q.q}</div>
-                                    {q.why && <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5, fontStyle:"italic"}}>— {q.why}</div>}
-                                  </div>
-                                </div>
-                                <textarea
-                                  value={answers[i] || ""}
-                                  onChange={(e) => setAnswers((p) => ({ ...p, [i]: e.target.value }))}
-                                  onKeyDown={(e) => e.stopPropagation()}
-                                  placeholder="Answer in one line. Or skip — Brandolph proceeds with the default."
-                                  rows={1}
-                                  style={{
-                                    width:"100%", marginLeft: 32, maxWidth:"calc(100% - 32px)",
-                                    padding: "8px 12px", borderRadius: 8,
-                                    border:"1px solid var(--c-line)", background:"var(--c-bg)",
-                                    fontFamily:"inherit", fontSize: 13, color:"var(--c-ink)",
-                                    lineHeight: 1.5, resize:"vertical", outline:"none",
-                                    boxSizing:"border-box",
-                                  }}
-                                />
+                      {(sharp.data.questions || []).length > 0 && (() => {
+                        const qs = sharp.data.questions;
+                        const i = Math.min(qStep, qs.length - 1);
+                        const q = qs[i];
+                        const isLast = i >= qs.length - 1;
+                        return (
+                          <div style={{marginBottom: 18}}>
+                            {/* Progress — one question at a time */}
+                            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 12}}>
+                              <div className="eyebrow">Question {i + 1} of {qs.length}</div>
+                              <div style={{display:"flex", gap: 6}}>
+                                {qs.map((_, k) => (
+                                  <button key={k} onClick={() => setQStep(k)} title={`Question ${k + 1}`}
+                                    style={{width: 9, height: 9, padding: 0, borderRadius:"50%", border:"none", cursor:"pointer",
+                                      background: k === i ? "var(--yellow-500)" : (answers[k] || "").trim() ? "var(--green-500)" : "var(--c-line)"}} />
+                                ))}
                               </div>
-                            ))}
+                            </div>
+                            {/* Focused question card */}
+                            <div className="card" style={{padding:"22px 24px", boxShadow:"var(--shadow-md)"}}>
+                              {q.solvingFor && (
+                                <div style={{marginBottom: 14}}>
+                                  <div className="eyebrow eyebrow--yellow" style={{marginBottom: 6}}>What we're solving for</div>
+                                  <p style={{margin: 0, fontSize: 14.5, color:"var(--c-ink)", lineHeight: 1.5}}>{q.solvingFor}</p>
+                                </div>
+                              )}
+                              <div style={{height: 1, background:"var(--c-line)", margin:"14px 0 16px"}} />
+                              <div style={{fontFamily:"Georgia, serif", fontSize: 19, fontWeight: 500, color:"var(--c-ink)", lineHeight: 1.4, marginBottom: 14}}>{q.q}</div>
+                              {q.why && (
+                                <div style={{marginBottom: 16}}>
+                                  <div className="eyebrow" style={{marginBottom: 4, color:"var(--c-faint)"}}>Grounded in your BIO</div>
+                                  <div style={{fontSize: 13, color:"var(--c-dim)", lineHeight: 1.55, fontStyle:"italic"}}>{q.why}</div>
+                                </div>
+                              )}
+                              <textarea
+                                value={answers[i] || ""}
+                                onChange={(e) => setAnswers((p) => ({ ...p, [i]: e.target.value }))}
+                                onKeyDown={(e) => e.stopPropagation()}
+                                placeholder="Answer in a sentence. Or skip — Brandolph proceeds with the default."
+                                rows={3}
+                                style={{width:"100%", padding:"12px 14px", borderRadius: 10,
+                                  border:"1px solid var(--c-line)", background:"var(--c-bg)",
+                                  fontFamily:"inherit", fontSize: 14, color:"var(--c-ink)",
+                                  lineHeight: 1.55, resize:"vertical", outline:"none", boxSizing:"border-box"}}
+                              />
+                              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop: 16}}>
+                                <button className="btn btn--ghost btn--sm" onClick={() => setQStep(i - 1)}
+                                  style={{visibility: i === 0 ? "hidden" : "visible"}}>← Back</button>
+                                {!isLast
+                                  ? <button className="btn btn--primary" onClick={() => setQStep(i + 1)}>Next question <Icon name="arrow" size={14} /></button>
+                                  : <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.04em"}}>Crew &amp; assembly below ↓</span>}
+                              </div>
+                            </div>
                           </div>
-                        </>
-                      )}
+                        );
+                      })()}
 
                       {(sharp.data.proposedSpecialists || []).length > 0 && (
                         <div style={{padding: 12, background:"var(--c-bg)", borderRadius: 10, marginBottom: 18}}>
