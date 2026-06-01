@@ -1689,11 +1689,20 @@ function BriefRunCanvas({ context, onClear, go }) {
        per-slot (one image per caption) from the copy specialist's completion —
        so we skip their standalone run in this loop. */
     const pairedVisualIds = new Set();
+    /* Map copy-agent-id → true when its group has a paired visual, so we can
+       set withVisualDirection on the copy run's deliverableSpec below. */
+    const copyHasVisual = new Map();
     for (const g of context.deliveryPlan?.deliverableGroups || []) {
       const entries = Object.entries(g.crew || {});
       const hasText = entries.some(([part]) => !/image|frames|hero/i.test(part));
       const visual = entries.find(([part]) => /image|frames|hero/i.test(part));
-      if (hasText && visual) pairedVisualIds.add(visual[1]);
+      if (hasText && visual) {
+        pairedVisualIds.add(visual[1]);
+        /* Record every non-visual crew member as having a paired visual. */
+        for (const [part, id] of entries) {
+          if (!/image|frames|hero/i.test(part)) copyHasVisual.set(id, true);
+        }
+      }
     }
 
     for (const agent of specs) {
@@ -1724,12 +1733,13 @@ function BriefRunCanvas({ context, onClear, go }) {
         refusals:       context.refusals || [],
       };
       const dspec = deliverableSpecForAgent(agent.id, context.deliveryPlan);
+      const hasVisual = !!copyHasVisual.get(agent.id);
       await streamSpecialistRun({
         specialistId: agent.id,
         briefText:    context.composedBrief,
         briefId:      sharedBriefId,
         briefMeta,
-        deliverableSpec: dspec || undefined,
+        deliverableSpec: dspec ? { ...dspec, withVisualDirection: hasVisual } : undefined,
         onToken: ({ text: t }) => {
           text += t;
           tokenCount += 1;
@@ -1827,7 +1837,7 @@ function BriefRunCanvas({ context, onClear, go }) {
               specialistId: visualId,
               briefText: context.rawBrief || context.title || "",
               briefId: sharedBriefId,
-              deliverableSpec: { type: group.type, part: "image", count: 1, platform, sourceText: items[i].body },
+              deliverableSpec: { type: group.type, part: "image", count: 1, platform, sourceText: items[i].body, artDirection: items[i].visualDirection || null },
               onProgress: () => {},
               onDone: (img) => {
                 const url = img?.output?.asset_url || null;
