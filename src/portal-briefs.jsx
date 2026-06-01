@@ -1399,7 +1399,7 @@ function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreak
   const stateLabel = completed ? "Run complete" : running ? "Running" : "Crew assembled";
   return (
     <div style={{
-      padding:"14px 36px 12px", borderBottom:"1px solid var(--c-line)",
+      padding:"14px max(36px, calc(100% - 1136px)) 12px 36px", borderBottom:"1px solid var(--c-line)",
       background:"var(--c-card)", position:"relative", zIndex: 2,
     }}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 18, marginBottom: 8}}>
@@ -1500,6 +1500,7 @@ function BriefRunCanvas({ context, onClear, go }) {
   const [err, setErr]             = useBrState(null);
   const [totalCost, setTotalCost] = useBrState(0);
   const [openId, setOpenId]       = useBrState(null);            /* selected specialist id for the notepad drawer */
+  const [openDeliverable, setOpenDeliverable] = useBrState(null);   /* clicked deliverable card → content drawer */
   const [editedText, setEditedText] = useBrState({});            /* per-spec text overrides from the notepad */
   const [briefId, setBriefId]       = useBrState(null);          /* surfaced so the notepad can fire re-runs */
 
@@ -1533,6 +1534,57 @@ function BriefRunCanvas({ context, onClear, go }) {
      the asset_url lands. The full output lives in the notepad drawer
      (opened on click). */
   const renderNode = (node) => {
+    if (node.kind === "deliverable-group") {
+      return (
+        <div style={{
+          width: "100%", height: node.h, boxSizing: "border-box",
+          border: "1.5px dashed var(--c-line)", borderRadius: 16,
+          background: "rgba(0,0,0,0.012)", pointerEvents: "none",
+        }}>
+          <div style={{
+            padding: "8px 14px", fontFamily: "var(--font-mono)", fontSize: 10,
+            letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--c-faint)",
+          }}>
+            {node.label} · {node.count} deliverable{node.count > 1 ? "s" : ""}
+          </div>
+        </div>
+      );
+    }
+
+    if (node.kind === "deliverable") {
+      const flagged = node.status === "flagged";
+      const stateColor = flagged ? "var(--pink-500)" : "var(--green-500)";
+      return (
+        <div className="cv-node" style={{
+          background: "var(--c-card)", border: "1px solid var(--c-line)",
+          borderLeft: `3px solid ${stateColor}`, borderRadius: 10, overflow: "hidden",
+          boxShadow: "var(--shadow-md)", width: "100%", boxSizing: "border-box",
+          height: node.h || 172, display: "flex", flexDirection: "column",
+        }}>
+          {node.assetUrl && (
+            <div style={{ height: 120, backgroundImage: `url("${node.assetUrl}")`, backgroundSize: "cover", backgroundPosition: "center" }} />
+          )}
+          <div style={{ padding: "10px 12px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <span className="eyebrow" style={{ fontSize: 9, color: stateColor, letterSpacing: "0.04em" }}>
+                {(node.platform || "generic").toUpperCase()} · {flagged ? "FLAGGED" : "READY"}
+              </span>
+              {node.qa?.voice_match != null && (
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--c-faint)" }}>{node.qa.voice_match}/100</span>
+              )}
+            </div>
+            {node.title && <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 4, color: "var(--c-ink)" }}>{node.title}</div>}
+            <div style={{ fontSize: 12, lineHeight: 1.45, color: "var(--c-dim)", flex: 1, maxHeight: "none", overflow: "hidden", whiteSpace: "pre-wrap" }}>{node.body}</div>
+            {node.specialistName && (
+              <div style={{ marginTop: 8, fontSize: 9.5, color: "var(--c-faint)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
+                by {node.specialistName}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     const isSpecialist = node.kind === "specialist";
     const isImage = isSpecialist && node.assetUrl;
     const state = node.state || node.kind;
@@ -1633,7 +1685,26 @@ function BriefRunCanvas({ context, onClear, go }) {
     setRunning(true); setErr(null);
     let sharedBriefId = null;
 
+    /* Visual specialists that pair with a copy part in their group are fired
+       per-slot (one image per caption) from the copy specialist's completion —
+       so we skip their standalone run in this loop. */
+    const pairedVisualIds = new Set();
+    for (const g of context.deliveryPlan?.deliverableGroups || []) {
+      const entries = Object.entries(g.crew || {});
+      const hasText = entries.some(([part]) => !/image|frames|hero/i.test(part));
+      const visual = entries.find(([part]) => /image|frames|hero/i.test(part));
+      if (hasText && visual) pairedVisualIds.add(visual[1]);
+    }
+
     for (const agent of specs) {
+      if (pairedVisualIds.has(agent.id)) {
+        /* This visual specialist renders per-slot images into its group's copy
+           cluster (handled when the copy specialist completes). Mark it waiting
+           and skip the standalone single-image run. */
+        setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
+          ? { ...n, state: "queued", sub: "pairs with the copy cluster" } : n));
+        continue;
+      }
       setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
         ? { ...n, state: "running", tokenCount: 0, outputText: "", sub: "streaming…" } : n));
 
@@ -1652,11 +1723,13 @@ function BriefRunCanvas({ context, onClear, go }) {
         rawBrief:       context.rawBrief || "",
         refusals:       context.refusals || [],
       };
+      const dspec = deliverableSpecForAgent(agent.id, context.deliveryPlan);
       await streamSpecialistRun({
         specialistId: agent.id,
         briefText:    context.composedBrief,
         briefId:      sharedBriefId,
         briefMeta,
+        deliverableSpec: dspec || undefined,
         onToken: ({ text: t }) => {
           text += t;
           tokenCount += 1;
@@ -1707,6 +1780,64 @@ function BriefRunCanvas({ context, onClear, go }) {
               : `${qa?.voice_match ?? "?"}/100 · ${passed ? "approved" : "flagged"}`,
           }
         : n));
+
+      /* Fan-out: a deliverable run returns N items → append a CONTAINED cluster
+         (one bordered box + a grid of cards), stacked below any existing
+         cluster so they never overlap. Legacy runs skip this entirely. */
+      if (done?.output?.kind === "deliverables" && Array.isArray(done.output.deliverables)) {
+        setNodes((prev) => {
+          const specNode = prev.find((n) => n.id === "spec-" + agent.id);
+          if (!specNode) return prev;
+          const groups = prev.filter((n) => n.kind === "deliverable-group");
+          const laneTop = groups.length
+            ? Math.max(...groups.map((g) => g.y + (g.h || 0))) + 44
+            : Math.max(40, specNode.y - 40);
+          const { groupNode, cardNodes } = buildDeliverableCluster(specNode, done.output.deliverables, laneTop);
+          setEdges((e) => [...e, { from: specNode.id, to: groupNode.id, fromSide: "right", toSide: "left" }]);
+          const cnt = done.output.deliverables.length;
+          const summary = `${cnt} ${done.output.type || "deliverable"} card${cnt > 1 ? "s" : ""} — see the ${specNode.title} cluster`;
+          return [
+            ...prev.map((nd) => nd.id === specNode.id
+              ? { ...nd, outputText: summary, sub: `${cnt} deliverables${done.output.platform ? " · " + done.output.platform : ""}` }
+              : nd),
+            groupNode,        // container first → renders BEHIND the cards
+            ...cardNodes,
+          ];
+        });
+      }
+
+      /* Pair a per-slot image onto each card of the cluster we just built. */
+      if (done?.output?.kind === "deliverables" && Array.isArray(done.output.deliverables)) {
+        const group = (context.deliveryPlan?.deliverableGroups || [])
+          .find((g) => Object.values(g.crew || {}).includes(agent.id));
+        const visualEntry = group && Object.entries(group.crew || {}).find(([part]) => /image|frames|hero/i.test(part));
+        const visualId = visualEntry?.[1];
+        if (visualId) {
+          const platform = group.platforms?.[0] || "generic";
+          setNodes((prev) => prev.map((n) => n.id === "spec-" + visualId
+            ? { ...n, state: "running", sub: "rendering images…" } : n));
+          const items = done.output.deliverables;
+          for (let i = 0; i < items.length; i++) {
+            const cardId = `spec-${agent.id}-d${i}`;
+            setNodes((prev) => prev.map((n) => n.id === "spec-" + visualId
+              ? { ...n, sub: `rendering image ${i + 1}/${items.length}…` } : n));
+            await streamSpecialistRun({
+              specialistId: visualId,
+              briefText: context.rawBrief || context.title || "",
+              briefId: sharedBriefId,
+              deliverableSpec: { type: group.type, part: "image", count: 1, platform, sourceText: items[i].body },
+              onProgress: () => {},
+              onDone: (img) => {
+                const url = img?.output?.asset_url || null;
+                if (url) setNodes((prev) => prev.map((n) => n.id === cardId ? { ...n, assetUrl: url } : n));
+              },
+              onError: () => {},
+            });
+          }
+          setNodes((prev) => prev.map((n) => n.id === "spec-" + visualId
+            ? { ...n, state: "done", sub: `${items.length} image${items.length > 1 ? "s" : ""} → ${agent.name || "copy"} cluster` } : n));
+        }
+      }
     }
 
     setRunning(false);
@@ -1748,6 +1879,7 @@ function BriefRunCanvas({ context, onClear, go }) {
         onNodeClick={(node) => {
           /* InteractiveCanvas uses setPointerCapture on the wrapper which
              swallows any inner onClick — node clicks MUST come through here. */
+          if (node?.kind === "deliverable") { setOpenDeliverable(node); return; }
           if (!node || node.kind !== "specialist" || !node.specId) return;
           const st = node.state;
           if (st === "running" || st === "done" || st === "flagged") setOpenId(node.specId);
@@ -1792,7 +1924,7 @@ function BriefRunCanvas({ context, onClear, go }) {
           disabled={running}
           style={{
             position:"fixed",
-            bottom: 64, left:"50%", transform:"translateX(-50%)",
+            bottom: 120, left:"50%", transform:"translateX(-50%)",
             zIndex: 50,
             height: 60, padding:"0 36px",
             borderRadius: 999,
@@ -1843,6 +1975,9 @@ function BriefRunCanvas({ context, onClear, go }) {
           onClose={() => setOpenId(null)}
         />
       )}
+      {openDeliverable && (
+        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} />
+      )}
     </>
   );
 }
@@ -1862,6 +1997,50 @@ const IMAGE_RERUN_OPTIONS = [
   { route: "vendor/fal/flux-schnell",  label: "Flux Schnell",   note: "Fast draft (13× cheaper)" },
   { route: "vendor/fal/recraft-v3",    label: "Recraft V3",     note: "Vector / illustration" },
 ];
+
+/* Read the full content of one deliverable card — title, body, image, plus
+   Copy / Export. Opened by clicking a deliverable card on the canvas. */
+function DeliverableDrawer({ node, onClose }) {
+  const [copied, setCopied] = useBrState(false);
+  const flagged = node.status === "flagged";
+  const stateColor = flagged ? "var(--pink-500)" : "var(--green-500)";
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(node.body || ""); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {}
+  };
+  const exportOne = () => {
+    const data = JSON.stringify({ title: node.title, body: node.body, platform: node.platform, status: node.status, by: node.specialistName }, null, 2);
+    const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = (node.title || "deliverable").replace(/\s+/g, "-").toLowerCase() + ".json"; a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div onPointerDown={(e) => e.stopPropagation()} style={{
+      position: "fixed", top: 0, right: 0, height: "100vh", width: 440, zIndex: 60,
+      background: "var(--c-card)", borderLeft: "1px solid var(--c-line)",
+      boxShadow: "-16px 0 40px rgba(0,0,0,0.12)", display: "flex", flexDirection: "column",
+    }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--c-line)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <span className="eyebrow" style={{ fontSize: 10, color: stateColor, letterSpacing: "0.06em" }}>
+            {(node.platform || "generic").toUpperCase()} · {flagged ? "FLAGGED" : "READY"}{node.qa?.voice_match != null ? ` · ${node.qa.voice_match}/100` : ""}
+          </span>
+          <button onClick={onClose} aria-label="Close" style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 18, lineHeight: 1, color: "var(--c-dim)" }}>✕</button>
+        </div>
+        <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--c-ink)", margin: 0, lineHeight: 1.3 }}>{node.title}</h2>
+        {node.specialistName && <div style={{ marginTop: 6, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--c-faint)", letterSpacing: "0.03em" }}>by {node.specialistName}</div>}
+      </div>
+      <div className="scroll" style={{ flex: 1, overflowY: "auto", padding: 20 }}>
+        {node.assetUrl && <img src={node.assetUrl} alt="" style={{ width: "100%", borderRadius: 10, marginBottom: 16, display: "block" }} />}
+        <div style={{ fontSize: 14, lineHeight: 1.65, color: "var(--c-ink)", whiteSpace: "pre-wrap" }}>{node.body}</div>
+      </div>
+      <div style={{ padding: "12px 20px", borderTop: "1px solid var(--c-line)", display: "flex", gap: 8 }}>
+        <button className="btn btn--primary btn--sm" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
+        <button className="btn btn--ghost btn--sm" onClick={exportOne}>Export</button>
+      </div>
+    </div>
+  );
+}
 
 /* Notepad drawer — full output, editable, copyable, saveable. Edits
    land in outputs.body.edited_text (not the original body.text) so the
@@ -2165,6 +2344,65 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
       </div>
     </Drawer>
   );
+}
+
+/* Which group + part (if any) an agent fills in the Delivery Plan, plus the
+   single platform we fan out for in Plan 3 (the group's first platform).
+   Returns null when there's no plan or the agent isn't in it → the run
+   behaves exactly as a legacy single-output run. */
+function deliverableSpecForAgent(agentId, plan) {
+  for (const g of plan?.deliverableGroups || []) {
+    for (const [part, id] of Object.entries(g.crew || {})) {
+      if (id === agentId) {
+        return { type: g.type, part, count: g.count, platform: g.platforms?.[0] || "generic" };
+      }
+    }
+  }
+  return null;
+}
+
+/* Build a CONTAINED cluster for a specialist's deliverables: one group
+   container node (the bordered, labeled box) + N card nodes laid out in a grid
+   inside it. Works for N=1 (a single contained card) up to many. `laneTop` is
+   the y to start the cluster at (caller stacks clusters so they never overlap). */
+function buildDeliverableCluster(specNode, deliverables, laneTop) {
+  const CARD_W = 280, CARD_H = 172, GAP = 16, PAD = 16, LABEL_H = 30;
+  const n = deliverables.length;
+  const cols = Math.min(3, Math.max(1, n));
+  const rows = Math.ceil(n / cols);
+  const groupX = specNode.x + specNode.w + 170;
+  const groupY = laneTop;
+  const groupW = PAD * 2 + cols * CARD_W + (cols - 1) * GAP;
+  const groupH = LABEL_H + PAD + rows * CARD_H + (rows - 1) * GAP + PAD;
+
+  const groupNode = {
+    id: specNode.id + "-grp",
+    kind: "deliverable-group",
+    x: groupX, y: groupY, w: groupW, h: groupH,
+    label: specNode.title,
+    count: n,
+  };
+
+  const cardNodes = deliverables.map((d, i) => {
+    const r = Math.floor(i / cols), c = i % cols;
+    return {
+      id: `${specNode.id}-d${i}`,
+      parentId: specNode.id,
+      kind: "deliverable",
+      x: groupX + PAD + c * (CARD_W + GAP),
+      y: groupY + LABEL_H + PAD + r * (CARD_H + GAP),
+      w: CARD_W, h: CARD_H,
+      specialistName: specNode.title,
+      title: d.title || `${specNode.title} · ${i + 1}`,
+      body: d.body || "",
+      assetUrl: d.assetUrl || null,
+      platform: d.platform || "generic",
+      status: d.status || (d.qa?.passed === false ? "flagged" : "approved"),
+      qa: d.qa || null,
+    };
+  });
+
+  return { groupNode, cardNodes };
 }
 
 /* Initial node layout: BIO (left) → Brief (middle) → Specialists (right
