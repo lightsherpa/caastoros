@@ -18,7 +18,8 @@
     "test:run": "node --env-file=server/.env scripts/test-run.mjs",
     "test:plan": "node --env-file=server/.env scripts/test-delivery-plan.mjs",
     "test:units": "node --test server/src/lib/platforms.test.mjs server/src/lib/taxonomy.test.mjs server/src/lib/delivery-plan.test.mjs server/src/lib/deliverables.test.mjs server/src/lib/compose-specialist-prompt.test.mjs server/src/lib/compose-image-prompt.test.mjs server/src/lib/models/fal-image.test.mjs",
-    "test:deliverables": "node --env-file=server/.env scripts/test-deliverables.mjs"
+    "test:deliverables": "node --env-file=server/.env scripts/test-deliverables.mjs",
+    "bench:image": "node --env-file=server/.env scripts/bench-image.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",
