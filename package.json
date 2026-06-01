@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "dev:server": "cd server && npm run dev",
-    "dev:all": "concurrently -k -n web,api -c yellow,cyan \"npm run dev\" \"npm run dev:server\"",
+    "dev:inngest": "npx inngest-cli@latest dev -u http://localhost:8787/api/inngest",
+    "dev:all": "concurrently -k -n web,api,inngest -c yellow,cyan,magenta \"npm run dev\" \"npm run dev:server\" \"npm run dev:inngest\"",
     "seed:specs": "node --env-file=server/.env scripts/seed-specs.mjs",
     "test:router": "node --env-file=server/.env scripts/test-router.mjs",
     "test:discovery": "node --env-file=server/.env scripts/test-discovery.mjs",
@@ -16,7 +17,7 @@
     "test:recovery": "node --env-file=server/.env scripts/test-recovery-link.mjs",
     "test:run": "node --env-file=server/.env scripts/test-run.mjs",
     "test:plan": "node --env-file=server/.env scripts/test-delivery-plan.mjs",
-    "test:units": "node --test server/src/lib/platforms.test.mjs server/src/lib/taxonomy.test.mjs server/src/lib/delivery-plan.test.mjs server/src/lib/deliverables.test.mjs server/src/lib/compose-specialist-prompt.test.mjs server/src/lib/compose-image-prompt.test.mjs",
+    "test:units": "node --test server/src/lib/platforms.test.mjs server/src/lib/taxonomy.test.mjs server/src/lib/delivery-plan.test.mjs server/src/lib/deliverables.test.mjs server/src/lib/compose-specialist-prompt.test.mjs server/src/lib/compose-image-prompt.test.mjs server/src/lib/models/fal-image.test.mjs",
     "test:deliverables": "node --env-file=server/.env scripts/test-deliverables.mjs"
   },
   "dependencies": {
