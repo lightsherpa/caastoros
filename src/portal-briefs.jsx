@@ -1495,7 +1495,8 @@ function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreak
 function MoodBoardCard({ tiles = [], bioVisual = null }) {
   const palette = bioVisual?.palette || [];
   const imagery = bioVisual?.imagery || [];
-  const typeName = bioVisual?.type?.heading || bioVisual?.type?.name || null;
+  // bio.visual.type is an array of { kind, family, ... } — render as type specimens.
+  const typeList = Array.isArray(bioVisual?.type) ? bioVisual.type : [];
   return (
     <div className="moodboard">
       <div className="moodboard-tiles">
@@ -1510,7 +1511,15 @@ function MoodBoardCard({ tiles = [], bioVisual = null }) {
           ))}
         </div>
       )}
-      {typeName && <div className="moodboard-type">{typeName}</div>}
+      {typeList.length > 0 && (
+        <div className="moodboard-type">
+          {typeList.slice(0, 2).map((t, i) => (
+            <span key={i} style={{ fontFamily: t.family || "inherit", marginRight: 10 }}>
+              {t.family || t.kind || "Aa"}
+            </span>
+          ))}
+        </div>
+      )}
       {imagery.length > 0 && (
         <div className="moodboard-keywords">
           {imagery.slice(0, 4).map((k, i) => <span key={i} className="moodboard-kw">{k}</span>)}
