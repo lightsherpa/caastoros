@@ -1788,19 +1788,21 @@ function BriefRunCanvas({ context, onClear, go }) {
         setNodes((prev) => {
           const specNode = prev.find((n) => n.id === "spec-" + agent.id);
           if (!specNode) return prev;
-          const groups = prev.filter((n) => n.kind === "deliverable-group");
-          const laneTop = groups.length
-            ? Math.max(...groups.map((g) => g.y + (g.h || 0))) + 44
+          /* Stack each new card-grid below any existing cards so lanes never
+             overlap, computed off the cards themselves (no group node now). */
+          const existing = prev.filter((n) => n.kind === "deliverable");
+          const laneTop = existing.length
+            ? Math.max(...existing.map((c) => c.y + (c.h || 172))) + 40
             : Math.max(40, specNode.y - 40);
-          const { groupNode, cardNodes } = buildDeliverableCluster(specNode, done.output.deliverables, laneTop);
-          setEdges((e) => [...e, { from: specNode.id, to: groupNode.id, fromSide: "right", toSide: "left" }]);
+          const { cardNodes } = buildDeliverableCluster(specNode, done.output.deliverables, laneTop);
+          /* Edge each card straight back to its specialist — keeps them coupled. */
+          setEdges((e) => [...e, ...cardNodes.map((c) => ({ from: specNode.id, to: c.id, fromSide: "right", toSide: "left" }))]);
           const cnt = done.output.deliverables.length;
-          const summary = `${cnt} ${done.output.type || "deliverable"} card${cnt > 1 ? "s" : ""} — see the ${specNode.title} cluster`;
+          const summary = `${cnt} ${done.output.type || "deliverable"} card${cnt > 1 ? "s" : ""} — branch off ${specNode.title}`;
           return [
             ...prev.map((nd) => nd.id === specNode.id
               ? { ...nd, outputText: summary, sub: `${cnt} deliverables${done.output.platform ? " · " + done.output.platform : ""}` }
               : nd),
-            groupNode,        // container first → renders BEHIND the cards
             ...cardNodes,
           ];
         });
@@ -2357,22 +2359,13 @@ function deliverableSpecForAgent(agentId, plan) {
    inside it. Works for N=1 (a single contained card) up to many. `laneTop` is
    the y to start the cluster at (caller stacks clusters so they never overlap). */
 function buildDeliverableCluster(specNode, deliverables, laneTop) {
-  const CARD_W = 280, CARD_H = 172, GAP = 16, PAD = 16, LABEL_H = 30;
+  /* Cards branch directly off the specialist in a tidy grid — NO container
+     box (the box was its own node and swallowed clicks). Each card is its own
+     clickable node; the caller edges each one back to the specialist. */
+  const CARD_W = 280, CARD_H = 172, GAP = 16;
   const n = deliverables.length;
   const cols = Math.min(3, Math.max(1, n));
-  const rows = Math.ceil(n / cols);
-  const groupX = specNode.x + specNode.w + 170;
-  const groupY = laneTop;
-  const groupW = PAD * 2 + cols * CARD_W + (cols - 1) * GAP;
-  const groupH = LABEL_H + PAD + rows * CARD_H + (rows - 1) * GAP + PAD;
-
-  const groupNode = {
-    id: specNode.id + "-grp",
-    kind: "deliverable-group",
-    x: groupX, y: groupY, w: groupW, h: groupH,
-    label: specNode.title,
-    count: n,
-  };
+  const baseX = specNode.x + specNode.w + 150;
 
   const cardNodes = deliverables.map((d, i) => {
     const r = Math.floor(i / cols), c = i % cols;
@@ -2380,8 +2373,8 @@ function buildDeliverableCluster(specNode, deliverables, laneTop) {
       id: `${specNode.id}-d${i}`,
       parentId: specNode.id,
       kind: "deliverable",
-      x: groupX + PAD + c * (CARD_W + GAP),
-      y: groupY + LABEL_H + PAD + r * (CARD_H + GAP),
+      x: baseX + c * (CARD_W + GAP),
+      y: laneTop + r * (CARD_H + GAP),
       w: CARD_W, h: CARD_H,
       specialistName: specNode.title,
       title: d.title || `${specNode.title} · ${i + 1}`,
@@ -2393,7 +2386,7 @@ function buildDeliverableCluster(specNode, deliverables, laneTop) {
     };
   });
 
-  return { groupNode, cardNodes };
+  return { cardNodes };
 }
 
 /* Initial node layout: BIO (left) → Brief (middle) → Specialists (right
