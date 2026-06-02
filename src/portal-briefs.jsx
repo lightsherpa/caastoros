@@ -1882,7 +1882,7 @@ function BriefRunCanvas({ context, onClear, go }) {
           const laneTop = existing.length
             ? Math.max(...existing.map((c) => c.y + (c.h || 172))) + 40
             : Math.max(40, specNode.y - 40);
-          const { cardNodes } = buildDeliverableCluster(specNode, done.output.deliverables, laneTop);
+          const { cardNodes } = buildDeliverableCluster(specNode, done.output.deliverables, laneTop, done.outputId);
           /* Edge each card straight back to its specialist — keeps them coupled. */
           setEdges((e) => [...e, ...cardNodes.map((c) => ({ from: specNode.id, to: c.id, fromSide: "right", toSide: "left" }))]);
           const cnt = done.output.deliverables.length;
@@ -1949,7 +1949,10 @@ function BriefRunCanvas({ context, onClear, go }) {
     return Array.from(map.entries());
   })();
 
-  const sendToHuman = (cardNode, notes) => {
+  const sendToHuman = async (cardNode, notes) => {
+    if (cardNode.sourceOutputId != null && cardNode.slot != null) {
+      try { await apiFetch("/api/craft", { method: "POST", body: JSON.stringify({ outputId: cardNode.sourceOutputId, slot: cardNode.slot, notes }) }); } catch (e) {}
+    }
     try { if (window.CI_CREDITS) window.CI_CREDITS.balance = Math.max(0, (window.CI_CREDITS.balance || 0) - HUMAN_POLISH_CR); } catch (e) {}
     setNodes((prev) => prev.map((n) => n.id === cardNode.id ? { ...n, humanCraft: true, polishNotes: notes } : n));
     setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true, polishNotes: notes } : d));
@@ -2554,7 +2557,7 @@ function deliverableSpecForAgent(agentId, plan) {
    container node (the bordered, labeled box) + N card nodes laid out in a grid
    inside it. Works for N=1 (a single contained card) up to many. `laneTop` is
    the y to start the cluster at (caller stacks clusters so they never overlap). */
-function buildDeliverableCluster(specNode, deliverables, laneTop) {
+function buildDeliverableCluster(specNode, deliverables, laneTop, outputId) {
   /* Cards branch directly off the specialist in a tidy grid — NO container
      box (the box was its own node and swallowed clicks). Each card is its own
      clickable node; the caller edges each one back to the specialist. */
@@ -2579,6 +2582,10 @@ function buildDeliverableCluster(specNode, deliverables, laneTop) {
       platform: d.platform || "generic",
       status: d.status || (d.qa?.passed === false ? "flagged" : "approved"),
       qa: d.qa || null,
+      sourceOutputId: outputId || null,
+      slot: i,
+      humanCraft: !!d.humanCraft,
+      polishNotes: d.polishNotes || null,
     };
   });
 
@@ -2758,12 +2765,19 @@ function BriefViewCanvas({ briefId, onClear, go }) {
     const dOut = s.outputs.find((o) => o.body?.kind === "deliverables" && Array.isArray(o.body.deliverables));
     const specNode = specNodes.find((n) => n.id === "spec-" + s.id);
     if (!dOut || !specNode) return;
-    const items = dOut.body.deliverables.map((d) => ({
-      title: d.title, body: d.body,
-      assetUrl: d.asset_url || d.assetUrl || imageUrls[imgIdx++] || null,
-      platform: d.platform, status: d.status, qa: d.qa,
-    }));
-    const { cardNodes: cards } = buildDeliverableCluster(specNode, items, specNode.y);
+    const items = dOut.body.deliverables.map((d) => {
+      const craft = d.craft || null;
+      const delivered = craft && craft.status === "delivered" ? craft.delivered : null;
+      return {
+        title: d.title,
+        body: (delivered && delivered.body) || d.body,
+        assetUrl: (delivered && delivered.asset_url) || d.asset_url || d.assetUrl || imageUrls[imgIdx++] || null,
+        platform: d.platform, status: d.status, qa: d.qa,
+        humanCraft: !!craft && ["queued", "in_craft", "delivered"].includes(craft.status),
+        polishNotes: craft ? craft.notes : null,
+      };
+    });
+    const { cardNodes: cards } = buildDeliverableCluster(specNode, items, specNode.y, dOut.id);
     cardNodes.push(...cards);
     cards.forEach((c) => cardEdges.push({ from: specNode.id, to: c.id, fromSide: "right", toSide: "left" }));
   });
@@ -2865,7 +2879,10 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   const anyFlagged = specs.some((s) => !s.passed);
   const totalCr = specs.reduce((sum, s) => sum + (s.agent?.cr || 0), 0);
 
-  const sendToHuman = (cardNode, notes) => {
+  const sendToHuman = async (cardNode, notes) => {
+    if (cardNode.sourceOutputId != null && cardNode.slot != null) {
+      try { await apiFetch("/api/craft", { method: "POST", body: JSON.stringify({ outputId: cardNode.sourceOutputId, slot: cardNode.slot, notes }) }); } catch (e) {}
+    }
     try { if (window.CI_CREDITS) window.CI_CREDITS.balance = Math.max(0, (window.CI_CREDITS.balance || 0) - HUMAN_POLISH_CR); } catch (e) {}
     setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true, polishNotes: notes } : d));
   };
