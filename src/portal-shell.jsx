@@ -1,5 +1,6 @@
 import React from "react";
-const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, Login, useSession } = window;
+import { supabase } from "./lib/supabase-browser.js";
+const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
 
@@ -16,27 +17,38 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 /* Routes ---------------------------------------------------------- */
-/* Grouped by `section` so the sidebar reads as a hierarchy: the daily
-   brief→ship loop first (Workspace), the brand canon next (Brand), the
-   "how it works" proof surfaces (Intelligence), then account (Account).
-   `discovery` is intentionally NOT a top-level item — it's the one-time
-   intake reached from inside Brand Intelligence; the route still works. */
+/* IA LOCKED 2026-05-24 (rev 2) per modes-templates-steward-plan.md §2:
+   four sections, two children each, section eyebrows ARE the contents
+   (slash-joined). Replaces the earlier Workspace/Brand/Capabilities/Account
+   structure. `discovery` and `canvas` are intentionally NOT nav items —
+   Discovery is reached from inside BIO ("Re-extract"); Canvas is a
+   workspace state, not a destination. Route id `craft` keeps its old id
+   so route guard + TopBar.titles don't break; label flips to "Humans".
+   The id rename is a follow-up cleanup PR. */
 const CLIENT_ROUTES = [
-  { id:"home",        label:"Create",             icon:"sparkles", section:"Workspace" },
-  { id:"briefs",      label:"Briefs",             icon:"brief",    section:"Workspace" },
-  { id:"library",     label:"Library",            icon:"files",    section:"Workspace" },
-  { id:"bio",         label:"Brand Intelligence", icon:"bio",      section:"Brand" },
-  { id:"specialists", label:"Specialists",        icon:"team",     section:"Capabilities" },
-  { id:"craft",       label:"Human craft",        icon:"craft",    section:"Capabilities" },
-  { id:"credits",     label:"Credits",            icon:"credit",   section:"Account" },
-  { id:"settings",    label:"Settings",           icon:"settings", section:"Account" },
+  { id:"home",        label:"Create",      icon:"sparkles", section:"Create / Briefs" },
+  { id:"briefs",      label:"Briefs",      icon:"brief",    section:"Create / Briefs" },
+  { id:"bio",         label:"BIO",         icon:"bio",      section:"BIO / Library" },
+  { id:"library",     label:"Library",     icon:"files",    section:"BIO / Library" },
+  { id:"specialists", label:"Specialists", icon:"team",     section:"Specialists / Humans" },
+  { id:"craft",       label:"Humans",      icon:"craft",    section:"Specialists / Humans" },
+  { id:"credits",     label:"Credits",     icon:"credit",   section:"Credits / Account" },
+  { id:"settings",    label:"Account",     icon:"settings", section:"Credits / Account" },
 ];
 
 const TEAM_ROUTES = [
   { id:"team",          label:"Job queue",     icon:"brief", section:"Team" },
+  { id:"team-craft",    label:"Craft polish",  icon:"brief", section:"Team" },
   { id:"team-capacity", label:"Capacity",      icon:"timer", section:"Team" },
   { id:"team-clients",  label:"Clients",       icon:"team",  section:"Team" },
   { id:"team-me",       label:"My earnings",   icon:"credit", section:"Team" },
+];
+
+/* Admin-only routes appended below the client nav for users with
+   role:'admin'. Keeps the admin's client view intact; adds tools. */
+const ADMIN_ROUTES = [
+  { id:"admin-specs",     label:"Specs",            icon:"settings", section:"Admin" },
+  { id:"admin-brandolph", label:"Brandolph memory", icon:"sparkles", section:"Admin" },
 ];
 
 /* useTweaks-style hook (copied to keep app self-contained from the panel) */
@@ -72,6 +84,22 @@ function useDesignSettings() {
   return [ds, setDsKey];
 }
 
+/* Shell mode — workspace vs default ----------------------------
+   Per modes-templates-steward-plan.md rev 2 §7. Workspace mode collapses
+   the dock and shrinks the topbar for focus surfaces (brief-detail,
+   canvas, board); hover-reveal returns the labels. Driven by the
+   `data-shell-mode` attribute on <html>, consumed by CSS rules in
+   portal.css. Pure CSS for the visual transitions — no JS layout reads. */
+const WORKSPACE_ROUTES = new Set(["brief-detail", "canvas", "board"]);
+function useShellMode(routeId) {
+  const mode = WORKSPACE_ROUTES.has(routeId) ? "workspace" : "default";
+  useShellEffect(() => {
+    document.documentElement.dataset.shellMode = mode;
+    return () => { delete document.documentElement.dataset.shellMode; };
+  }, [mode]);
+  return mode;
+}
+
 /* Hash router --------------------------------------------------- */
 function useRoute() {
   const parse = () => {
@@ -87,6 +115,83 @@ function useRoute() {
   }, []);
   const go = (path) => { window.location.hash = "#/" + path; };
   return [route, go];
+}
+
+/* Workspace switcher ──────────────────────────────────────────────
+   Lists every brand the signed-in user has RLS access to and lets
+   them switch the active workspace. Selection is persisted via
+   setCurrentBrandId() which broadcasts a 'brand:changed' event so
+   every data hook (briefs, BIO, library, discovery) re-fetches.
+   Mounted inside the AppDock, directly under the logo. */
+function useBrandList() {
+  const [state, setState] = useShellState({ brands: [], loading: true });
+  useShellEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("brands")
+        .select("id, name, created_at")
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      setState({ brands: data || [], loading: false });
+      // Seed the current-brand selection on first load if none chosen yet.
+      if (!getCurrentBrandId() && data?.[0]?.id) {
+        setCurrentBrandId(data[0].id);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return state;
+}
+
+function WorkspaceSwitcher() {
+  const { brands, loading } = useBrandList();
+  const currentId = useCurrentBrandId();
+  const [open, setOpen] = useShellState(false);
+  const current = brands.find((b) => b.id === currentId) || brands[0];
+  const initial = (current?.name?.trim()?.[0] || "?").toUpperCase();
+
+  // Close on outside click
+  const rootRef = React.useRef(null);
+  useShellEffect(() => {
+    if (!open) return;
+    const onClick = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  if (loading || !current) {
+    return <div className="ws-switcher ws-switcher--ghost" aria-hidden="true" />;
+  }
+
+  return (
+    <div className="ws-switcher" ref={rootRef}>
+      <button className={"ws-switcher__trigger" + (open ? " ws-switcher__trigger--open" : "")}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox" aria-expanded={open}>
+        <span className="ws-switcher__chip" aria-hidden="true">{initial}</span>
+        <span className="ws-switcher__name">{current.name || "Workspace"}</span>
+        <span className="ws-switcher__chev" aria-hidden="true"><Icon name="chev" size={12} /></span>
+      </button>
+      {open && (
+        <div className="ws-switcher__menu" role="listbox">
+          {brands.map((b) => {
+            const active = b.id === current.id;
+            const ini = (b.name?.trim()?.[0] || "?").toUpperCase();
+            return (
+              <button key={b.id} role="option" aria-selected={active}
+                className={"ws-switcher__option" + (active ? " ws-switcher__option--active" : "")}
+                onClick={() => { setCurrentBrandId(b.id); setOpen(false); }}>
+                <span className="ws-switcher__chip ws-switcher__chip--sm">{ini}</span>
+                <span className="ws-switcher__name">{b.name}</span>
+                {active && <span className="ws-switcher__tick"><Icon name="check" size={12} /></span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* Logo / brandmark mini ----------------------------------------- */
@@ -243,25 +348,30 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
 /* Top yellow strip --------------------------------------------- */
 function TopBar({ portal, route, brandName, go }) {
   const isClient = portal === "client";
+  /* TopBar titles — eyebrows now match the rev-2 §2 section structure
+     (slash-joined section eyebrows that ARE the contents). */
   const titles = {
-    home:        ["Create",            "Workspace"],
-    discovery:   ["Discovery",         "Brand Intelligence"],
-    bio:         ["Brand Intelligence","Workspace"],
-    briefs:      ["Briefs",            "Workspace"],
-    library:     ["Library",           "Workspace"],
-    "brief-detail":["Brief",           "Workspace"],
-    board:       ["Brief",            "Workspace"],
-    specialists: ["Specialists · 33 on shift", "Workspace"],
-    "specialist-new": ["New specialist", "Capabilities"],
-    canvas:      ["Canvas",            "Workspace"],
-    craft:       ["Human craft",       "Workspace"],
-    credits:     ["Credits",           "Workspace"],
-    settings:    ["Settings",          "Workspace"],
+    home:        ["Create",            "Create / Briefs"],
+    discovery:   ["Discovery",         "BIO / Library"],
+    bio:         ["BIO",               "BIO / Library"],
+    briefs:      ["Briefs",            "Create / Briefs"],
+    library:     ["Library",           "BIO / Library"],
+    "brief-detail":["Brief",           "Create / Briefs"],
+    board:       ["Brief",             "Create / Briefs"],
+    specialists: ["Specialists · 33 on shift", "Specialists / Humans"],
+    "specialist-new": ["New specialist", "Specialists / Humans"],
+    canvas:      ["Canvas",            "Create / Briefs"],
+    craft:       ["Humans",            "Specialists / Humans"],
+    credits:     ["Credits",           "Credits / Account"],
+    settings:    ["Account",           "Credits / Account"],
     team:        ["Job queue",         "Team portal"],
+    "team-craft":["Craft polish",       "Team portal"],
     "team-job":  ["Active job",        "Team portal"],
     "team-capacity":["Capacity & SLA", "Team portal"],
     "team-clients":["Client roster",   "Team portal"],
     "team-me":   ["My earnings",       "Team portal"],
+    "admin-specs":     ["Specs",            "Admin"],
+    "admin-brandolph": ["Brandolph memory", "Admin"],
   };
   const [title, crumb] = titles[route] || [route, ""];
   const ws = isClient ? brandName : "La Mesa team";
@@ -296,18 +406,43 @@ function TopBar({ portal, route, brandName, go }) {
 /* App-wide menu — a persistent, always-open sidebar with a prominent
    brand logo at the top. No collapse. */
 function AppDock({ portal, currentRoute, onNav, onLogout }) {
-  const routes = portal === "team" ? TEAM_ROUTES : CLIENT_ROUTES;
+  /* Admins see the client nav + the admin extras. Team users see their
+     own nav unchanged. This keeps the admin's everyday surfaces intact
+     and just adds operator tooling at the bottom of the dock. */
+  const routes = portal === "team"
+    ? TEAM_ROUTES
+    : portal === "admin"
+      ? [...CLIENT_ROUTES, ...ADMIN_ROUTES]
+      : CLIENT_ROUTES;
   const isActive = (id) => currentRoute === id
     || (id === "briefs" && currentRoute === "brief-detail")
     || (id === "bio" && currentRoute === "discovery")
     || (id === "specialists" && currentRoute === "specialist-new")
     || (id === "team" && currentRoute === "team-job");
+
+  /* Logo doubles as a "back to dashboard" affordance — clickable
+     whenever the user is anywhere except home. A back-arrow chip
+     appears next to the logo on non-home routes so the action is
+     visible, not hidden behind a tooltip. */
+  const homeRoute = portal === "team" ? "team" : "home";
+  const isHome = currentRoute === homeRoute;
+  const goHome = () => onNav(homeRoute);
   return (
     <nav className="app-dock" aria-label="Navigation">
-      <div className="app-dock__logo">
+      <button
+        className={"app-dock__logo" + (isHome ? "" : " app-dock__logo--linked")}
+        onClick={isHome ? undefined : goHome}
+        disabled={isHome}
+        title={isHome ? "CaastorOS" : "Back to dashboard"}
+        aria-label={isHome ? "CaastorOS" : "Back to dashboard"}
+      >
+        {!isHome && (
+          <span className="app-dock__back" aria-hidden="true"><Icon name="arrowLeft" size={13} /></span>
+        )}
         <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height:30, width:"auto", flexShrink:0}} />
         <span className="app-dock__os">OS</span>
-      </div>
+      </button>
+      {portal !== "team" && <WorkspaceSwitcher />}
       <div className="app-dock__items">
         {routes.map((r, i) => (
           <React.Fragment key={r.id}>
@@ -329,6 +464,21 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
   );
 }
 
+/* Workspace-mode standalone logo — appears at top-left, outside the
+   collapsed dock, vertically aligned with the (now shorter) topbar.
+   Per rev-2 plan §7 workspace state feedback: the in-dock logo gets
+   clipped at 44-56px dock width and looks broken; pulling it out
+   cleans the focus surface up. Only renders in workspace mode —
+   defensive in case the CSS hides-in-default rule isn't loaded. */
+function WorkspaceLogo({ shellMode }) {
+  if (shellMode !== "workspace") return null;
+  return (
+    <div className="workspace-logo" aria-hidden="true">
+      <img src="intelligence/assets/icon-white.svg" alt="" />
+    </div>
+  );
+}
+
 /* ────────────────────────────────────────────────────────────── */
 /* Root App                                                          */
 function App() {
@@ -336,9 +486,21 @@ function App() {
   const [route, go] = useRoute();
   const session = useSession();
   const [ds, setDs] = useDesignSettings();
+  const shellMode = useShellMode(route.id);
 
   const onLoginRoute = route.id === "login" || (route.id === "team" && route.param === "login");
   const portal = session ? session.role : "client";
+
+  /* Resolve the real brand name so the TopBar crumb reflects the
+     workspace switcher, not the mock CI_BRAND. The palette-shift
+     experiment was rolled back per user direction — keep the brand
+     plumbing (switcher + data refetch) without recoloring the UI. */
+  const currentBrandId = useCurrentBrandId();
+  const { brands: allBrands } = useBrandList();
+  const currentBrandName = allBrands.find((b) => b.id === currentBrandId)?.name
+                        || allBrands[0]?.name
+                        || window.CI_BRAND?.name
+                        || "Workspace";
 
   /* Expose current portal to shared components so they can hide model/route detail on client */
   window.__CI_PORTAL = portal;
@@ -347,26 +509,41 @@ function App() {
      bounce them off login routes back to their home. */
   useShellEffect(() => {
     if (!session) return;
+    if (session._recovery) return;                            // stay on the recovery form until new password set
+    if (session._pending) return;                             // bootstrap profile lacks real role — wait for async resolve
     if (onLoginRoute) { go(session.role === "team" ? "team" : "home"); return; }
     const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery" || route.id === "specialist-new" || route.id === "canvas" || route.id === "board";
-    const isTeamRoute = TEAM_ROUTES.some(r => r.id === route.id) || route.id === "team-job";
+    const isTeamRoute  = TEAM_ROUTES.some(r => r.id === route.id) || route.id === "team-job";
+    const isAdminRoute = ADMIN_ROUTES.some(r => r.id === route.id);
     if (session.role === "client" && !isClientRoute) go("home");
     if (session.role === "team"   && !isTeamRoute  ) go("team");
+    if (session.role === "admin"  && !isClientRoute && !isAdminRoute) go("home");
   }, [session, route.id, route.param, onLoginRoute]);
 
-  /* Not signed in → show the matching login screen. */
-  if (!session) {
+  /* Not signed in → show the matching login screen.
+     OR signed in but in PASSWORD_RECOVERY state (user clicked the
+     password-reset email link) → show the recovery form so they MUST
+     set a new password before they can reach the portal. */
+  if (!session || session._recovery) {
     const role = (route.id === "team" && route.param === "login") ? "team" : "client";
-    return <Login key={role} role={role} go={go} />;
+    const initialMode = session?._recovery ? "recovery" : "signin";
+    return <Login key={role + "-" + initialMode} role={role} go={go} initialMode={initialMode} />;
   }
 
-  const logout = () => { window.CI_AUTH.signOut(); go("login"); };
+  const logout = async () => {
+    /* Await sign-out so the session is null BEFORE we navigate to /login —
+       otherwise the route guard sees a still-truthy session on the login
+       route and bounces back to home, creating a "can't log out" symptom. */
+    try { await window.CI_AUTH.signOut(); } catch (e) { console.warn("signOut failed:", e); }
+    go("login");
+  };
 
   return (
     <div className="app" data-screen-label={portal === "client" ? "Client portal" : "Team portal"}>
+      <WorkspaceLogo shellMode={shellMode} />
       <AppDock portal={portal} currentRoute={route.id} onNav={go} onLogout={logout} />
       <div style={{display:"flex", flexDirection:"column", minWidth:0}}>
-        <TopBar portal={portal} route={route.id} brandName={window.CI_BRAND.name} go={go} />
+        <TopBar portal={portal} route={route.id} brandName={currentBrandName} go={go} />
         <main className="scroll" style={{flex:1, overflowY:"auto"}}>
           <div className="route-view" key={route.id + "/" + (route.param || "")}>
             <ScreenRouter route={route} go={go} tweaks={tweaks} setTweak={setTweak} />
@@ -395,15 +572,18 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "brief-detail": return <BriefBoard id={route.param} go={go} />;
     case "specialists":  return <SpecialistsDirectory go={go} />;
     case "specialist-new": return <SpecialistAuthor go={go} />;
-    case "canvas":       return <CanvasView />;
+    case "canvas":       return <CanvasView go={go} />;
     case "craft":        return <CraftMarketplace go={go} tier={tweaks.tier} />;
     case "credits":      return <CreditsLedger />;
     case "settings":     return <SettingsView />;
     case "team":         return <TeamQueue go={go} />;
+    case "team-craft":   return <CraftQueue />;
     case "team-job":     return <TeamJob id={route.param} go={go} />;
     case "team-capacity":return <TeamCapacity />;
     case "team-clients": return <TeamClients />;
     case "team-me":      return <TeamMe />;
+    case "admin-specs":     return <AdminSpecs />;
+    case "admin-brandolph": return <AdminBrandolphMemory />;
     default:             return <BrandolphHome tweaks={tweaks} setTweak={setTweak} go={go} />;
   }
 }
