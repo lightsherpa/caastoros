@@ -1538,6 +1538,7 @@ function BriefRunCanvas({ context, onClear, go }) {
   const [totalCost, setTotalCost] = useBrState(0);
   const [openId, setOpenId]       = useBrState(null);            /* selected specialist id for the notepad drawer */
   const [openDeliverable, setOpenDeliverable] = useBrState(null);   /* clicked deliverable card → content drawer */
+  const [openBrief, setOpenBrief] = useBrState(false);   /* clicked Brief node → brief drawer */
   const [editedText, setEditedText] = useBrState({});            /* per-spec text overrides from the notepad */
   const [briefId, setBriefId]       = useBrState(null);          /* surfaced so the notepad can fire re-runs */
 
@@ -1618,6 +1619,7 @@ function BriefRunCanvas({ context, onClear, go }) {
               <span className="eyebrow" style={{ fontSize: 9, color: stateColor, letterSpacing: "0.04em" }}>
                 {(node.platform || "generic").toUpperCase()} · {flagged ? "FLAGGED" : "READY"}
               </span>
+              {node.humanCraft && <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing:"0.06em", color:"var(--purple-600, #6b46c1)" }}>✦ IN HUMAN CRAFT</span>}
               {node.qa?.voice_match != null && (
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--c-faint)" }}>{node.qa.voice_match}/100</span>
               )}
@@ -1947,6 +1949,12 @@ function BriefRunCanvas({ context, onClear, go }) {
     return Array.from(map.entries());
   })();
 
+  const sendToHuman = (cardNode) => {
+    try { if (window.CI_CREDITS) window.CI_CREDITS.balance = Math.max(0, (window.CI_CREDITS.balance || 0) - HUMAN_POLISH_CR); } catch (e) {}
+    setNodes((prev) => prev.map((n) => n.id === cardNode.id ? { ...n, humanCraft: true } : n));
+    setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true } : d));
+  };
+
   return (
     <>
       <CanvasHeader
@@ -1968,6 +1976,7 @@ function BriefRunCanvas({ context, onClear, go }) {
           /* InteractiveCanvas uses setPointerCapture on the wrapper which
              swallows any inner onClick — node clicks MUST come through here. */
           if (node?.kind === "deliverable") { setOpenDeliverable(node); return; }
+          if (node?.kind === "brief") { setOpenBrief(true); return; }
           if (!node || node.kind !== "specialist" || !node.specId) return;
           const st = node.state;
           if (st === "running" || st === "done" || st === "flagged") setOpenId(node.specId);
@@ -2064,7 +2073,13 @@ function BriefRunCanvas({ context, onClear, go }) {
         />
       )}
       {openDeliverable && (
-        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} />
+        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} onSendToHuman={sendToHuman} />
+      )}
+      {openBrief && (
+        <BriefDrawer
+          brief={{ title: context.title, tension: context.tension, sharpenedBrief: context.sharpenedBrief, rawBrief: context.rawBrief, refusals: context.refusals, deliveryPlan: context.deliveryPlan }}
+          onClose={() => setOpenBrief(false)}
+        />
       )}
     </>
   );
@@ -2086,12 +2101,60 @@ const IMAGE_RERUN_OPTIONS = [
   { route: "vendor/fal/recraft-v3",    label: "Recraft V3",     note: "Vector / illustration" },
 ];
 
+/* The brief + Brandolph's recommendations — opened by clicking the Brief node. */
+function BriefDrawer({ brief, onClose }) {
+  const groups = brief.deliveryPlan?.deliverableGroups || [];
+  return (
+    <Drawer open={true} onClose={onClose} title={brief.title || "Brief"} eyebrow="BRANDOLPH · BRIEF & RECOMMENDATIONS" width={620}
+      footer={<button className="btn btn--ghost" onClick={onClose}>Close</button>}>
+      {brief.tension && (
+        <div style={{ marginBottom: 18 }}>
+          <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 6 }}>The tension Brandolph named</div>
+          <p style={{ margin: 0, fontFamily: "Georgia, serif", fontStyle: "italic", fontSize: 16, lineHeight: 1.5, color: "var(--c-ink)" }}>{brief.tension}</p>
+        </div>
+      )}
+      {brief.sharpenedBrief && (
+        <div style={{ marginBottom: 18 }}>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>How a CMO would write this</div>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--c-ink)" }}>{brief.sharpenedBrief}</p>
+        </div>
+      )}
+      {brief.rawBrief && (
+        <div style={{ marginBottom: 18 }}>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>Your original request</div>
+          <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: "var(--c-dim)" }}>{brief.rawBrief}</p>
+        </div>
+      )}
+      {(brief.refusals || []).length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <div className="eyebrow" style={{ marginBottom: 6, color: "var(--pink-500)" }}>Brandolph's recommendations — what we will NOT do</div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {brief.refusals.map((r, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--c-ink)", marginBottom: 4 }}>{r}</li>)}
+          </ul>
+        </div>
+      )}
+      {groups.length > 0 && (
+        <div>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>What Brandolph is producing</div>
+          {groups.map((g, i) => (
+            <div key={i} style={{ fontSize: 13.5, color: "var(--c-ink)", marginBottom: 4 }}>
+              {g.count}× {String(g.type || "").replace(/_/g, " ")}{g.platforms?.length ? ` · ${g.platforms.join(", ")}` : ""}
+            </div>
+          ))}
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
 /* Read the full content of one deliverable card — title, body, image, plus
    Copy / Export. Opened by clicking a deliverable card on the canvas. */
-function DeliverableDrawer({ node, onClose }) {
+const HUMAN_POLISH_CR = 40;   /* credits to contract a human to polish one deliverable */
+function DeliverableDrawer({ node, onClose, onSendToHuman }) {
   const [copied, setCopied] = useBrState(false);
   const flagged = node.status === "flagged";
   const stateColor = flagged ? "var(--pink-500)" : "var(--green-500)";
+  const inCraft = !!node.humanCraft;
   const copy = async () => {
     try { await navigator.clipboard.writeText(node.body || ""); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {}
   };
@@ -2112,9 +2175,18 @@ function DeliverableDrawer({ node, onClose }) {
       footer={<>
         <button className="btn btn--ghost" onClick={onClose}>Close</button>
         <button className="btn btn--ghost btn--sm" onClick={exportOne}>Export</button>
-        <button className="btn btn--primary btn--sm" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
+        <button className="btn btn--ghost btn--sm" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
+        {inCraft
+          ? <span style={{ display:"inline-flex", alignItems:"center", gap: 6, height: 28, padding:"0 12px", borderRadius: 999, background:"var(--purple-50, rgba(124,92,255,0.12))", color:"var(--purple-600, #6b46c1)", fontSize: 12, fontWeight: 600 }}>✦ In human craft</span>
+          : (onSendToHuman && <button className="btn btn--primary btn--sm" onClick={() => onSendToHuman(node)}>Send to human · {HUMAN_POLISH_CR} cr</button>)
+        }
       </>}
     >
+      {inCraft && (
+        <div style={{ marginBottom: 14, padding:"10px 12px", borderRadius: 10, background:"var(--purple-50, rgba(124,92,255,0.10))", border:"1px solid var(--purple-200, rgba(124,92,255,0.3))", fontSize: 12.5, color:"var(--c-ink)" }}>
+          ✦ A human is polishing this piece. You'll see the refined version land here when it's done.
+        </div>
+      )}
       {node.assetUrl && <img src={node.assetUrl} alt="" style={{ width: "100%", borderRadius: 10, marginBottom: 16, display: "block" }} />}
       <div style={{ fontSize: 14, lineHeight: 1.65, color: "var(--c-ink)", whiteSpace: "pre-wrap" }}>{node.body}</div>
     </Drawer>
@@ -2556,6 +2628,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   const [state, setState] = useBrState({ loading: true, brief: null, runs: [], cert: null, error: null });
   const [openId, setOpenId]       = useBrState(null);
   const [openDeliverable, setOpenDeliverable] = useBrState(null);   /* clicked deliverable card → drawer */
+  const [openBrief, setOpenBrief] = useBrState(false);   /* clicked Brief node → brief drawer */
   const [editedText, setEditedText] = useBrState({});
 
   useBrEffect(() => {
@@ -2684,6 +2757,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
           <div style={{ padding:"10px 12px", flex:1, minHeight:0, display:"flex", flexDirection:"column" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 4 }}>
               <span className="eyebrow" style={{ fontSize: 9, color: sc }}>{(node.platform || "generic").toUpperCase()} · {flagged ? "FLAGGED" : "READY"}</span>
+              {node.humanCraft && <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing:"0.06em", color:"var(--purple-600, #6b46c1)" }}>✦ IN HUMAN CRAFT</span>}
             </div>
             {node.title && <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 4, color:"var(--c-ink)" }}>{node.title}</div>}
             <div style={{ fontSize: 12, lineHeight: 1.45, color:"var(--c-dim)", flex:1, overflow:"hidden" }}>{node.body}</div>
@@ -2753,6 +2827,11 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   const anyFlagged = specs.some((s) => !s.passed);
   const totalCr = specs.reduce((sum, s) => sum + (s.agent?.cr || 0), 0);
 
+  const sendToHuman = (cardNode) => {
+    try { if (window.CI_CREDITS) window.CI_CREDITS.balance = Math.max(0, (window.CI_CREDITS.balance || 0) - HUMAN_POLISH_CR); } catch (e) {}
+    setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true } : d));
+  };
+
   return (
     <>
       <CanvasHeader
@@ -2772,6 +2851,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         exportName={"brief-" + briefId.slice(0, 8)}
         onNodeClick={(node) => {
           if (node?.kind === "deliverable") { setOpenDeliverable(node); return; }
+          if (node?.kind === "brief") { setOpenBrief(true); return; }
           if (node?.kind === "specialist" && node.specId) setOpenId(node.specId);
         }}
         helper={`${specs.length} runs on this brief. Click any specialist to verify, edit, or copy its output.`}
@@ -2830,7 +2910,13 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         />
       )}
       {openDeliverable && (
-        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} />
+        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} onSendToHuman={sendToHuman} />
+      )}
+      {openBrief && (
+        <BriefDrawer
+          brief={{ title: briefTitle(state.brief), tension: state.brief.payload?.tension, sharpenedBrief: state.brief.payload?.sharpenedBrief, rawBrief: humanize(extractOriginalRequest(state.brief.payload?.request) || state.brief.payload?.request || ""), refusals: state.brief.payload?.refusals }}
+          onClose={() => setOpenBrief(false)}
+        />
       )}
     </>
   );
