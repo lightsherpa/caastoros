@@ -90,15 +90,15 @@ window.CI_AGENTS = [
   { id:"a40", code:"L2-40", dept:"Copy", name:"Press & Bio",       job:"Releases, founder bios, about pages, partnership announcements.",                                              model:"sonnet",   cr:8,  status:"live" },
 
   // Visual (11) — was "Design"; Iconography moved to Web & UX; +6 daily-bread artefacts
-  { id:"a19", code:"L2-19", dept:"Visual", name:"Identity Drafts",          job:"Logo + system first cuts. Hand off to L3 for craft.",                                                  model:"recraft",  cr:18, status:"live" },
-  { id:"a20", code:"L2-20", dept:"Visual", name:"Hero KV",                  job:"Hero visuals for campaigns and launches.",                                                             model:"flux",     cr:14, status:"live" },
-  { id:"a21", code:"L2-21", dept:"Visual", name:"Editorial Image",          job:"Image-led storytelling. In-feed + content.",                                                          model:"fluxSchnell", cr:10, status:"live" },
-  { id:"a22", code:"L2-22", dept:"Visual", name:"Pack & Packaging",         job:"Pack architecture, dielines, label layouts.",                                                          model:"flux",     cr:18, status:"live" },
+  { id:"a19", code:"L2-19", dept:"Visual", name:"Identity Drafts",          job:"Logo + system first cuts. Hand off to L3 for craft.",                                                  model:"gptimage",  cr:18, status:"live" },
+  { id:"a20", code:"L2-20", dept:"Visual", name:"Hero KV",                  job:"Hero visuals for campaigns and launches.",                                                             model:"gptimage",     cr:14, status:"live" },
+  { id:"a21", code:"L2-21", dept:"Visual", name:"Editorial Image",          job:"Image-led storytelling. In-feed + content.",                                                          model:"gptimage", cr:10, status:"live" },
+  { id:"a22", code:"L2-22", dept:"Visual", name:"Pack & Packaging",         job:"Pack architecture, dielines, label layouts.",                                                          model:"gptimage",     cr:18, status:"live" },
   { id:"a24", code:"L2-24", dept:"Visual", name:"Brand Consistency QA",     job:"Vision check — scores every visual against BIO + asset rules.",                                       model:"gemFlash",    cr:2,  status:"live" },
   { id:"a41", code:"L2-41", dept:"Visual", name:"Social Post Designer",     job:"Instagram squares, stories, carousels, LinkedIn graphics, TikTok thumbnails — by platform spec.",     model:"fluxSchnell",     cr:8,  status:"live" },
-  { id:"a42", code:"L2-42", dept:"Visual", name:"Ad Creative",              job:"Display banners + paid social ads, sized per platform spec.",                                          model:"fluxSchnell",     cr:9,  status:"live" },
-  { id:"a43", code:"L2-43", dept:"Visual", name:"OOH / Print",              job:"Billboard layouts, magazine ads, posters — in print-ready formats.",                                  model:"flux",     cr:12, status:"live" },
-  { id:"a44", code:"L2-44", dept:"Visual", name:"Style Frames",             job:"Polished frames for moving image — the pitch direction before any video runs.",                       model:"flux",     cr:12, status:"live" },
+  { id:"a42", code:"L2-42", dept:"Visual", name:"Ad Creative",              job:"Display banners + paid social ads, sized per platform spec.",                                          model:"flux",     cr:9,  status:"live" },
+  { id:"a43", code:"L2-43", dept:"Visual", name:"OOH / Print",              job:"Billboard layouts, magazine ads, posters — in print-ready formats.",                                  model:"gptimage",     cr:12, status:"live" },
+  { id:"a44", code:"L2-44", dept:"Visual", name:"Style Frames",             job:"Polished frames for moving image — the pitch direction before any video runs.",                       model:"gptimage",     cr:12, status:"live" },
   { id:"a45", code:"L2-45", dept:"Visual", name:"Infographic & Data Viz",   job:"Diagrams, charts, infographics — when a brief needs to show a number.",                                model:"sonnet",   cr:9,  status:"live" },
   { id:"a46", code:"L2-46", dept:"Visual", name:"Lifestyle / Product Photo",job:"Style direction + image gen for ecom + lifestyle photography.",                                       model:"fluxSchnell",     cr:10, status:"live" },
 
