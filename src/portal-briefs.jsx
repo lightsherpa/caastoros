@@ -1949,10 +1949,10 @@ function BriefRunCanvas({ context, onClear, go }) {
     return Array.from(map.entries());
   })();
 
-  const sendToHuman = (cardNode) => {
+  const sendToHuman = (cardNode, notes) => {
     try { if (window.CI_CREDITS) window.CI_CREDITS.balance = Math.max(0, (window.CI_CREDITS.balance || 0) - HUMAN_POLISH_CR); } catch (e) {}
-    setNodes((prev) => prev.map((n) => n.id === cardNode.id ? { ...n, humanCraft: true } : n));
-    setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true } : d));
+    setNodes((prev) => prev.map((n) => n.id === cardNode.id ? { ...n, humanCraft: true, polishNotes: notes } : n));
+    setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true, polishNotes: notes } : d));
   };
 
   return (
@@ -2155,6 +2155,8 @@ function DeliverableDrawer({ node, onClose, onSendToHuman }) {
   const flagged = node.status === "flagged";
   const stateColor = flagged ? "var(--pink-500)" : "var(--green-500)";
   const inCraft = !!node.humanCraft;
+  const [polishMode, setPolishMode] = useBrState(false);
+  const [polishNotes, setPolishNotes] = useBrState("");
   const copy = async () => {
     try { await navigator.clipboard.writeText(node.body || ""); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {}
   };
@@ -2172,19 +2174,55 @@ function DeliverableDrawer({ node, onClose, onSendToHuman }) {
       title={node.title}
       eyebrow={`${(node.platform || "generic").toUpperCase()} · ${flagged ? "FLAGGED" : "READY"}${node.qa?.voice_match != null ? ` · ${node.qa.voice_match}/100` : ""}${node.specialistName ? ` · by ${node.specialistName}` : ""}`}
       width={560}
-      footer={<>
-        <button className="btn btn--ghost" onClick={onClose}>Close</button>
-        <button className="btn btn--ghost btn--sm" onClick={exportOne}>Export</button>
-        <button className="btn btn--ghost btn--sm" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
-        {inCraft
-          ? <span style={{ display:"inline-flex", alignItems:"center", gap: 6, height: 28, padding:"0 12px", borderRadius: 999, background:"var(--purple-50, rgba(124,92,255,0.12))", color:"var(--purple-600, #6b46c1)", fontSize: 12, fontWeight: 600 }}>✦ In human craft</span>
-          : (onSendToHuman && <button className="btn btn--primary btn--sm" onClick={() => onSendToHuman(node)}>Send to human · {HUMAN_POLISH_CR} cr</button>)
-        }
-      </>}
+      footer={
+        inCraft ? (
+          <>
+            <button className="btn btn--ghost" onClick={onClose}>Close</button>
+            <span style={{ display:"inline-flex", alignItems:"center", gap: 6, height: 28, padding:"0 12px", borderRadius: 999, background:"var(--purple-50, rgba(124,92,255,0.12))", color:"var(--purple-600, #6b46c1)", fontSize: 12, fontWeight: 600 }}>✦ In human craft</span>
+          </>
+        ) : polishMode ? (
+          <>
+            <button className="btn btn--ghost" onClick={() => setPolishMode(false)}>Cancel</button>
+            <button className="btn btn--primary btn--sm" onClick={() => { onSendToHuman && onSendToHuman(node, polishNotes.trim()); setPolishMode(false); }}>
+              Confirm — send to human · {HUMAN_POLISH_CR} cr
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn--ghost" onClick={onClose}>Close</button>
+            <button className="btn btn--ghost btn--sm" onClick={exportOne}>Export</button>
+            <button className="btn btn--ghost btn--sm" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
+            {onSendToHuman && <button className="btn btn--primary btn--sm" onClick={() => setPolishMode(true)}>Send to human · {HUMAN_POLISH_CR} cr</button>}
+          </>
+        )
+      }
     >
       {inCraft && (
         <div style={{ marginBottom: 14, padding:"10px 12px", borderRadius: 10, background:"var(--purple-50, rgba(124,92,255,0.10))", border:"1px solid var(--purple-200, rgba(124,92,255,0.3))", fontSize: 12.5, color:"var(--c-ink)" }}>
           ✦ A human is polishing this piece. You'll see the refined version land here when it's done.
+          {node.polishNotes && <div style={{ marginTop: 8, paddingTop: 8, borderTop:"1px solid var(--purple-200, rgba(124,92,255,0.3))", fontStyle:"italic", color:"var(--c-dim)", whiteSpace:"pre-wrap" }}>Your brief to the human:{"\n"}{node.polishNotes}</div>}
+        </div>
+      )}
+      {polishMode && !inCraft && (
+        <div style={{ marginBottom: 16, padding:"14px 16px", borderRadius: 12, background:"var(--c-bg)", border:"1px solid var(--c-line)" }}>
+          <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 8 }}>Brief the human · what to polish</div>
+          <textarea
+            value={polishNotes}
+            onChange={(e) => setPolishNotes(e.target.value)}
+            autoFocus
+            placeholder="Specific requests, points to add or edit — e.g. 'tighten the opening', 'make the CTA softer', 'add a line about the Madrid pour-over'."
+            rows={4}
+            style={{ width:"100%", padding:"10px 12px", borderRadius: 8, border:"1px solid var(--c-line)", background:"var(--c-card)", fontFamily:"inherit", fontSize: 13.5, lineHeight: 1.55, resize:"vertical", outline:"none", boxSizing:"border-box" }}
+          />
+          <div style={{ display:"flex", flexWrap:"wrap", gap: 6, marginTop: 8 }}>
+            {["Tighten it", "More playful", "Fix the CTA", "Match the BIO voice", "Make it shorter"].map((chip) => (
+              <button key={chip} type="button"
+                onClick={() => setPolishNotes((p) => (p.trim() ? p.replace(/\s*$/, "") + "\n" : "") + "• " + chip)}
+                style={{ height: 24, padding:"0 10px", fontSize: 11.5, cursor:"pointer", borderRadius: 999, border:"1px solid var(--c-line)", background:"var(--c-card)", color:"var(--c-dim)" }}>
+                + {chip}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {node.assetUrl && <img src={node.assetUrl} alt="" style={{ width: "100%", borderRadius: 10, marginBottom: 16, display: "block" }} />}
@@ -2827,9 +2865,9 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   const anyFlagged = specs.some((s) => !s.passed);
   const totalCr = specs.reduce((sum, s) => sum + (s.agent?.cr || 0), 0);
 
-  const sendToHuman = (cardNode) => {
+  const sendToHuman = (cardNode, notes) => {
     try { if (window.CI_CREDITS) window.CI_CREDITS.balance = Math.max(0, (window.CI_CREDITS.balance || 0) - HUMAN_POLISH_CR); } catch (e) {}
-    setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true } : d));
+    setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true, polishNotes: notes } : d));
   };
 
   return (
