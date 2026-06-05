@@ -1,10 +1,16 @@
 import React from "react";
+import { apiFetch } from "./lib/supabase-browser.js";
 const { Icon, BrandolphDot, StreamedText } = window;
 /* Caastor Intelligence — Floating Brandolph                          */
 /* The mascot button + chat panel that lives on every client screen.  */
 /* Hidden on team portal and on /home (where chat is already primary).*/
 
 const { useState: useFState, useEffect: useFEffect, useRef: useFRef } = React;
+
+/* Live backend (P0). If VITE_API_BASE is set, we stream from caastoros-server.
+   If unset (or the fetch fails), we keep the fakeReply mock so the SPA never
+   degrades from a missing server.                                            */
+const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/$/, "");
 
 /* The OFFICIAL Caastor / Brandolph mascot — paths lifted from         */
 /* /assets/mascot/yellow.svg. Yellow body, black outline + face.       */
@@ -44,6 +50,84 @@ function MascotIcon({ size = 60, color = "yellow" }) {
   );
 }
 
+/* Memory-derived contextual greeting. Reads the brand's running
+   memory (approval rates, edit patterns, escalation signal) and
+   surfaces the single most useful thing Brandolph could say right
+   now. Falls back to the route-based generic line if the brand has
+   no signal yet.
+
+   Returns { line, prompts? } — prompts is a curated list of follow-up
+   asks the floater can render as quick-tap buttons. */
+function deriveContextFromMemory({ stats, signals, routeId, agentsById }) {
+  if (!stats || stats.length === 0) return { line: null, prompts: null };
+
+  /* 1. Premium re-run pattern — operator keeps escalating a spec */
+  const rerunUp = {};
+  for (const s of (signals || [])) {
+    if (s.kind === "spec.rerun_with_premium" && s.specialist_id) {
+      rerunUp[s.specialist_id] = (rerunUp[s.specialist_id] || 0) + 1;
+    }
+  }
+  const escalated = Object.entries(rerunUp).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1])[0];
+  if (escalated) {
+    const [id, n] = escalated;
+    const name = agentsById?.[id]?.name || id;
+    return {
+      line: `*You've escalated ${name} to premium ${n} times this month.* Want me to default it to the heavier model and stop asking?`,
+      prompts: [
+        { eyebrow: "Promote", text: `Default ${name} to its premium model from now on.` },
+        { eyebrow: "Leave it", text: `Keep ${name} on the cheap default — I'll escalate manually.` },
+      ],
+    };
+  }
+
+  /* 2. High edit rate — specialist consistently needs human polish */
+  const heavyEdit = stats
+    .filter((r) => (r.runs_total || 0) >= 3)
+    .map((r) => ({ ...r, editRate: r.runs_total > 0 ? r.runs_edited / r.runs_total : 0 }))
+    .filter((r) => r.editRate >= 0.4)
+    .sort((a, b) => b.editRate - a.editRate)[0];
+  if (heavyEdit) {
+    const name = agentsById?.[heavyEdit.specialist_id]?.name || heavyEdit.specialist_id;
+    const pct = Math.round(100 * heavyEdit.editRate);
+    return {
+      line: `*${name} is getting heavily edited.* ${pct}% of runs touched. Could be the brief, could be the model, could be the BIO voice.`,
+      prompts: [
+        { eyebrow: "Diagnose", text: `Why am I editing ${name} so much?` },
+        { eyebrow: "Try", text: `Re-run my last ${name} brief on a stronger model.` },
+      ],
+    };
+  }
+
+  /* 3. Low brand-match on images — palette / BIO visual drift */
+  const lowVision = stats
+    .filter((r) => (r.brand_match_n || 0) >= 2 && (r.avg_brand_match ?? 100) < 65)
+    .sort((a, b) => a.avg_brand_match - b.avg_brand_match)[0];
+  if (lowVision) {
+    const name = agentsById?.[lowVision.specialist_id]?.name || lowVision.specialist_id;
+    return {
+      line: `*${name} keeps scoring ${lowVision.avg_brand_match}/100 on brand match.* The BIO visual rules may need tightening.`,
+      prompts: [
+        { eyebrow: "Diagnose", text: `What's drifting in my ${name} outputs?` },
+        { eyebrow: "Tune", text: `Help me tighten the BIO palette + imagery rules.` },
+      ],
+    };
+  }
+
+  /* 4. Strong recent week — celebrate, suggest next */
+  const recentRuns = (signals || []).filter((s) => s.kind === "run.approved" || s.kind === "run.flagged");
+  const recentApproved = recentRuns.filter((s) => s.kind === "run.approved").length;
+  if (recentRuns.length >= 8) {
+    const pct = Math.round(100 * recentApproved / recentRuns.length);
+    return {
+      line: `*${recentRuns.length} runs recently, ${pct}% approved.* What's next on the slate?`,
+      prompts: null,
+    };
+  }
+
+  return { line: null, prompts: null };
+}
+
 /* Contextual greeting Brandolph says when first opened on each route. */
 function getContextLine(routeId) {
   switch (routeId) {
@@ -59,6 +143,50 @@ function getContextLine(routeId) {
     case "settings":     return "*Workspace governance.* Ask me what the forbidden list should be, or whether your auto-approve threshold is loose.";
     default:             return "*I'm Brandolph.* Ask me what's running, what's stuck, or what to do next. Free to ask — briefs preview cost.";
   }
+}
+
+/* Stream tokens from POST /api/brandolph/ask. Throws on network/HTTP
+   error so the caller can fall back to fakeReply.                       */
+async function streamBrandolph({ history, routeId, onToken, signal }) {
+  /* apiFetch attaches the session JWT — /api/brandolph/ask is requireAuth,
+     so a raw fetch() (no Authorization header) 401s and silently drops the
+     floater to the mock reply. apiFetch also returns the streaming Response
+     untouched, so SSE reading below is unchanged. */
+  const res = await apiFetch("/api/brandolph/ask", {
+    method: "POST",
+    body: JSON.stringify({ messages: history, routeId }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error("server " + res.status);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    // SSE frames are separated by a blank line
+    let split;
+    while ((split = buf.indexOf("\n\n")) !== -1) {
+      const frame = buf.slice(0, split);
+      buf = buf.slice(split + 2);
+      let eventName = "message";
+      const dataLines = [];
+      for (const line of frame.split("\n")) {
+        if (line.startsWith("event:")) eventName = line.slice(6).trim();
+        else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+      }
+      if (dataLines.length === 0) continue;
+      let payload = null;
+      try { payload = JSON.parse(dataLines.join("\n")); } catch { payload = null; }
+      if (eventName === "token" && payload?.text) onToken(payload.text);
+      else if (eventName === "error") throw new Error(payload?.message || "stream error");
+      else if (eventName === "done") return payload;
+    }
+  }
+  return null;
 }
 
 /* Mock replies — heuristic match on user input.                       */
@@ -98,7 +226,9 @@ function FloaterMessage({ m }) {
         <MascotIcon size={26} />
       </span>
       <div className="bf-msg__bubble">
-        <StreamedText html={m.text} startDelay={300} />
+        {m.live
+          ? <span>{m.text}{m.text ? <span className="b-caret" /> : <BrandolphDot state="thinking" />}</span>
+          : <StreamedText html={m.text} startDelay={300} />}
       </div>
     </div>
   );
@@ -159,28 +289,102 @@ function FloatingBrandolph() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (portal !== "client") return null;
-  /* The floater is reachable on every client screen — including /home,
-     which is now a launchpad (not a chat). Use it to ask status / get
-     advice without committing to a new brief. */
+  if (portal !== "client" && portal !== "admin") return null;
+  /* The floater is reachable on every client + admin screen — including
+     /home, which is now a launchpad (not a chat). Use it to ask status,
+     get advice, or react to Brandolph's memory observations. */
 
-  const prompts = [
+  /* Brand memory snapshot — fetched once per workspace switch, drives
+     the contextual greeting. Falls back gracefully if the migration
+     isn't applied or the fetch fails (Brandolph still works). */
+  const [memory, setMemory] = useFState(null);
+  const currentBrandId = window.useCurrentBrandId ? window.useCurrentBrandId() : null;
+  useFEffect(() => {
+    if (!currentBrandId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/brandolph/memory?brandId=" + encodeURIComponent(currentBrandId));
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setMemory(json);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [currentBrandId, open]);
+
+  const agentsById = window.CI_AGENTS ? Object.fromEntries(window.CI_AGENTS.map((a) => [a.id, a])) : {};
+  const derived = memory && memory.migrationApplied
+    ? deriveContextFromMemory({ stats: memory.stats, signals: memory.signals, routeId, agentsById })
+    : { line: null, prompts: null };
+
+  const prompts = derived.prompts || [
     { eyebrow: "Status",   text: "What's running and what needs me?" },
     { eyebrow: "Next",     text: "What should I brief next?" },
     { eyebrow: "Sharpen",  text: "Read my BIO and tell me what's weak." },
     { eyebrow: "Refuse",   text: "What should I kill this cycle?" },
   ];
 
-  const send = (textArg) => {
+  const send = async (textArg) => {
     const t = (textArg ?? input).trim();
     if (!t || thinking) return;
-    setMessages(prev => [...prev, { role: "user", text: t }]);
+    const userMsg = { role: "user", text: t };
+    setMessages(prev => [...prev, userMsg]);
     setInput("");
     setThinking(true);
-    setTimeout(() => {
-      setMessages(prev => [...prev, { role: "brandolph", text: fakeReply(t) }]);
-      setThinking(false);
-    }, 1400 + Math.random() * 600);
+
+    /* Mock fallback path — used when no API_BASE is configured, and as the
+       recovery branch if the live call throws.                            */
+    const playMock = () => {
+      setTimeout(() => {
+        setMessages(prev => [...prev, { role: "brandolph", text: fakeReply(t) }]);
+        setThinking(false);
+      }, 1400 + Math.random() * 600);
+    };
+
+    if (!API_BASE) { playMock(); return; }
+
+    /* Live path — append an empty `live` brandolph message and grow it as
+       tokens arrive from the server.                                      */
+    const history = [...messages, userMsg].map(m => ({
+      role: m.role === "user" ? "user" : "assistant",
+      content: m.text,
+    }));
+    setMessages(prev => [...prev, { role: "brandolph", text: "", live: true }]);
+
+    try {
+      await streamBrandolph({
+        history,
+        routeId,
+        onToken: (delta) => {
+          setMessages(prev => {
+            const copy = prev.slice();
+            const last = copy[copy.length - 1];
+            if (last && last.live) copy[copy.length - 1] = { ...last, text: last.text + delta };
+            return copy;
+          });
+        },
+      });
+      /* Mark the message done — switches the renderer from raw to formatted. */
+      setMessages(prev => {
+        const copy = prev.slice();
+        const last = copy[copy.length - 1];
+        if (last && last.live) copy[copy.length - 1] = { ...last, live: false };
+        return copy;
+      });
+    } catch (err) {
+      /* Drop the empty live bubble and fall back to mock so the UI never breaks. */
+      setMessages(prev => {
+        const copy = prev.slice();
+        const last = copy[copy.length - 1];
+        if (last && last.live) copy.pop();
+        return copy;
+      });
+      console.warn("Brandolph live stream failed, falling back to mock:", err);
+      playMock();
+      return;
+    }
+    setThinking(false);
   };
 
   const handleKey = (e) => {
@@ -212,7 +416,7 @@ function FloatingBrandolph() {
           <div ref={bodyRef} className="bf-body scroll">
             {messages.length === 0 ? (
               <React.Fragment>
-                <FloaterMessage m={{ role: "brandolph", text: getContextLine(routeId) }} />
+                <FloaterMessage m={{ role: "brandolph", text: derived.line || getContextLine(routeId) }} />
                 <div className="eyebrow" style={{marginTop: 4, marginBottom: 4}}>Try asking</div>
                 <div style={{display:"flex", flexDirection:"column", gap: 8}}>
                   {prompts.map((p, i) => (

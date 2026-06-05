@@ -178,14 +178,56 @@ function AgentCard({ agentId, compact = false, onClick, showCaps = false }) {
   );
 }
 
-/* Output card — used in /briefs/[id] and canvas drawers */
+/* Output card — used in /briefs/[id] and canvas drawers.
+   Footer renders the rev-2 §5.5 / §9 attribution. Two render modes:
+   - Client (default, public): leads with the Steward chip; NO model name.
+     This is the moat-defining trust signal — `certified by Marina` is
+     impossible to fake without the real Steward operation.
+   - Team / debug: adds `routed via {model}` and `run {short_id}` for
+     ops debugging. Surfaces by default on team portal; hover-reveal on
+     client portal so debugging is always one mouse-hover away.
+   Data sources (mocked here; real wiring at P3 reads from `runs` row +
+   `bios.certified_by/at`): CI_BRAND.steward, CI_BRAND.bioVersion,
+   output.meta (date), CI_AGENTS[].model (key into CI_MODELS for label),
+   output.id (truncated to 7 chars as the run short_id). */
 function OutputCard({ output }) {
   const agent = window.CI_AGENTS.find(a => a.id === output.agentId);
   const isTeam = useIsTeam();
+  const brand = window.CI_BRAND;
+  const steward = brand && brand.steward;
+  const modelLabel = agent && window.CI_MODELS && window.CI_MODELS[agent.model] ? window.CI_MODELS[agent.model].label : null;
+  const shortRunId = output.id ? String(output.id).replace(/[^a-z0-9]/gi, "").slice(0, 7) : "";
+
+  const footerBase = {
+    marginTop: 6, paddingTop: 10,
+    borderTop:"1px dashed var(--c-line-2)",
+    fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)",
+    letterSpacing:"0.04em", lineHeight: 1.45,
+  };
+
+  const ClientFooter = (
+    <div style={footerBase}>
+      Composed by <span style={{color:"var(--c-ink)"}}>{agent ? agent.name : "Specialist"}</span>
+      {brand && brand.bioVersion ? <> · BIO v{brand.bioVersion}</> : null}
+      {steward ? <> · certified by <span style={{color:"var(--c-ink)"}}>{steward.firstName}</span> · {steward.certifiedAt}</> : null}
+    </div>
+  );
+
+  const DebugFooter = (
+    <div style={{...footerBase, color:"var(--c-dim)"}}>
+      Composed by <span style={{color:"var(--c-ink)"}}>{agent ? agent.name : "Specialist"}</span>
+      {modelLabel ? <> · routed via {modelLabel}</> : null}
+      {brand && brand.bioVersion ? <> · BIO v{brand.bioVersion}</> : null}
+      {steward ? <> · certified by <span style={{color:"var(--c-ink)"}}>{steward.firstName}</span> · {steward.certifiedAt}</> : null}
+      {shortRunId ? <> · run {shortRunId}</> : null}
+    </div>
+  );
+
   return (
-    <div style={{
+    <div className="output-card" style={{
       background:"var(--c-card)", border:"1px solid var(--c-line)",
       borderRadius: 12, padding: 18, display:"flex", flexDirection:"column", gap: 10,
+      position:"relative",
     }}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
         <span className="eyebrow eyebrow--yellow">{output.type}</span>
@@ -196,16 +238,26 @@ function OutputCard({ output }) {
         color:"var(--c-ink)", fontSize: 16.5, lineHeight: 1.55,
         margin:0,
       }}>"{output.body}"</p>
-      <div style={{
-        marginTop: 6, paddingTop: 10,
-        borderTop:"1px dashed var(--c-line-2)",
-        display:"flex", justifyContent:"space-between", gap:8,
-        fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)",
-        letterSpacing:"0.04em",
-      }}>
-        <span>{agent ? agent.name : "Specialist"} · {agent ? agent.code : ""}</span>
-        <span>{output.meta}</span>
-      </div>
+      {isTeam ? DebugFooter : (
+        /* Client portal: render client footer inline; hover-reveal the debug
+           footer in a small tooltip card so debugging is one hover away. */
+        <div className="output-card__footer-wrap" style={{position:"relative"}}>
+          {ClientFooter}
+          <div className="output-card__debug-tip" style={{
+            position:"absolute", left: 0, right: 0, top: "calc(100% + 6px)",
+            background:"var(--c-card)", border:"1px solid var(--c-line)",
+            borderRadius: 8, padding:"8px 12px",
+            boxShadow:"var(--shadow-md, 0 4px 16px rgba(0,0,0,0.08))",
+            opacity: 0, pointerEvents:"none",
+            transform:"translateY(-4px)",
+            transition:"opacity 140ms ease, transform 140ms ease",
+            zIndex: 5,
+          }}>
+            <div style={{fontSize:9.5, fontFamily:"var(--font-mono)", letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--c-faint)", marginBottom: 4}}>Debug attribution</div>
+            {DebugFooter}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -327,13 +379,21 @@ function PageHeader({ eyebrow, title, sub, right }) {
 function Icon({ name, size = 16, stroke = 1.6 }) {
   const paths = {
     home:      "M3 11.5L10 4l7 7.5V17a1 1 0 01-1 1h-3v-5h-4v5H4a1 1 0 01-1-1z",
-    bio:       "M5 4h7l4 4v8a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zM12 4v4h4",
-    brief:     "M4 4h12v3H4zM4 9h12v3H4zM4 14h8v3H4z",
+    // BIO — open book / two-page spread. The "canon" of the brand,
+    // visibly singular and bound, distinct from the Library grid.
+    bio:       "M10 5v12M3 5h6a1 1 0 011 1v11a1 1 0 00-1-1H3zM17 5h-6a1 1 0 00-1 1v11a1 1 0 011-1h6z",
+    // Brief — a document with a title bar + two content strokes.
+    // Reads as "page with a brief on it", not a hamburger menu.
+    brief:     "M4 3h12v14H4zM4 7h12M7 11h6M7 14h4",
     spark:     "M10 2v6M10 12v6M2 10h6M12 10h6M5 5l3 3M12 12l3 3M5 15l3-3M12 8l3-3",
     canvas:    "M3 4h14v12H3zM3 9h14M9 4v12",
-    craft:     "M3 16l4-12 4 8 3-5 3 9zM3 16h14",
-    credit:    "M2 5h16v10H2zM2 9h16M5 12h4",
-    settings:  "M10 2l1.6 2.4 2.8.6.6 2.8L17 10l-2 2.2-.6 2.8-2.8.6L10 18l-1.6-2.4-2.8-.6-.6-2.8L3 10l2-2.2.6-2.8 2.8-.6z",
+    // Humans — single figure (the artisan finishing the work).
+    // Distinct from team (two figures, plural).
+    craft:     "M10 3a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM4 17a6 6 0 0112 0",
+    // Credits — a card with a small chip strip.
+    credit:    "M3 6h14v8H3zM3 9.5h14M6 12.5h3",
+    // Settings — clean radial gear with a central circle.
+    settings:  "M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14.1 5.9l1.4-1.4M10 7a3 3 0 100 6 3 3 0 000-6z",
     team:      "M7 9a3 3 0 100-6 3 3 0 000 6zM2 17a5 5 0 0110 0M15 8a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM18 17a4 4 0 00-3-3.9",
     arrow:     "M4 10h12M11 5l5 5-5 5",
     arrowLeft: "M16 10H4M9 5l-5 5 5 5",
@@ -343,11 +403,15 @@ function Icon({ name, size = 16, stroke = 1.6 }) {
     star:      "M10 2l2.4 5 5.6.8-4 3.9.9 5.5L10 14.6l-5 2.6.9-5.5-4-3.9 5.6-.8z",
     chev:      "M6 8l4 4 4-4",
     dot:       "",
-    sparkles:  "M10 3l1.5 3 3 1.5-3 1.5L10 12l-1.5-3-3-1.5 3-1.5zM15 12l.7 1.5L17 14l-1.3.5L15 16l-.7-1.5L13 14l1.3-.5z",
+    // Create — single 4-point star with a small accent. Cleaner than the
+    // old double-asterisk; reads as "make something new".
+    sparkles:  "M9.5 2.5l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM16 12.5l.7 1.8 1.8.7-1.8.7L16 17.5l-.7-1.8-1.8-.7 1.8-.7z",
     refresh:   "M4 10a6 6 0 0111-3M16 10a6 6 0 01-11 3M14 4v4h-4M6 16v-4h4",
     flag:      "M5 18V4h9l-1 3 1 3H5",
     edit:      "M4 16l3-1 9-9-2-2-9 9zM13 6l2 2",
-    files:     "M5 4h8l3 3v9a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zM13 4v3h3",
+    // Library — a 2x2 contact sheet. Reads instantly as "collection",
+    // visually distinct from the BIO's book spread.
+    files:     "M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z",
     download:  "M10 3v11M5 9l5 5 5-5M4 17h12",
     mail:      "M3 5h14v10H3zM3 5l7 5 7-5",
     timer:     "M10 7v4l3 2M10 3a7 7 0 100 14 7 7 0 000-14zM8 1h4",
@@ -361,6 +425,42 @@ function Icon({ name, size = 16, stroke = 1.6 }) {
     </svg>
   );
 }
+
+/* ─── Current-brand state ───────────────────────────────────────
+   Single source of truth for which brand the workspace is viewing.
+   Persisted to localStorage and broadcast via a 'brand:changed' event
+   so every data hook (briefs, BIO, library, discovery) can re-fetch
+   when the user picks a new brand from the dock-mounted switcher. */
+const CURRENT_BRAND_KEY = "ci_current_brand_id";
+
+function getCurrentBrandId() {
+  try { return localStorage.getItem(CURRENT_BRAND_KEY) || null; }
+  catch { return null; }
+}
+
+function setCurrentBrandId(id) {
+  try {
+    if (id) localStorage.setItem(CURRENT_BRAND_KEY, id);
+    else    localStorage.removeItem(CURRENT_BRAND_KEY);
+  } catch {}
+  // Notify listeners. Custom event because storage events don't fire
+  // in the same tab that wrote the value.
+  window.dispatchEvent(new CustomEvent("brand:changed", { detail: { id } }));
+}
+
+/* Hook — components subscribe to the current brand id and rerender
+   when it changes. Returns null until set. */
+function useCurrentBrandId() {
+  const [id, setId] = React.useState(() => getCurrentBrandId());
+  React.useEffect(() => {
+    const onChange = (e) => setId(e.detail?.id || null);
+    window.addEventListener("brand:changed", onChange);
+    return () => window.removeEventListener("brand:changed", onChange);
+  }, []);
+  return id;
+}
+
+Object.assign(window, { getCurrentBrandId, setCurrentBrandId, useCurrentBrandId });
 
 /* Split prose into sentences for line-by-line streaming.            */
 /* Respects *…* emphasis spans so a period inside an emphasis        */

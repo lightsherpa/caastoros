@@ -106,7 +106,7 @@ function CraftModal({ pack, onClose }) {
     <Drawer
       open={true}
       onClose={onClose}
-      eyebrow={`Human craft · ${pack.eta}`}
+      eyebrow={`Humans · ${pack.eta}`}
       title={pack.label}
       footer={<>
         <button className="btn btn--ghost" onClick={onClose}>Cancel</button>
@@ -176,7 +176,7 @@ function TierLock() {
         <em style={{background:"var(--yellow-200)", padding:"0 4px", fontStyle:"normal"}}>This lives in Brandolph.</em>
       </h2>
       <p style={{fontSize: 14.5, color:"var(--c-dim)", lineHeight: 1.55, margin: 0, marginBottom: 22}}>
-        Human craft — the L3 layer — is the difference between an AI draft and finished work a buyer takes seriously. It comes with Brandolph and up.
+        Humans — the L3 layer — are the difference between an AI draft and finished work a buyer takes seriously. They come with Brandolph and up.
       </p>
       <div style={{display:"flex", gap: 10, justifyContent:"center"}}>
         <button className="btn btn--primary btn--lg">Upgrade to Brandolph</button>

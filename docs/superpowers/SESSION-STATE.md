@@ -1,8 +1,19 @@
-# CaastorOS — Session State / Resume Note (2026-06-05)
+# CaastorOS — Session State / Resume Note (2026-06-06)
 
 > Read this + `CLAUDE.md` to resume. All work below is **committed to git**.
 
-## What was built this session (the "canvas → human craft" arc)
+## Latest session (2026-06-06) — stabilized + committed the live Discovery→BIO loop
+The ~4k-line uncommitted WIP that wired the SPA to the real backend is now reviewed, fixed, and **committed**:
+- **Live Discovery→BIO loop (frontend):** `portal-discovery.jsx` `useLiveBio` polling hook + `DiscoveryStep1` fires `POST /api/discovery/start` + `DiscoveryStep2Running` polls for the version bump + `BioViewer` reads/edits real BIOs via `GET`/`PATCH /api/bios/:id` and `POST /api/bios/:id/sources`. Backend (discovery/compile-bio/bios/assign-steward/memory) was already committed; this is the consumer.
+- **Live floater:** streams `POST /api/brandolph/ask` (SSE) + memory greeting from `GET /api/brandolph/memory`, mock fallback intact.
+- **Real Supabase auth** rewrite (signin/signup/forgot/recovery), current-brand store, OutputCard attribution footer, redrawn icons.
+- **Bugfix:** floater `streamBrandolph` was raw `fetch` (no JWT) → always 401 → silent mock fallback; now uses `apiFetch`.
+- **Verified without spending credits:** `npm run build` clean · `npm run test:units` 47/47 · server boots, all loop endpoints 401-guarded.
+- **STILL UNVERIFIED (user to run, costs credits):** one real end-to-end Discovery (scrape vinilo.coffee → Gemini 2.5 Pro BIO synth → bios row → Steward cert chip flips). Run `npm run dev:all`, sign up, paste a URL on Discovery, watch the BIO land + the cert chip.
+- **Next milestone (Track B):** Steward certification UI in the Team portal (the BIO compiles + enqueues a cert job, but a human can't yet sign it) + Supabase Storage file upload (`/sources/upload` exists; wire the three-bucket UI to it).
+
+---
+## Prior session — the "canvas → human craft" arc
 
 **Backend (Plans 1 & 2 — server, fully unit-tested, `npm run test:units` = green):**
 - **Delivery Plan contract** — `server/src/lib/{platforms,taxonomy,delivery-plan,deliverables}.js`. The Sharpener (`server/src/lib/sharpener.js`) now emits a structured `deliveryPlan` (typed deliverable groups: count + platforms + parts + crew, incl. **visual** specialists) instead of a flat text-only list. Specs: `docs/superpowers/specs/2026-05-31-canvas-delivery-plan-design.md`. Plans: `docs/superpowers/plans/`.
