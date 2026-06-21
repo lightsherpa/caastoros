@@ -7,3 +7,6 @@ dist/
 .env
 .env.local
 .env.*.local
+
+# Large raw media — keep out of git (use external storage / git-lfs if needed)
+explainer-video/

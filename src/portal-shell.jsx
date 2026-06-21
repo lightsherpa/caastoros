@@ -127,29 +127,73 @@ function useBrandList() {
   const [state, setState] = useShellState({ brands: [], loading: true });
   useShellEffect(() => {
     let cancelled = false;
-    (async () => {
+    const load = async () => {
       const { data } = await supabase
         .from("brands")
         .select("id, name, created_at")
         .order("created_at", { ascending: true });
       if (cancelled) return;
       setState({ brands: data || [], loading: false });
-      // Seed the current-brand selection on first load if none chosen yet.
-      if (!getCurrentBrandId() && data?.[0]?.id) {
+      // Seed AND validate the current-brand selection. `brands` is RLS-scoped
+      // to the signed-in user's workspaces, so a stored id that isn't in the
+      // list is stale — left over from a previous account on this browser
+      // (it points at another workspace's brand and 403s every /api/* call).
+      // Reset to the first owned brand in both the unset and stale cases.
+      const stored = getCurrentBrandId();
+      const ownsStored = stored && (data || []).some((b) => b.id === stored);
+      if (!ownsStored && data?.[0]?.id) {
         setCurrentBrandId(data[0].id);
+      } else if (!data?.length && stored) {
+        setCurrentBrandId(null);   // no brands at all → clear stale pointer
       }
-    })();
-    return () => { cancelled = true; };
+    };
+    load();
+    // Refetch when a brand is added or switched (e.g. "+ Add brand" runs
+    // discovery → setCurrentBrandId fires 'brand:changed'); otherwise the
+    // newly-created brand never appears in the switcher until a reload.
+    // Safe against loops: load() only calls setCurrentBrandId when the stored
+    // id isn't owned, which can't recur once the new brand is in the list.
+    window.addEventListener("brand:changed", load);
+    return () => { cancelled = true; window.removeEventListener("brand:changed", load); };
   }, []);
   return state;
 }
 
+/* Workspace tier — drives the brand allowance gate on the switcher's
+   "Add brand" action and the highlighted "Current plan" on the upgrade
+   page. Fetched once; defaults to "00" (Creek) when absent. */
+function useWorkspaceTier() {
+  const [tier, setTier] = useShellState("00");
+  useShellEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("workspaces")
+        .select("tier")
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data?.tier) setTier(data.tier);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  return tier;
+}
+
 function WorkspaceSwitcher() {
   const { brands, loading } = useBrandList();
+  const tier = useWorkspaceTier();
   const currentId = useCurrentBrandId();
   const [open, setOpen] = useShellState(false);
   const current = brands.find((b) => b.id === currentId) || brands[0];
   const initial = (current?.name?.trim()?.[0] || "?").toUpperCase();
+
+  const limit = window.CI_BRAND_LIMITS[tier] ?? 1;
+  const canAdd = brands.length < limit;
+  const onAddBrand = () => {
+    window.location.hash = canAdd ? "#/discovery/new" : "#/upgrade";
+    setOpen(false);
+  };
 
   // Close on outside click
   const rootRef = React.useRef(null);
@@ -188,6 +232,16 @@ function WorkspaceSwitcher() {
               </button>
             );
           })}
+          <div style={{height:1, background:"var(--c-line)", margin:"4px 2px"}} aria-hidden="true" />
+          <button type="button"
+            className="ws-switcher__option"
+            style={{color:"var(--c-dim)"}}
+            onClick={onAddBrand}>
+            <span className="ws-switcher__chip ws-switcher__chip--sm"
+              style={{background:"transparent", color:"var(--c-dim)", boxShadow:"inset 0 0 0 1px var(--c-line)"}}
+              aria-hidden="true">+</span>
+            <span className="ws-switcher__name" style={{color:"var(--c-dim)"}}>Add brand</span>
+          </button>
         </div>
       )}
     </div>
@@ -198,7 +252,7 @@ function WorkspaceSwitcher() {
 function Brandmark() {
   return (
     <div style={{display:"flex", alignItems:"baseline", gap: 5}}>
-      <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS"
+      <img src="caastor/assets/logo-full-yellow.png" alt="CaastorOS"
         className="brand-logo" style={{height: 34, width:"auto", display:"block", alignSelf:"center"}} />
       <span style={{fontFamily:"var(--font-mono)", fontSize: 15, fontWeight: 600, color:"var(--c-ink)", letterSpacing:"0.01em"}}>OS</span>
     </div>
@@ -239,7 +293,7 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
         ) : (
           <div className="card" style={{padding:"10px 12px", background:"var(--c-bg)", boxShadow:"none"}}>
             <div style={{display:"flex", alignItems:"center", gap: 10}}>
-              <img src="intelligence/assets/profile-1.jpg" alt="" style={{width:30, height:30, borderRadius:"50%", objectFit:"cover"}} />
+              <img src="caastor/assets/profile-1.jpg" alt="" style={{width:30, height:30, borderRadius:"50%", objectFit:"cover"}} />
               <div style={{flex:1, minWidth: 0}}>
                 <div style={{fontSize:13, fontWeight: 500, color:"var(--c-ink)"}}>Aitana Vives</div>
                 <div className="eyebrow">Senior designer</div>
@@ -364,6 +418,7 @@ function TopBar({ portal, route, brandName, go }) {
     craft:       ["Humans",            "Specialists / Humans"],
     credits:     ["Credits",           "Credits / Account"],
     settings:    ["Account",           "Credits / Account"],
+    upgrade:     ["Plans",             "Credits / Account"],
     team:        ["Job queue",         "Team portal"],
     "team-craft":["Craft polish",       "Team portal"],
     "team-job":  ["Active job",        "Team portal"],
@@ -374,7 +429,12 @@ function TopBar({ portal, route, brandName, go }) {
     "admin-brandolph": ["Brandolph memory", "Admin"],
   };
   const [title, crumb] = titles[route] || [route, ""];
-  const ws = isClient ? brandName : "La Mesa team";
+  /* Breadcrumb workspace segment: the team portal is the only surface that
+     belongs to the La Mesa team. Client routes — and the admin's client-nav
+     surfaces (Briefs / BIO / …) — are brand workspaces, so show the brand
+     name there. Showing "La Mesa team" to a client/brand view is a mixed
+     mental model (sidebar says "My brand", login said "Client portal"). */
+  const ws = portal === "team" ? "La Mesa team" : brandName;
   return (
     <div className="topbar">
       <div className="titlestrip__crumb">{ws} · {crumb}</div>
@@ -397,7 +457,7 @@ function TopBar({ portal, route, brandName, go }) {
             <BrandolphDot /> Brandolph is reading
           </div>
         )}
-        <img src={isClient ? window.CI_USER.avatar : "intelligence/assets/profile-1.jpg"} alt="" style={{width: 30, height: 30, borderRadius: "50%", objectFit:"cover", border:"1.5px solid rgba(0,0,0,0.12)"}} />
+        <img src={isClient ? window.CI_USER.avatar : "caastor/assets/profile-1.jpg"} alt="" style={{width: 30, height: 30, borderRadius: "50%", objectFit:"cover", border:"1.5px solid rgba(0,0,0,0.12)"}} />
       </div>
     </div>
   );
@@ -439,7 +499,7 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
         {!isHome && (
           <span className="app-dock__back" aria-hidden="true"><Icon name="arrowLeft" size={13} /></span>
         )}
-        <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height:30, width:"auto", flexShrink:0}} />
+        <img src="caastor/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height:30, width:"auto", flexShrink:0}} />
         <span className="app-dock__os">OS</span>
       </button>
       {portal !== "team" && <WorkspaceSwitcher />}
@@ -474,7 +534,7 @@ function WorkspaceLogo({ shellMode }) {
   if (shellMode !== "workspace") return null;
   return (
     <div className="workspace-logo" aria-hidden="true">
-      <img src="intelligence/assets/icon-white.svg" alt="" />
+      <img src="caastor/assets/icon-white.svg" alt="" />
     </div>
   );
 }
@@ -512,7 +572,7 @@ function App() {
     if (session._recovery) return;                            // stay on the recovery form until new password set
     if (session._pending) return;                             // bootstrap profile lacks real role — wait for async resolve
     if (onLoginRoute) { go(session.role === "team" ? "team" : "home"); return; }
-    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery" || route.id === "specialist-new" || route.id === "canvas" || route.id === "board";
+    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery" || route.id === "specialist-new" || route.id === "canvas" || route.id === "board" || route.id === "upgrade";
     const isTeamRoute  = TEAM_ROUTES.some(r => r.id === route.id) || route.id === "team-job";
     const isAdminRoute = ADMIN_ROUTES.some(r => r.id === route.id);
     if (session.role === "client" && !isClientRoute) go("home");
@@ -564,7 +624,7 @@ function App() {
 function ScreenRouter({ route, go, tweaks, setTweak }) {
   switch(route.id) {
     case "home":         return <BrandolphHome tweaks={tweaks} setTweak={setTweak} go={go} />;
-    case "discovery":    return <Discovery go={go} />;
+    case "discovery":    return <Discovery go={go} newBrand={route.param === "new"} />;
     case "bio":          return <BioViewer go={go} bioScore={tweaks.bioScore} />;
     case "briefs":       return <BriefsLibrary go={go} />;
     case "library":      return <Library go={go} />;
@@ -576,6 +636,7 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "craft":        return <CraftMarketplace go={go} tier={tweaks.tier} />;
     case "credits":      return <CreditsLedger />;
     case "settings":     return <SettingsView />;
+    case "upgrade":      return <UpgradeView go={go} />;
     case "team":         return <TeamQueue go={go} />;
     case "team-craft":   return <CraftQueue />;
     case "team-job":     return <TeamJob id={route.param} go={go} />;
@@ -586,6 +647,134 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "admin-brandolph": return <AdminBrandolphMemory />;
     default:             return <BrandolphHome tweaks={tweaks} setTweak={setTweak} go={go} />;
   }
+}
+
+/* Upgrade / plans ------------------------------------------------- */
+/* On-brand pricing page. Reachable directly (#/upgrade) and via the
+   workspace switcher's gated "Add brand" path (over brand allowance →
+   here). Four tiers from CI_TIERS / CI_BRAND_LIMITS; the user's current
+   tier is highlighted. Upgrade CTAs are stubs (billing is P7 — Stripe
+   not built). No prices: we have none yet. */
+const TIER_ORDER = ["00", "01", "02", "03"];
+const TIER_BLURBS = {
+  "00": "One brand, the full Brandolph crew, and your certified BIO.",
+  "01": "Run two brands side by side with shared specialist memory.",
+  "02": "Three brands plus priority human craft polish.",
+  "03": "Unlimited brands for studios running the whole roster.",
+};
+function tierAllowance(tier) {
+  const n = window.CI_BRAND_LIMITS[tier] ?? 1;
+  if (n === Infinity) return "Unlimited brands";
+  return n === 1 ? "1 brand" : `${n} brands`;
+}
+
+function UpgradeView({ go }) {
+  const currentTier = useWorkspaceTier();
+  const session = useSession();
+  const isAdmin = session?.role === "admin";
+  const [note, setNote] = useShellState(null);   // tier id with the "opens soon" message shown
+  const tiers = window.CI_TIERS || {};
+  const currentIdx = TIER_ORDER.indexOf(currentTier);
+
+  return (
+    <div style={{maxWidth: 1080, margin:"0 auto", padding:"40px 32px 64px"}}>
+      <div className="eyebrow" style={{marginBottom: 12}}>Plans</div>
+      <h1 style={{
+        fontFamily:"var(--font-serif)", fontStyle:"italic", fontWeight: 500,
+        fontSize: "clamp(32px, 5vw, 52px)", lineHeight: 1.05, letterSpacing:"-0.02em",
+        color:"var(--c-ink)", margin:"0 0 12px",
+      }}>
+        Grow your studio.
+      </h1>
+      <p style={{fontSize: 15, color:"var(--c-dim)", lineHeight: 1.5, maxWidth: 520, margin:"0 0 40px"}}>
+        Every plan ships the full Brandolph crew and a senior-certified BIO. Choose the
+        brand allowance that fits the work in front of you.
+      </p>
+
+      <div style={{display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap: 16}}>
+        {TIER_ORDER.map((id, idx) => {
+          const name = tiers[id] || id;
+          const isCurrent = id === currentTier;
+          const isHigher = idx > currentIdx;
+          return (
+            <div key={id} className="card"
+              style={{
+                display:"flex", flexDirection:"column", gap: 14, padding:"22px 20px",
+                position:"relative",
+                ...(isCurrent ? { boxShadow:"inset 0 0 0 1.5px var(--yellow-500)" } : {}),
+              }}>
+              {isCurrent && (
+                <span className="eyebrow eyebrow--yellow"
+                  style={{position:"absolute", top: 16, right: 18}}>
+                  Current plan
+                </span>
+              )}
+              <div className="eyebrow">{`Tier ${id}`}</div>
+              <div style={{
+                fontFamily:"var(--font-serif)", fontStyle:"italic", fontWeight: 500,
+                fontSize: 26, lineHeight: 1, color:"var(--c-ink)",
+              }}>
+                {name}
+              </div>
+              <div style={{
+                fontFamily:"var(--font-mono)", fontSize: 12, letterSpacing:"0.02em",
+                color:"var(--c-dim)",
+              }}>
+                {tierAllowance(id)}
+              </div>
+              <div style={{fontSize: 13, color:"var(--c-dim)", lineHeight: 1.45, flex: 1}}>
+                {TIER_BLURBS[id]}
+              </div>
+              <div style={{fontFamily:"var(--font-mono)", fontSize: 18, color:"var(--c-ink)"}} aria-hidden="true">—</div>
+              {isCurrent ? (
+                <button className="btn" disabled
+                  style={{width:"100%", justifyContent:"center", opacity: 0.55, cursor:"default"}}>
+                  Your plan
+                </button>
+              ) : isHigher ? (
+                !isAdmin ? (
+                  <div style={{
+                    fontSize: 12, color:"var(--c-dim)", lineHeight: 1.4,
+                  }}>
+                    Plan changes are managed by your workspace admin.
+                  </div>
+                ) : (
+                  <>
+                    <button className="btn btn--primary"
+                      style={{width:"100%", justifyContent:"center"}}
+                      onClick={() => setNote(id)}>
+                      {id === "03" ? "Talk to us" : "Upgrade"}
+                    </button>
+                    {note === id && (
+                      <div style={{
+                        fontSize: 12, color:"var(--c-dim)", lineHeight: 1.4,
+                        background:"var(--c-bg)", border:"1px solid var(--c-line)",
+                        borderRadius: 8, padding:"8px 10px",
+                      }}>
+                        {id === "03"
+                          ? "Reach your Caastor team to set up The Colony 🐜."
+                          : "Upgrading opens soon — talk to your Caastor team."}
+                      </div>
+                    )}
+                  </>
+                )
+              ) : (
+                <button className="btn" disabled
+                  style={{width:"100%", justifyContent:"center", opacity: 0.45, cursor:"default"}}>
+                  Included
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <button className="btn btn--link" style={{marginTop: 28, fontSize: 13}}
+        onClick={() => go && go("home")}>
+        ← Back to Create
+      </button>
+    </div>
+  );
 }
 
 /* Tweaks panel ---------------------------------------------------- */

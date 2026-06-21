@@ -27,17 +27,17 @@ function useStewardJobs() {
 }
 
 function useStewardJob(jobId) {
-  const [data, setData] = useTState({ job: null, sources: [], you: null, error: null, loading: true });
+  const [data, setData] = useTState({ job: null, sources: [], you: null, focus: [], error: null, loading: true });
   const reload = async () => {
-    if (!jobId) { setData({ job: null, sources: [], you: null, error: "No job id", loading: false }); return; }
+    if (!jobId) { setData({ job: null, sources: [], you: null, focus: [], error: "No job id", loading: false }); return; }
     setData(d => ({ ...d, loading: true, error: null }));
     try {
       const res = await apiFetch(`/api/steward/jobs/${jobId}`);
-      if (!res.ok) { setData({ job: null, sources: [], you: null, error: `HTTP ${res.status}`, loading: false }); return; }
+      if (!res.ok) { setData({ job: null, sources: [], you: null, focus: [], error: `HTTP ${res.status}`, loading: false }); return; }
       const json = await res.json();
-      setData({ job: json.job, sources: json.sources || [], you: json.you || null, error: null, loading: false });
+      setData({ job: json.job, sources: json.sources || [], you: json.you || null, focus: json.focus || [], error: null, loading: false });
     } catch (e) {
-      setData({ job: null, sources: [], you: null, error: e?.message || String(e), loading: false });
+      setData({ job: null, sources: [], you: null, focus: [], error: e?.message || String(e), loading: false });
     }
   };
   useTEffect(() => { reload(); }, [jobId]);
@@ -468,7 +468,7 @@ function EditableTypeList({ value, onChange }) {
    and either certifies (with notes), cancels, or — V2 — patches the
    BIO before certifying (refinement P1.5-001). */
 function TeamJob({ id, go }) {
-  const { job, sources, you, error, loading, reload } = useStewardJob(id);
+  const { job, sources, you, focus, error, loading, reload } = useStewardJob(id);
   const [notes, setNotes] = useTState("");
   const [edited, setEdited] = useTState(null);                /* edited BIO payload — null until job loads */
   const [submitting, setSubmitting] = useTState(false);
@@ -646,8 +646,46 @@ function TeamJob({ id, go }) {
         </div>
       </main>
 
-      {/* Right rail — sources + actions */}
+      {/* Right rail — focus list + sources + actions */}
       <aside className="tjob-right scroll" style={{borderLeft:"1px solid var(--c-line)", background:"var(--c-card)", overflowY:"auto", display:"flex", flexDirection:"column"}}>
+        {/* Focus first — where the Steward should look (ranked: gaps, then thin/low-confidence fields) */}
+        <div style={{padding: 20, borderBottom:"1px solid var(--c-line)"}}>
+          <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Focus first · {focus.length}</div>
+          {focus.length === 0 ? (
+            <div style={{fontSize: 11.5, color:"var(--c-faint)"}}>Nothing flagged — every field reads through.</div>
+          ) : (
+            <div style={{display:"flex", flexDirection:"column", gap: 8}}>
+              {focus.map((f, i) => {
+                const isMissing = f.status === "missing";
+                const pillBg  = isMissing ? "var(--pink-50, rgba(244,143,177,0.16))" : "var(--yellow-50, rgba(212,175,55,0.16))";
+                const pillCol = isMissing ? "var(--pink-500)" : "var(--yellow-800)";
+                const highStakes = typeof f.importance === "number" && f.importance >= 1.0;
+                return (
+                  <div key={f.field || i} className="card card--inset" style={{padding:"9px 11px"}}>
+                    <div style={{display:"flex", alignItems:"center", gap: 6, flexWrap:"wrap", marginBottom: 4}}>
+                      <span style={{fontSize: 12.5, color:"var(--c-ink)", fontWeight: 500}}>{f.label || f.field}</span>
+                      <span className="pill" style={{height: 18, padding:"0 7px", fontSize: 9.5, letterSpacing:"0.03em", background: pillBg, color: pillCol}}>
+                        {isMissing ? "missing" : "low conf"}
+                      </span>
+                      {typeof f.conf === "number" && (
+                        <span style={{fontSize: 10.5, color:"var(--c-dim)", fontFamily:"var(--font-mono)"}}>{f.conf}%</span>
+                      )}
+                      {highStakes && (
+                        <span className="pill" style={{height: 18, padding:"0 7px", fontSize: 9.5, letterSpacing:"0.03em", background:"var(--neutral-50)", color:"var(--c-dim)"}}>high-stakes</span>
+                      )}
+                    </div>
+                    {f.source && (
+                      <div style={{fontSize: 10.5, color:"var(--c-faint)", fontFamily:"var(--font-mono)", marginBottom: 3, wordBreak:"break-word"}}>{f.source}</div>
+                    )}
+                    {f.action && (
+                      <div style={{fontSize: 11.5, color:"var(--c-dim)", lineHeight: 1.4}}>{f.action}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
         <div style={{padding: 20, borderBottom:"1px solid var(--c-line)"}}>
           <div className="eyebrow" style={{marginBottom: 12}}>Sources read · {sources.length}</div>
           {Object.entries(sourcesByBucket).map(([bucket, list]) => (

@@ -43,7 +43,7 @@ function bootstrapProfileFromStorage() {
     role: "client",                                       // refined when async resolveProfile completes
     workspaceId: null,
     name: u.user_metadata?.name || u.email?.split("@")[0] || "User",
-    avatar: u.user_metadata?.avatar_url || "intelligence/assets/profile-3.jpg",
+    avatar: u.user_metadata?.avatar_url || "caastor/assets/profile-3.jpg",
     at: Date.now(),
     _pending: true,                                       // marker: full profile (role+workspaceId) still loading
   };
@@ -73,7 +73,7 @@ async function resolveProfile(authUser) {
     // For UI rendering — name + avatar are decorative; default fallbacks until
     // we add a `users.display_name` column.
     name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "User",
-    avatar: authUser.user_metadata?.avatar_url || "intelligence/assets/profile-3.jpg",
+    avatar: authUser.user_metadata?.avatar_url || "caastor/assets/profile-3.jpg",
     at: Date.now(),
   };
 }
@@ -107,6 +107,10 @@ async function signOut() {
      the route guard would bounce the user back to the portal. Local
      cleanup first, backend cleanup as best-effort after. */
   try { window.localStorage.removeItem("ci_sb_session"); } catch (e) {}
+  // Clear the per-browser current-brand pointer too — otherwise the next
+  // account to sign in on this browser inherits a brand id from a workspace
+  // it doesn't own, and every /api/* call 403s until it's reset.
+  try { window.localStorage.removeItem("ci_current_brand_id"); } catch (e) {}
   currentProfile = null;
   notify();
   try {
@@ -171,7 +175,7 @@ supabase.auth.onAuthStateChange((event, session) => {
     role: "client",
     workspaceId: null,
     name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "User",
-    avatar: session.user.user_metadata?.avatar_url || "intelligence/assets/profile-3.jpg",
+    avatar: session.user.user_metadata?.avatar_url || "caastor/assets/profile-3.jpg",
     at: Date.now(),
     _pending: true,
   };
@@ -270,13 +274,13 @@ function Login({ role = "client", go, initialMode = "signin" }) {
     mode === "signup"   ? "Create your account"
     : mode === "forgot"  ? "Reset your password"
     : mode === "recovery" ? "Set a new password"
-    : (isTeam ? "La Mesa creative team" : "Sign in to your workspace");
+    : (isTeam ? "La Mesa creative team" : "Sign in to your brand workspace");
 
   return (
     <div className={"auth-root" + (isTeam ? " auth-root--team" : "")}>
       <form className="auth-card" onSubmit={submit}>
         <div className="auth-mark" style={{display:"flex", alignItems:"baseline", gap:5}}>
-          <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height: 38, width:"auto", alignSelf:"center"}} />
+          <img src="caastor/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height: 38, width:"auto", alignSelf:"center"}} />
           <span style={{fontFamily:"var(--font-mono)", fontSize:18, fontWeight:600, color:"var(--text-primary)", letterSpacing:"0.01em"}}>OS</span>
         </div>
         <h1>{isTeam ? "Team portal" : "Client portal"}</h1>
@@ -360,9 +364,13 @@ function Login({ role = "client", go, initialMode = "signin" }) {
 
         <div className="auth-alt">
           {mode === "signin" && (
-            <button type="button" className="btn btn--link" onClick={() => { setMode("signup"); setError(null); setInfo(null); }}>
-              First time? Create an account →
-            </button>
+            <span style={{ fontSize: 13.5, color: "var(--c-dim)" }}>
+              First time?{" "}
+              <button type="button" className="btn btn--link" style={{ textDecoration: "underline" }}
+                onClick={() => { setMode("signup"); setError(null); setInfo(null); }}>
+                Create an account
+              </button>
+            </span>
           )}
           {mode === "signup" && (
             <button type="button" className="btn btn--link" onClick={() => { setMode("signin"); setError(null); setInfo(null); }}>
@@ -387,9 +395,10 @@ function Login({ role = "client", go, initialMode = "signin" }) {
             </button>
           )}
         </div>
-        <div className="auth-alt">
-          <a className="btn btn--link" href={isTeam ? "#/login" : "#/team/login"}>
-            {isTeam ? "Sign in as a client" : "On the Caastor team? Sign in here"} →
+        <div className="auth-alt" style={{ marginTop: 16, fontSize: 12, color: "var(--c-faint)" }}>
+          {isTeam ? "Not on the team?" : "Caastor team member?"}{" "}
+          <a className="btn btn--link" style={{ fontSize: 12 }} href={isTeam ? "#/login" : "#/team/login"}>
+            {isTeam ? "Client sign-in" : "Team sign-in"} →
           </a>
         </div>
       </form>

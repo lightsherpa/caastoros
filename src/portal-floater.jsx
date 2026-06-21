@@ -276,6 +276,13 @@ function FloatingBrandolph() {
   const [routeId] = hash.split("/");
   const onHome = routeId === "home";
 
+  /* List routes render full-width rows whose right edge carries a status
+     pill + open/→ affordance. The fixed bottom-right floater was landing
+     on top of a mid-list row, occluding its CTA. On those routes we lift
+     the floater clear of the row gutter so it never competes with row
+     content. Behaviour/features are untouched — purely a position nudge. */
+  const onListRoute = routeId === "briefs" || routeId === "library";
+
   /* Auto-scroll body to bottom when messages change */
   useFEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -289,14 +296,16 @@ function FloatingBrandolph() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (portal !== "client" && portal !== "admin") return null;
-  /* The floater is reachable on every client + admin screen — including
-     /home, which is now a launchpad (not a chat). Use it to ask status,
-     get advice, or react to Brandolph's memory observations. */
-
   /* Brand memory snapshot — fetched once per workspace switch, drives
      the contextual greeting. Falls back gracefully if the migration
-     isn't applied or the fetch fails (Brandolph still works). */
+     isn't applied or the fetch fails (Brandolph still works).
+
+     CRITICAL: these hooks must run UNCONDITIONALLY, ABOVE the early
+     `return null` below. `portal` flips client→team when the async role
+     resolve completes; if the return sat before these hooks the hook
+     count would change between renders and React throws "rendered fewer
+     hooks than expected", white-screening the whole app (it bit every
+     team/admin account). All hooks first, conditional return after. */
   const [memory, setMemory] = useFState(null);
   const currentBrandId = window.useCurrentBrandId ? window.useCurrentBrandId() : null;
   useFEffect(() => {
@@ -312,6 +321,10 @@ function FloatingBrandolph() {
     })();
     return () => { cancelled = true; };
   }, [currentBrandId, open]);
+
+  /* The floater only renders on client + admin surfaces. This early
+     return MUST stay below every hook above (stable hook order). */
+  if (portal !== "client" && portal !== "admin") return null;
 
   const agentsById = window.CI_AGENTS ? Object.fromEntries(window.CI_AGENTS.map((a) => [a.id, a])) : {};
   const derived = memory && memory.migrationApplied
@@ -485,10 +498,16 @@ function FloatingBrandolph() {
         onClick={() => setOpen(o => !o)}
         aria-label="Ask Brandolph"
         aria-expanded={open}
+        style={onListRoute && !open ? { bottom: "var(--space-13, 80px)" } : undefined}
       >
         <MascotIcon size={60} />
         {!open && messages.length === 0 && (
-          <span className="bf-button__ping" aria-hidden="true">1</span>
+          <span
+            className="bf-button__ping"
+            role="status"
+            aria-label="Brandolph has 1 suggestion for you"
+            title="Brandolph has a suggestion for you"
+          >1</span>
         )}
       </button>
     </React.Fragment>

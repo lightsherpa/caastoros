@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caastor — Creative on Demand</title>
+<meta name="description" content="The creative on demand platform with strategic support, AI execution across nine models, and human craft to close. One platform, one credit balance.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=DM+Sans:opsz,wght@9..40,300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+/* ═══════════════════════════
+   TOKENS
+═══════════════════════════ */
+:root {
+  --bg:            #0A0A0A;
+  --bg-deep:       #050505;
+  --surface:       #101010;
+  --surface-2:     #141414;
+  --surface-3:     #181818;
+  --border-faint:  #181818;
+  --border:        #232323;
+  --border-emp:    #2e2e2e;
+  --border-bright: #404040;
+  --text:          #EAE6DD;
+  --text-warm:     #d8d2c5;
+  --text-dim:      #908a82;
+  --text-faint:    #4a4a48;
+  --text-ghost:    #2a2a28;
+
+  --accent:        #F5C518;
+  --accent-soft:   #FFD75A;
+  --accent-bg:     #1c1700;
+  --accent-bg-2:   #2a2200;
+  --accent-border: #3d3000;
+  --accent-line:   #5a4500;
+
+  --green:         #6BD96B;
+  --green-bg:      #0d1a0d;
+  --green-border:  #1e3d1e;
+  --red:           #E05252;
+  --purple:        #c084fc;
+
+  --m-opus:        #c084fc;
+  --m-sonnet:      #F5C518;
+  --m-haiku:       #6BD96B;
+  --m-gpt5:        #10a37f;
+  --m-gemini:      #4c8df6;
+  --m-flux:        #ff8c42;
+  --m-recraft:     #d97757;
+  --m-exa:         #20808d;
+
+  --font-display:  'Fraunces', 'Georgia', serif;
+  --font-body:     'DM Sans', system-ui, sans-serif;
+  --font-mono:     'JetBrains Mono', monospace;
+  --max:           1380px;
+  --gutter:        clamp(1.25rem, 4vw, 3rem);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.92 0 0 0 0 0.9 0 0 0 0 0.85 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.5; pointer-events: none; z-index: 1; mix-blend-mode: overlay;
+}
+body::after {
+  content: '';
+  position: fixed; top: -40vh; right: -20vw;
+  width: 70vw; height: 70vh;
+  background: radial-gradient(ellipse, rgba(245,197,24,0.04) 0%, transparent 65%);
+  pointer-events: none; z-index: 0;
+}
+
+::selection { background: var(--accent); color: #000; }
+
+/* ═══ TYPE ═══ */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144, "SOFT" 30;
+  font-weight: 500; line-height: 0.97; letter-spacing: -0.025em;
+}
+
+/* ═══ LAYOUT ═══ */
+.shell {
+  max-width: var(--max); margin: 0 auto;
+  padding: 0 var(--gutter); position: relative; z-index: 2;
+}
+section { padding: clamp(5rem, 10vw, 9rem) 0; position: relative; }
+section + section { border-top: 1px solid var(--border-faint); }
+
+.section-label {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-faint); padding-top: 0.5rem;
+  border-top: 1px solid var(--border); display: inline-block;
+  margin-bottom: 2.5rem;
+}
+.section-label span { color: var(--accent); }
+
+.section-title {
+  font-size: clamp(2.4rem, 5.5vw, 4.5rem);
+  font-variation-settings: "opsz" 144, "SOFT" 40, "wght" 450;
+  letter-spacing: -0.03em; line-height: 0.95;
+}
+.section-title em {
+  font-style: italic; color: var(--accent);
+  font-variation-settings: "opsz" 144, "SOFT" 90, "wght" 350;
+}
+.section-sub {
+  margin-top: 1.5rem; color: var(--text-dim);
+  font-size: 1.05rem; max-width: 56ch; line-height: 1.6;
+}
+
+/* ═══ BUTTONS ═══ */
+.btn {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  text-decoration: none; padding: 0.75rem 1.25rem;
+  border: none; cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  font-weight: 600; white-space: nowrap;
+}
+.btn-primary { background: var(--accent); color: #000; }
+.btn-primary:hover { background: var(--accent-soft); }
+.btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border-emp); }
+.btn-ghost:hover { color: var(--text); border-color: var(--border-bright); }
+.arrow { display: inline-block; transition: transform 0.2s; }
+.btn:hover .arrow { transform: translateX(3px); }
+
+/* ═══ NAV ═══ */
+nav.top {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(10,10,10,0.88);
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border-faint);
+}
+.top-inner {
+  max-width: var(--max); margin: 0 auto;
+  padding: 0.85rem var(--gutter);
+  display: flex; align-items: center; justify-content: space-between; gap: 2rem;
+}
+.brand {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-family: var(--font-mono); font-size: 13px;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--text); text-decoration: none; font-weight: 600;
+}
+.brand-dot {
+  width: 7px; height: 7px; background: var(--accent);
+  border-radius: 50%; box-shadow: 0 0 10px var(--accent);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.75); }
+}
+.top-nav {
+  display: flex; gap: 0; overflow-x: auto; scrollbar-width: none;
+}
+.top-nav::-webkit-scrollbar { display: none; }
+.top-nav a {
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-dim); text-decoration: none;
+  padding: 0.4rem 0.8rem; white-space: nowrap; transition: color 0.2s;
+}
+.top-nav a:hover { color: var(--text); }
+.nav-ctas { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
+.nav-cta-ghost {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-dim); text-decoration: none;
+  padding: 0.4rem 0.75rem; border: 1px solid var(--border);
+  transition: color 0.2s, border-color 0.2s;
+}
+.nav-cta-ghost:hover { color: var(--text); border-color: var(--border-emp); }
+.nav-cta-primary {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: #000; background: var(--accent);
+  padding: 0.45rem 0.85rem; text-decoration: none; font-weight: 600;
+  transition: background 0.2s;
+}
+.nav-cta-primary:hover { background: var(--accent-soft); }
+@media (max-width: 768px) { .top-nav { display: none; } .nav-ctas .nav-cta-ghost { display: none; } }
+
+/* ═══ HERO ═══ */
+.hero {
+  min-height: 100vh; display: flex; flex-direction: column;
+  justify-content: center;
+  padding: clamp(7rem, 14vw, 11rem) 0 clamp(4rem, 8vw, 6rem);
+  position: relative;
+}
+.hero-kicker {
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 2.25rem;
+  display: flex; align-items: center; gap: 0.8rem;
+}
+.hero-kicker::before { content: ''; width: 28px; height: 1px; background: var(--accent); }
+
+.hero-headline {
+  font-size: clamp(4rem, 13vw, 14rem);
+  font-variation-settings: "opsz" 144, "SOFT" 50, "wght" 380;
+  letter-spacing: -0.045em; line-height: 0.87; margin-bottom: 4rem;
+}
+.hero-headline em {
+  font-style: italic; color: var(--accent);
+  font-variation-settings: "opsz" 144, "SOFT" 100, "wght" 300;
+}
+
+.hero-lower {
+  display: grid; grid-template-columns: 1.1fr 1fr;
+  gap: 4rem; align-items: end;
+}
+@media (max-width: 900px) { .hero-lower { grid-template-columns: 1fr; gap: 2.5rem; } }
+
+.hero-sub {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 24, "SOFT" 60, "wght" 380;
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  line-height: 1.35; color: var(--text-warm);
+  letter-spacing: -0.01em; max-width: 44ch; margin-bottom: 2.5rem;
+}
+.hero-sub strong { color: var(--accent); font-weight: inherit; font-style: italic; }
+
+.hero-ctas { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+.hero-cta-note {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-faint); margin-top: 1.25rem;
+}
+
+.hero-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+}
+.stat { background: var(--surface); padding: 1.75rem 1.5rem; }
+.stat-num {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144, "wght" 400;
+  font-size: 2.8rem; line-height: 1; color: var(--accent); letter-spacing: -0.03em;
+}
+.stat-unit { font-size: 1rem; color: var(--text-dim); font-variation-settings: "opsz" 36, "wght" 350; }
+.stat-label {
+  font-family: var(--font-mono); font-size: 9px; text-transform: uppercase;
+  letter-spacing: 0.16em; color: var(--text-faint); margin-top: 0.6rem; line-height: 1.5;
+}
+
+.hero-scroll {
+  position: absolute; bottom: 2.5rem; left: var(--gutter);
+  font-family: var(--font-mono); font-size: 9px;
+  letter-spacing: 0.22em; text-transform: uppercase; color: var(--text-faint);
+  display: flex; align-items: center; gap: 0.8rem;
+}
+.hero-scroll::after {
+  content: ''; width: 1px; height: 22px;
+  background: linear-gradient(to bottom, var(--accent), transparent);
+  animation: scrollline 2s ease-in-out infinite;
+}
+@keyframes scrollline { 0%,100%{ opacity:.3; } 50%{ opacity:1; } }
+
+/* ═══ PROOF BAR ═══ */
+.proof-bar {
+  border-top: 1px solid var(--border-faint); border-bottom: 1px solid var(--border-faint);
+  background: var(--surface); padding: 2.5rem 0; overflow: hidden; position: relative; z-index: 2;
+}
+.proof-header {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-faint); text-align: center; margin-bottom: 1.75rem;
+}
+.proof-header span { color: var(--accent); }
+.logo-strip {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+}
+.logo-track {
+  display: flex; align-items: stretch;
+  animation: scroll-logos 32s linear infinite; white-space: nowrap;
+}
+@keyframes scroll-logos { 0%{ transform:translateX(0); } 100%{ transform:translateX(-50%); } }
+.logo-item {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-faint);
+  padding: 0.5rem 1.75rem; border-right: 1px solid var(--border-faint);
+  flex-shrink: 0; transition: color 0.3s;
+}
+.logo-item:hover { color: var(--text-dim); }
+
+/* ═══ THREE SUPPORT LAYERS ═══ */
+.layers-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+  margin-top: 3.5rem;
+}
+@media (max-width: 750px) { .layers-row { grid-template-columns: 1fr; } }
+
+.layer {
+  background: var(--surface); padding: 2.5rem 2rem;
+  display: flex; flex-direction: column; transition: background 0.3s; position: relative;
+}
+.layer:hover { background: var(--surface-2); }
+.layer-bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.layer:nth-child(1) .layer-bar { background: var(--purple); }
+.layer:nth-child(2) .layer-bar { background: var(--accent); }
+.layer:nth-child(3) .layer-bar { background: var(--green); }
+
+.layer-index {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-faint); margin-bottom: 1.5rem;
+}
+.layer-type {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; margin-bottom: 0.6rem;
+}
+.layer:nth-child(1) .layer-type { color: var(--purple); }
+.layer:nth-child(2) .layer-type { color: var(--accent); }
+.layer:nth-child(3) .layer-type { color: var(--green); }
+
+.layer-title {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 60, "SOFT" 50, "wght" 520;
+  font-size: 1.75rem; letter-spacing: -0.02em; line-height: 1.05; margin-bottom: 1rem;
+}
+.layer-body { font-size: 0.92rem; color: var(--text-dim); line-height: 1.65; flex: 1; margin-bottom: 1.5rem; }
+.layer-body strong { color: var(--text-warm); font-weight: 500; }
+.layer-quote {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 36, "SOFT" 70, "wght" 380;
+  font-size: 0.88rem; font-style: italic;
+  color: var(--text-faint); line-height: 1.5;
+  padding: 0.85rem 1rem; background: var(--bg-deep);
+  border-left: 2px solid var(--accent-line);
+}
+
+/* ═══ HOW IT WORKS — 5 STEPS ═══ */
+.divider-statement {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 2.75rem 3rem; margin-bottom: 2.5rem;
+  position: relative; overflow: hidden;
+}
+.divider-statement::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 15% 50%, rgba(245,197,24,0.05), transparent 55%);
+  pointer-events: none;
+}
+.divider-text {
+  position: relative;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144, "SOFT" 50, "wght" 400;
+  font-size: clamp(1.3rem, 2.6vw, 2rem);
+  line-height: 1.25; color: var(--text); letter-spacing: -0.02em; max-width: 36ch;
+}
+.divider-text em { font-style: italic; color: var(--accent); }
+
+.steps-row {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+}
+@media (max-width: 960px) { .steps-row { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .steps-row { grid-template-columns: 1fr; } }
+
+.step {
+  background: var(--surface); padding: 2rem 1.75rem;
+  position: relative; transition: background 0.3s;
+}
+.step:hover { background: var(--surface-2); }
+.step-ghost {
+  position: absolute; bottom: 1.25rem; right: 1.25rem;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144, "SOFT" 20, "wght" 300;
+  font-size: 3.5rem; letter-spacing: -0.04em;
+  color: var(--text-ghost); line-height: 1;
+}
+.step-num {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 0.75rem;
+}
+.step-title {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 36, "SOFT" 50, "wght" 520;
+  font-size: 1.2rem; letter-spacing: -0.015em; line-height: 1.15; margin-bottom: 0.65rem;
+}
+.step-body { font-size: 0.88rem; color: var(--text-dim); line-height: 1.6; max-width: 28ch; position: relative; }
+
+/* ═══ MODEL GRID ═══ */
+.models-intro {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 2.5rem; margin-bottom: 2.5rem; position: relative; overflow: hidden;
+}
+.models-intro::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 80% 50%, rgba(245,197,24,0.04), transparent 55%);
+  pointer-events: none;
+}
+.models-intro-text {
+  position: relative;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144, "SOFT" 50, "wght" 400;
+  font-size: clamp(1.2rem, 2.2vw, 1.75rem);
+  line-height: 1.3; color: var(--text); letter-spacing: -0.018em; max-width: 38ch;
+}
+.models-intro-text em { font-style: italic; color: var(--accent); }
+
+.models-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+}
+.model-card {
+  background: var(--surface); padding: 1.5rem 1.25rem;
+  position: relative; display: flex; flex-direction: column;
+  min-height: 160px; transition: background 0.2s;
+}
+.model-card:hover { background: var(--surface-2); }
+.model-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.model-card[data-color="opus"]::before    { background: var(--m-opus); }
+.model-card[data-color="sonnet"]::before  { background: var(--m-sonnet); }
+.model-card[data-color="haiku"]::before   { background: var(--m-haiku); }
+.model-card[data-color="gpt5"]::before    { background: var(--m-gpt5); }
+.model-card[data-color="gemini"]::before  { background: var(--m-gemini); }
+.model-card[data-color="flux"]::before    { background: var(--m-flux); }
+.model-card[data-color="recraft"]::before { background: var(--m-recraft); }
+.model-card[data-color="exa"]::before     { background: var(--m-exa); }
+.model-vendor {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--text-faint); margin-bottom: 0.4rem;
+}
+.model-name {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1rem; margin-bottom: 0.5rem; letter-spacing: -0.015em;
+}
+.model-role { font-size: 0.83rem; color: var(--text-dim); line-height: 1.5; flex: 1; }
+.model-tag {
+  font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.14em;
+  text-transform: uppercase; margin-top: 0.85rem; padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border-emp); color: var(--text-faint); align-self: flex-start;
+}
+
+/* ═══ CREDIT POOL ═══ */
+.credit-layout {
+  display: grid; grid-template-columns: 1fr 1.6fr;
+  gap: 2.5rem; align-items: start; margin-top: 3.5rem;
+}
+@media (max-width: 800px) { .credit-layout { grid-template-columns: 1fr; } }
+
+.credit-card {
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 2rem; position: relative;
+}
+.credit-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(to right, var(--accent), transparent);
+}
+.credit-big {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144, "wght" 400;
+  font-size: 5rem; line-height: 1; letter-spacing: -0.04em;
+  color: var(--accent); margin-bottom: 0.4rem;
+}
+.credit-big span { font-size: 1.4rem; color: var(--text-faint); }
+.credit-card-label {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-faint); margin-bottom: 1.5rem;
+}
+.credit-card-body { font-size: 0.9rem; color: var(--text-dim); line-height: 1.65; }
+.credit-card-body strong { color: var(--text-warm); font-weight: 500; }
+
+.credit-table {
+  display: flex; flex-direction: column; gap: 1px;
+  background: var(--border); border: 1px solid var(--border);
+}
+.cr-row {
+  background: var(--surface); padding: 0.9rem 1.25rem;
+  display: grid; grid-template-columns: 56px 1fr auto;
+  align-items: center; gap: 1rem; transition: background 0.2s;
+}
+.cr-row:hover { background: var(--surface-2); }
+.cr-weight {
+  font-family: var(--font-mono); font-size: 11px;
+  font-weight: 600; color: var(--accent); letter-spacing: 0.05em; white-space: nowrap;
+}
+.cr-name { font-size: 0.88rem; color: var(--text-warm); }
+.cr-eg {
+  font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-faint); text-align: right;
+  max-width: 18ch; line-height: 1.5;
+}
+.cr-row-human {
+  background: var(--accent-bg); padding: 0.9rem 1.25rem;
+  display: grid; grid-template-columns: 56px 1fr auto;
+  align-items: center; gap: 1rem;
+  border-top: 1px solid var(--accent-border);
+}
+.cr-weight-h { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--green); }
+
+/* ═══ TESTIMONIALS ═══ */
+.testi-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+  margin-top: 3.5rem;
+}
+@media (max-width: 700px) { .testi-grid { grid-template-columns: 1fr; } }
+.testi {
+  background: var(--surface); padding: 2.25rem 2rem; transition: background 0.3s;
+}
+.testi:hover { background: var(--surface-2); }
+.testi-quote {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 24, "SOFT" 60, "wght" 380;
+  font-size: 1.1rem; line-height: 1.45; color: var(--text-warm);
+  letter-spacing: -0.01em; margin-bottom: 1.5rem;
+}
+.testi-quote::before {
+  content: '"'; color: var(--accent); font-size: 1.5rem;
+  display: block; margin-bottom: 0.5rem; line-height: 1;
+  font-variation-settings: "opsz" 144, "SOFT" 100, "wght" 300;
+}
+.testi-author { display: flex; align-items: center; gap: 0.75rem; }
+.author-av {
+  width: 32px; height: 32px; background: var(--surface-3);
+  border: 1px solid var(--border-emp); display: flex; align-items: center;
+  justify-content: center; font-family: var(--font-mono); font-size: 11px;
+  color: var(--accent); font-weight: 600; flex-shrink: 0;
+}
+.author-n { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text); font-weight: 600; }
+.author-t { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-faint); margin-top: 0.2rem; }
+.author-m { margin-left: auto; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); border: 1px solid var(--border); padding: 0.2rem 0.5rem; }
+
+/* ═══ PRICING ═══ */
+.plans-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+  margin-top: 3.5rem;
+}
+@media (max-width: 1100px) { .plans-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .plans-grid { grid-template-columns: 1fr; } }
+
+.plan {
+  background: var(--surface); padding: 2rem 1.75rem;
+  position: relative; display: flex; flex-direction: column; transition: background 0.3s;
+}
+.plan:hover { background: var(--surface-2); }
+.plan::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--border-emp); transition: background 0.3s; }
+.plan:hover::before { background: var(--accent-line); }
+.plan.flagship { background: var(--accent-bg); border-left: 1px solid var(--accent-border); border-right: 1px solid var(--accent-border); }
+.plan.flagship::before { background: var(--accent); }
+
+.plan-badge {
+  font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em;
+  text-transform: uppercase; background: var(--accent); color: #000;
+  padding: 0.2rem 0.5rem; display: inline-block; margin-bottom: 1.25rem;
+  font-weight: 600; align-self: flex-start;
+}
+.plan-tier { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 0.4rem; }
+.plan-name {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 60, "SOFT" 50, "wght" 520;
+  font-size: 1.5rem; letter-spacing: -0.02em; margin-bottom: 0.4rem;
+}
+.plan-price {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144, "wght" 400;
+  font-size: 3rem; color: var(--text); letter-spacing: -0.04em; line-height: 1; margin-bottom: 0.3rem;
+}
+.plan-price .currency { font-size: 1rem; color: var(--text-dim); vertical-align: super; font-variation-settings: "opsz" 36, "wght" 350; }
+.plan-period { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 0.5rem; }
+.plan-credits {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 1.25rem;
+  padding: 0.3rem 0.6rem; background: var(--accent-bg); border: 1px solid var(--accent-border);
+  display: inline-block; align-self: flex-start;
+}
+.plan-desc { font-size: 0.88rem; color: var(--text-dim); line-height: 1.6; margin-bottom: 1.5rem; flex: 1; }
+.plan-list { list-style: none; margin-bottom: 1.75rem; }
+.plan-list li {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-dim); padding: 0.45rem 0; border-bottom: 1px solid var(--border-faint);
+  display: flex; align-items: center; gap: 0.6rem;
+}
+.plan-list li::before { content: '→'; color: var(--accent); flex-shrink: 0; }
+.plan-list li.off { color: var(--text-faint); }
+.plan-list li.off::before { color: var(--text-faint); content: '—'; }
+.plan-cta {
+  width: 100%; padding: 0.7rem 1rem; font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; text-align: center; text-decoration: none; display: block;
+  font-weight: 600; transition: all 0.2s;
+}
+.plan-cta-o { background: transparent; color: var(--text-dim); border: 1px solid var(--border-emp); }
+.plan-cta-o:hover { color: var(--text); border-color: var(--border-bright); }
+.plan-cta-f { background: var(--accent); color: #000; border: none; }
+.plan-cta-f:hover { background: var(--accent-soft); }
+.plans-note {
+  margin-top: 1.5rem; text-align: center;
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-faint);
+}
+.plans-note span { color: var(--accent); }
+
+/* ═══ CTA BAND ═══ */
+.cta-band {
+  background: var(--surface); border: 1px solid var(--border);
+  margin: 0 var(--gutter);
+  padding: clamp(3rem, 6vw, 5rem) clamp(2rem, 5vw, 4rem);
+  position: relative; overflow: hidden;
+}
+.cta-band::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 60% 50%, rgba(245,197,24,0.06), transparent 65%);
+  pointer-events: none;
+}
+.cta-inner { position: relative; }
+.cta-kicker { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.5rem; }
+.cta-h {
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-variation-settings: "opsz" 144, "SOFT" 50, "wght" 420;
+  letter-spacing: -0.03em; line-height: 0.95; margin-bottom: 1.25rem;
+}
+.cta-sub { color: var(--text-dim); font-size: 1rem; max-width: 52ch; line-height: 1.6; margin-bottom: 2.5rem; }
+.cta-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.cta-note { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint); }
+
+/* ═══ FOOTER ═══ */
+footer {
+  border-top: 1px solid var(--border-faint);
+  padding: clamp(3rem, 6vw, 5rem) 0 2rem;
+  position: relative; z-index: 2;
+}
+.footer-grid {
+  display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.2fr;
+  gap: 3rem; margin-bottom: 3rem;
+}
+@media (max-width: 900px) { .footer-grid { grid-template-columns: 1fr 1fr; gap: 2rem; } }
+@media (max-width: 560px) { .footer-grid { grid-template-columns: 1fr; } }
+.footer-brand { font-family: var(--font-mono); font-size: 14px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text); font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+.footer-tag {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 24, "SOFT" 60, "wght" 380;
+  font-size: 1rem; color: var(--text-dim); line-height: 1.5; max-width: 26ch;
+  letter-spacing: -0.01em; font-style: italic; margin-bottom: 1.5rem;
+}
+.footer-col-h { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 1.25rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
+.footer-links { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+.footer-links a { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+.footer-links a:hover { color: var(--text); }
+.nl-form { display: flex; gap: 0; margin-top: 0.5rem; }
+.nl-in { flex: 1; background: var(--bg-deep); border: 1px solid var(--border); border-right: none; padding: 0.6rem 0.9rem; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; color: var(--text); outline: none; }
+.nl-in::placeholder { color: var(--text-faint); }
+.nl-in:focus { border-color: var(--border-emp); }
+.nl-btn { background: var(--accent); color: #000; border: none; padding: 0.6rem 1rem; cursor: pointer; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; transition: background 0.2s; white-space: nowrap; }
+.nl-btn:hover { background: var(--accent-soft); }
+.nl-note { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-faint); margin-top: 0.6rem; }
+.footer-bottom { display: flex; justify-content: space-between; align-items: center; padding-top: 1.5rem; border-top: 1px solid var(--border-faint); gap: 1rem; flex-wrap: wrap; }
+.footer-copy { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint); }
+.footer-mkt { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); display: flex; gap: 1rem; }
+.footer-mkt span { color: var(--accent); }
+
+/* ═══ REVEAL ═══ */
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.65s ease, transform 0.65s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="top">
+  <div class="top-inner">
+    <a href="/" class="brand"><span class="brand-dot"></span>Caastor</a>
+    <div class="top-nav">
+      <a href="#support">Platform</a>
+      <a href="#models">Agents</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/about-us">About</a>
+      <a href="/contact-us">Contact</a>
+    </div>
+    <div class="nav-ctas">
+      <a href="/pricing" class="nav-cta-ghost">See Plans</a>
+      <a href="/contact-us" class="nav-cta-primary">Book a Call</a>
+    </div>
+  </div>
+</nav>
+
+
+<!-- HERO -->
+<section class="hero">
+  <div class="shell">
+
+    <div class="hero-kicker">Creative on Demand Platform</div>
+
+    <h1 class="hero-headline">
+      Creative,<br><em>on demand.</em>
+    </h1>
+
+    <div class="hero-lower">
+      <div>
+        <p class="hero-sub">
+          Strategy that sharpens your brief.
+          AI execution across nine specialist models.
+          <strong>Human craft to close.</strong>
+          One platform. One credit balance. Nothing outsourced to a cheaper model.
+        </p>
+        <div class="hero-ctas">
+          <a href="#" class="btn btn-primary">Start for Free <span class="arrow">→</span></a>
+          <a href="/contact-us" class="btn btn-ghost">Book a Call <span class="arrow">→</span></a>
+        </div>
+        <p class="hero-cta-note">Europe → start free &nbsp;·&nbsp; GCC → book a call &nbsp;·&nbsp; Credits never expire</p>
+      </div>
+
+      <div class="hero-stats">
+        <div class="stat">
+          <div class="stat-num">33</div>
+          <div class="stat-label">Specialist agents across every creative discipline</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">9</div>
+          <div class="stat-label">AI models, each routed to the job it wins</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">3</div>
+          <div class="stat-label">Layers of support — strategic, executional, human</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="hero-scroll">Scroll</div>
+</section>
+
+
+<!-- PROOF BAR -->
+<div class="proof-bar">
+  <div class="shell">
+    <p class="proof-header">200+ brands in the GCC and Europe — including <span>Deloitte Digital · Dubai Chamber · UOWD</span></p>
+  </div>
+  <div class="logo-strip">
+    <div class="logo-track">
+      <span class="logo-item">Deloitte Digital</span><span class="logo-item">Dubai Chamber</span>
+      <span class="logo-item">World Class Scholars</span><span class="logo-item">Geoking</span>
+      <span class="logo-item">Supersub</span><span class="logo-item">UOWD</span>
+      <span class="logo-item">1004 Gourmet</span><span class="logo-item">Aseer</span>
+      <span class="logo-item">EIRA</span><span class="logo-item">Magnoos</span>
+      <span class="logo-item">Bissan</span><span class="logo-item">Grey Noise Gallery</span>
+      <span class="logo-item">Deloitte Digital</span><span class="logo-item">Dubai Chamber</span>
+      <span class="logo-item">World Class Scholars</span><span class="logo-item">Geoking</span>
+      <span class="logo-item">Supersub</span><span class="logo-item">UOWD</span>
+      <span class="logo-item">1004 Gourmet</span><span class="logo-item">Aseer</span>
+      <span class="logo-item">EIRA</span><span class="logo-item">Magnoos</span>
+      <span class="logo-item">Bissan</span><span class="logo-item">Grey Noise Gallery</span>
+    </div>
+  </div>
+</div>
+
+
+<!-- THREE SUPPORT LAYERS -->
+<section id="support">
+  <div class="shell">
+    <div class="reveal">
+      <div class="section-label"><span>01</span> &nbsp;·&nbsp; How We're Different</div>
+      <h2 class="section-title">Three layers.<br>Most platforms<br>have <em>one.</em></h2>
+      <p class="section-sub">Other creative platforms give you execution. We give you strategy that sets up the work, execution that routes each job to the right model, and human craft that closes what matters most.</p>
+    </div>
+
+    <div class="layers-row">
+
+      <div class="layer reveal">
+        <div class="layer-bar"></div>
+        <div class="layer-index">01 / 03</div>
+        <div class="layer-type">Strategic</div>
+        <h3 class="layer-title">Your brief gets sharper before work starts.</h3>
+        <p class="layer-body">
+          Every engagement starts with a strategic read. Our AI operator loads your brand intelligence, reviews the request, and surfaces a stronger version of the brief — with the reasoning visible so you can accept, edit, or redirect.
+          <br><br>
+          <strong>No more back-and-forth revision cycles caused by a brief that was vague from the start.</strong> The strategic layer catches that before a single credit is spent on execution.
+        </p>
+        <p class="layer-quote">The work starts at a higher baseline. That's the compounding advantage.</p>
+      </div>
+
+      <div class="layer reveal">
+        <div class="layer-bar"></div>
+        <div class="layer-index">02 / 03</div>
+        <div class="layer-type">Executional</div>
+        <h3 class="layer-title">33 agents. 9 models. Each job routed to the one that wins it.</h3>
+        <p class="layer-body">
+          Once the brief is sharp, the platform assembles the right agents and shows you the routing before you commit. <strong>Voice and tone to Sonnet. Conversion copy to GPT-5. Volume variants to Gemini. Campaign imagery to Flux.</strong>
+          <br><br>
+          One model behind everything is a margin decision, not a quality one. We built the stack differently — and we show you the routing so you can see exactly what you're getting.
+        </p>
+        <p class="layer-quote">The routing is the product. Remove any layer and the quality drops.</p>
+      </div>
+
+      <div class="layer reveal">
+        <div class="layer-bar"></div>
+        <div class="layer-index">03 / 03</div>
+        <div class="layer-type">Human</div>
+        <h3 class="layer-title">Real people close the work that matters.</h3>
+        <p class="layer-body">
+          When craft matters — a pitch deck going to investors, a brand identity going to print, a campaign visual that has to own a room — <strong>the Caastor creative team finishes it</strong>. Same credit pool. Cost shown before you confirm.
+          <br><br>
+          Available from Tier 02 upward. 2–4 business day turnaround. One team that already knows your brand from the strategic layer up.
+        </p>
+        <p class="layer-quote">AI gets you 80% of the way, fast. Human craft closes the gap that actually shows.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- HOW THE PLATFORM WORKS -->
+<section>
+  <div class="shell">
+    <div class="reveal">
+      <div class="section-label"><span>02</span> &nbsp;·&nbsp; The Platform Flow</div>
+      <h2 class="section-title">From brief to<br><em>finished work.</em></h2>
+    </div>
+
+    <div class="divider-statement reveal">
+      <p class="divider-text">
+        You bring the need.<br>
+        The platform brings the <em>strategy, the execution,</em><br>
+        and the craft — in that order.
+      </p>
+    </div>
+
+    <div class="steps-row">
+      <div class="step reveal" data-delay="0">
+        <div class="step-ghost">1</div>
+        <div class="step-num">Step 01</div>
+        <h3 class="step-title">Brief comes in</h3>
+        <p class="step-body">You submit through the platform. The strategic layer reads the brief and loads your Brand Intelligence Object.</p>
+      </div>
+      <div class="step reveal" data-delay="70">
+        <div class="step-ghost">2</div>
+        <div class="step-num">Step 02</div>
+        <h3 class="step-title">Brief gets sharpened</h3>
+        <p class="step-body">A stronger version is proposed with the logic visible. You accept, edit, or redirect. Weak briefs get caught here before credits are spent.</p>
+      </div>
+      <div class="step reveal" data-delay="140">
+        <div class="step-ghost">3</div>
+        <div class="step-num">Step 03</div>
+        <h3 class="step-title">Agents are assembled</h3>
+        <p class="step-body">The platform picks the agents and shows you the model routing before you commit. Credit cost displayed upfront — no surprises.</p>
+      </div>
+      <div class="step reveal" data-delay="210">
+        <div class="step-ghost">4</div>
+        <div class="step-num">Step 04</div>
+        <h3 class="step-title">Work is delivered</h3>
+        <p class="step-body">Output arrives with model attribution per deliverable. The strategic thread runs through every piece — not just the brief.</p>
+      </div>
+      <div class="step reveal" data-delay="280">
+        <div class="step-ghost">5</div>
+        <div class="step-num">Step 05</div>
+        <h3 class="step-title">Human closes if needed</h3>
+        <p class="step-body">For work that needs the last 20%, the creative team finishes it. Same platform, same credits, same brand context. Nothing starts from scratch.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- MODEL STACK -->
+<section id="models">
+  <div class="shell">
+    <div class="reveal">
+      <div class="section-label"><span>03</span> &nbsp;·&nbsp; The Model Stack</div>
+      <h2 class="section-title">Nine models.<br>Every job routed to<br>the one that <em>wins it.</em></h2>
+    </div>
+
+    <div class="models-intro reveal">
+      <p class="models-intro-text">
+        One model behind everything is a <em>margin decision</em>, not a quality one.
+        We route per job — and show you exactly which model is doing what before you commit.
+      </p>
+    </div>
+
+    <div class="models-grid">
+      <div class="model-card reveal" data-color="opus">
+        <div class="model-vendor">Anthropic</div>
+        <div class="model-name">Claude Opus</div>
+        <div class="model-role">Strategic reasoning, brand diagnosis, positioning, complex brief sharpening. The thinking layer.</div>
+        <div class="model-tag">8 cr · reasoning premium</div>
+      </div>
+      <div class="model-card reveal" data-color="sonnet">
+        <div class="model-vendor">Anthropic</div>
+        <div class="model-name">Claude Sonnet</div>
+        <div class="model-role">Voice, tone-of-voice systems, long-form copy, multilingual adaptation, email sequences.</div>
+        <div class="model-tag">3–8 cr · senior craft</div>
+      </div>
+      <div class="model-card reveal" data-color="gpt5">
+        <div class="model-vendor">OpenAI</div>
+        <div class="model-name">GPT-5</div>
+        <div class="model-role">Conversion copy, landing pages, CTA variants, paid ad copy. Where direct response is the metric.</div>
+        <div class="model-tag">8 cr · reasoning premium</div>
+      </div>
+      <div class="model-card reveal" data-color="gemini">
+        <div class="model-vendor">Google</div>
+        <div class="model-name">Gemini Flash</div>
+        <div class="model-role">Volume variants, subject lines, FAQ sets, QA passes. High throughput at low cost.</div>
+        <div class="model-tag">1 cr · volume work</div>
+      </div>
+      <div class="model-card reveal" data-color="flux">
+        <div class="model-vendor">Black Forest Labs</div>
+        <div class="model-name">Flux 2</div>
+        <div class="model-role">Photorealistic campaign imagery, product visuals, lifestyle shots, hero key visuals.</div>
+        <div class="model-tag">2 cr · per image</div>
+      </div>
+      <div class="model-card reveal" data-color="recraft">
+        <div class="model-vendor">Recraft</div>
+        <div class="model-name">Recraft V3</div>
+        <div class="model-role">Vector illustration, brand-consistent icon systems, stylized graphics, logo concepts.</div>
+        <div class="model-tag">2 cr · per image</div>
+      </div>
+      <div class="model-card reveal" data-color="exa">
+        <div class="model-vendor">Exa</div>
+        <div class="model-name">Exa Search</div>
+        <div class="model-role">Live competitive intelligence, market research synthesis, brand audit data gathering.</div>
+        <div class="model-tag">5 cr · live research</div>
+      </div>
+      <div class="model-card reveal" data-color="haiku">
+        <div class="model-vendor">Anthropic</div>
+        <div class="model-name">Claude Haiku</div>
+        <div class="model-role">Fast supporting work — summaries, structure passes, internal routing, lightweight QA.</div>
+        <div class="model-tag">1 cr · volume work</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CREDIT MODEL -->
+<section>
+  <div class="shell">
+    <div class="reveal">
+      <div class="section-label"><span>04</span> &nbsp;·&nbsp; Credits</div>
+      <h2 class="section-title">One pool.<br>AI and human.<br><em>You own the mix.</em></h2>
+      <p class="section-sub">AI work and human craft draw from the same credit balance. You see the cost before confirming every engagement. No hidden charges — no surprise invoices.</p>
+    </div>
+
+    <div class="credit-layout reveal">
+      <div class="credit-card">
+        <div class="credit-big">cr<span> = work</span></div>
+        <div class="credit-card-label">One universal credit pool — AI + Human</div>
+        <p class="credit-card-body">
+          Credits are the unit of work for everything on the platform.
+          <strong>An AI strategy brief costs 8 credits.</strong>
+          Having a human designer finish a pitch deck costs 300.
+          You decide the mix — more AI when speed matters, more human when craft does.
+          <br><br>
+          Top-up packs available at any time. Credits never expire.
+        </p>
+      </div>
+
+      <div class="credit-table">
+        <div class="cr-row">
+          <div class="cr-weight">8 cr</div>
+          <div class="cr-name">Reasoning premium</div>
+          <div class="cr-eg">Brief Gen · Diagnosis · Positioning · Big Idea</div>
+        </div>
+        <div class="cr-row">
+          <div class="cr-weight">5 cr</div>
+          <div class="cr-name">Live research</div>
+          <div class="cr-eg">Competitive intel · Market audit · Exa sessions</div>
+        </div>
+        <div class="cr-row">
+          <div class="cr-weight">3 cr</div>
+          <div class="cr-name">Senior craft</div>
+          <div class="cr-eg">Voice · TOV · Email sequences · Multilingual</div>
+        </div>
+        <div class="cr-row">
+          <div class="cr-weight">2 cr</div>
+          <div class="cr-name">Image & visual</div>
+          <div class="cr-eg">Flux · Recraft · GPT-Image · per asset</div>
+        </div>
+        <div class="cr-row">
+          <div class="cr-weight">1 cr</div>
+          <div class="cr-name">Volume work</div>
+          <div class="cr-eg">Variants · Subject lines · QA passes</div>
+        </div>
+        <div class="cr-row-human">
+          <div class="cr-weight-h">80–700 cr</div>
+          <div class="cr-name" style="color:var(--text-warm);">Human craft &nbsp;<span style="font-family:var(--font-mono);font-size:8px;color:var(--green);letter-spacing:0.12em;text-transform:uppercase;">Tier 02+</span></div>
+          <div class="cr-eg" style="color:var(--text-faint);">Logo polish · Deck finish · Brand guidelines · Packaging</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- TESTIMONIALS -->
+<section>
+  <div class="shell">
+    <div class="reveal">
+      <div class="section-label"><span>05</span> &nbsp;·&nbsp; Client Results</div>
+      <h2 class="section-title">What 200+ brands say<br>about working with <em>Caastor.</em></h2>
+    </div>
+
+    <div class="testi-grid">
+      <div class="testi reveal">
+        <p class="testi-quote">Working with Caastor feels like having an in-house creative team, but without the overhead. They've handled everything from our pitch deck to our ongoing marketing work.</p>
+        <div class="testi-author">
+          <div class="author-av">PN</div>
+          <div><div class="author-n">Phil N.</div><div class="author-t">CEO · World Class Scholars</div></div>
+          <div class="author-m">UAE</div>
+        </div>
+      </div>
+      <div class="testi reveal">
+        <p class="testi-quote">Finally found a creative partner who understands startups. No complex briefs needed — they get it and deliver. The strategic layer is what makes the difference.</p>
+        <div class="testi-author">
+          <div class="author-av">UB</div>
+          <div><div class="author-n">Umer B.</div><div class="author-t">Founder · Grey Noise Gallery</div></div>
+          <div class="author-m">UAE</div>
+        </div>
+      </div>
+      <div class="testi reveal">
+        <p class="testi-quote">We needed both Arabic and English designs for our social media. Their team nailed it from day one — no back and forth, just clean work that fits our brand exactly.</p>
+        <div class="testi-author">
+          <div class="author-av">HS</div>
+          <div><div class="author-n">Huda S.</div><div class="author-t">Founder · Bissan</div></div>
+          <div class="author-m">UAE</div>
+        </div>
+      </div>
+      <div class="testi reveal">
+        <p class="testi-quote">Caastor helped us launch our dashboard app for KSA two months ahead of schedule. Their speed on design requests made all the difference in hitting our deadline.</p>
+        <div class="testi-author">
+          <div class="author-av">MK</div>
+          <div><div class="author-n">Maher K.</div><div class="author-t">CEO · Geoking</div></div>
+          <div class="author-m">KSA</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- PRICING -->
+<section>
+  <div class="shell">
+    <div class="reveal">
+      <div class="section-label"><span>06</span> &nbsp;·&nbsp; Pricing</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1.5rem;">
+        <h2 class="section-title">Start free.<br>Scale when <em>ready.</em></h2>
+        <a href="/pricing" class="btn btn-ghost" style="align-self:flex-end;">Full pricing details <span class="arrow">→</span></a>
+      </div>
+      <p class="section-sub">Four tiers. Credits never expire. Upgrade, downgrade, or cancel — no contracts, no setup fees.</p>
+    </div>
+
+    <div class="plans-grid">
+
+      <div class="plan reveal">
+        <div class="plan-tier">Tier 00</div>
+        <div class="plan-name">Discover</div>
+        <div class="plan-price"><span class="currency">€</span>0</div>
+        <div class="plan-period">free &nbsp;·&nbsp; or €49 one-time</div>
+        <div class="plan-credits">30 credits</div>
+        <p class="plan-desc">Free entry. One full brand intake, audit, and strategic diagnosis. No credit card to start.</p>
+        <ul class="plan-list">
+          <li>Brand intake + BIO creation</li>
+          <li>Brand audit + diagnosis</li>
+          <li>Strategic brief generation</li>
+          <li class="off">No human craft</li>
+          <li class="off">AI agents only</li>
+        </ul>
+        <a href="#" class="plan-cta plan-cta-o">Start Free</a>
+      </div>
+
+      <div class="plan reveal">
+        <div class="plan-tier">Tier 01</div>
+        <div class="plan-name">Strategy</div>
+        <div class="plan-price"><span class="currency">€</span>290</div>
+        <div class="plan-period">per month</div>
+        <div class="plan-credits">250 credits / month</div>
+        <p class="plan-desc">Full AI strategy and creative suite. For founders, indie teams, and agencies white-labelling strategic capability.</p>
+        <ul class="plan-list">
+          <li>Full CMO suite (12 agents)</li>
+          <li>Concept + brief generation</li>
+          <li>Strategic Avatar</li>
+          <li>Top-up packs available</li>
+          <li class="off">No human craft access</li>
+        </ul>
+        <a href="#" class="plan-cta plan-cta-o">Get Started</a>
+      </div>
+
+      <div class="plan flagship reveal">
+        <div class="plan-badge">Flagship</div>
+        <div class="plan-tier">Tier 02</div>
+        <div class="plan-name">Brandolph</div>
+        <div class="plan-price"><span class="currency">€</span>790</div>
+        <div class="plan-period">per month</div>
+        <div class="plan-credits">900 credits / month</div>
+        <p class="plan-desc">The full platform. AI strategy and execution with human craft available from the same credit pool. You decide the mix.</p>
+        <ul class="plan-list">
+          <li>Everything in Strategy</li>
+          <li>Human craft on credits</li>
+          <li>All execution departments</li>
+          <li>Web + email agents</li>
+          <li>300 cr rollover / month</li>
+        </ul>
+        <a href="/contact-us" class="plan-cta plan-cta-f">Book a Call</a>
+      </div>
+
+      <div class="plan reveal">
+        <div class="plan-tier">Tier 03</div>
+        <div class="plan-name">Embedded</div>
+        <div class="plan-price"><span class="currency">€</span>1,790</div>
+        <div class="plan-period">per month</div>
+        <div class="plan-credits">2,500 credits / month</div>
+        <p class="plan-desc">Replaces a fractional CMO + design retainer + strategy tool — ~€8,600/mo of equivalent capacity — at €1,790.</p>
+        <ul class="plan-list">
+          <li>Everything in Brandolph</li>
+          <li>Priority delivery queue</li>
+          <li>Dedicated creative director</li>
+          <li>800 cr rollover / month</li>
+          <li>+€490 / extra active slot</li>
+        </ul>
+        <a href="/contact-us" class="plan-cta plan-cta-o">Talk to Us</a>
+      </div>
+
+    </div>
+
+    <p class="plans-note">Top-up credit packs available anytime &nbsp;·&nbsp; <span>credits never expire</span> &nbsp;·&nbsp; 10% off annual prepay</p>
+  </div>
+</section>
+
+
+<!-- CTA BAND -->
+<section style="padding: clamp(2rem,5vw,4rem) 0;">
+  <div class="cta-band reveal">
+    <div class="cta-inner">
+      <div class="cta-kicker">Your brand is ready when you are</div>
+      <h2 class="cta-h">Start with a free<br>brand discovery.</h2>
+      <p class="cta-sub">No credit card. No commitment. The platform reads your brand, runs the audit, and shows you exactly where the gaps are — free on Tier 00.</p>
+      <div class="cta-row">
+        <a href="#" class="btn btn-primary">Start for Free <span class="arrow">→</span></a>
+        <a href="/contact-us" class="btn btn-ghost">Book a Call <span class="arrow">→</span></a>
+        <span class="cta-note">Europe → start free &nbsp;·&nbsp; GCC → book a call</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- FOOTER -->
+<footer>
+  <div class="shell">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand"><span class="brand-dot"></span>Caastor</div>
+        <p class="footer-tag">The creative on demand platform for brands that move with intent.</p>
+        <div style="display:flex;gap:0.5rem;">
+          <a href="#" class="btn btn-ghost" style="padding:0.4rem 0.7rem;font-size:10px;">IG</a>
+          <a href="#" class="btn btn-ghost" style="padding:0.4rem 0.7rem;font-size:10px;">LI</a>
+        </div>
+      </div>
+      <div>
+        <div class="footer-col-h">Platform</div>
+        <ul class="footer-links">
+          <li><a href="#support">How it works</a></li>
+          <li><a href="#models">The agents</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/faq">FAQ</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-h">Company</div>
+        <ul class="footer-links">
+          <li><a href="/about-us">About</a></li>
+          <li><a href="/contact-us">Contact</a></li>
+          <li><a href="/contact-us">Careers</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-h">Stay in the loop</div>
+        <p style="font-family:var(--font-mono);font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-faint);margin-bottom:0.75rem;">Occasionally, we send things worth reading.</p>
+        <div class="nl-form">
+          <input type="email" class="nl-in" placeholder="your@email.com">
+          <button class="nl-btn">Subscribe</button>
+        </div>
+        <p class="nl-note">No spam. Unsubscribe anytime.</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span class="footer-copy">©2026 Caastor Intelligence · All rights reserved</span>
+      <div class="footer-mkt">Serving <span>GCC</span> · <span>Spain</span> · <span>Italy</span> · <span>France</span></div>
+    </div>
+  </div>
+</footer>
+
+
+<script>
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const delay = parseInt(e.target.dataset.delay || 0);
+      setTimeout(() => e.target.classList.add('visible'), delay);
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.07, rootMargin: '0px 0px -30px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>

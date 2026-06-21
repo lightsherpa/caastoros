@@ -179,7 +179,7 @@ function TierLock() {
         Humans — the L3 layer — are the difference between an AI draft and finished work a buyer takes seriously. They come with Brandolph and up.
       </p>
       <div style={{display:"flex", gap: 10, justifyContent:"center"}}>
-        <button className="btn btn--primary btn--lg">Upgrade to Brandolph</button>
+        <button className="btn btn--primary btn--lg">Upgrade to The River 🌊</button>
         <button className="btn btn--ghost">See plans</button>
       </div>
     </div>
@@ -361,9 +361,9 @@ function SettingsView() {
               <h3 style={{margin: 0, marginBottom: 18}}>Members · 3</h3>
               <div style={{display:"flex", flexDirection:"column", gap: 8}}>
                 {[
-                  { name:"Marina Reyes", email:"marina@vinilo.coffee", role:"Owner", p:"intelligence/assets/profile-3.jpg" },
-                  { name:"Aleix Roca",   email:"aleix@vinilo.coffee", role:"Member", p:"intelligence/assets/profile-2.jpg" },
-                  { name:"Júlia Bonet",  email:"julia@vinilo.coffee", role:"Viewer", p:"intelligence/assets/profile-4.jpg" },
+                  { name:"Marina Reyes", email:"marina@vinilo.coffee", role:"Owner", p:"caastor/assets/profile-3.jpg" },
+                  { name:"Aleix Roca",   email:"aleix@vinilo.coffee", role:"Member", p:"caastor/assets/profile-2.jpg" },
+                  { name:"Júlia Bonet",  email:"julia@vinilo.coffee", role:"Viewer", p:"caastor/assets/profile-4.jpg" },
                 ].map((m, i) => (
                   <div key={i} style={{display:"flex", alignItems:"center", gap: 12, padding: 12, border:"1px solid var(--c-line)", borderRadius: 10}}>
                     <img src={m.p} alt="" style={{width: 36, height: 36, borderRadius:"50%", objectFit:"cover"}} />
@@ -432,7 +432,7 @@ function SettingsView() {
               <h3 style={{margin: 0}}>Tier & billing</h3>
               <div className="card card--inset" style={{padding: 22, background:"var(--yellow-50)", border:"1px solid var(--yellow-200)"}}>
                 <div className="eyebrow eyebrow--yellow" style={{marginBottom: 6}}>Current plan</div>
-                <div style={{fontSize: 22, fontWeight: 600, marginBottom: 6}}>Tier 02 · Brandolph</div>
+                <div style={{fontSize: 22, fontWeight: 600, marginBottom: 6}}>Tier 02 · The River 🌊</div>
                 <div style={{fontSize: 14, color:"var(--c-dim)"}}>900 cr / month · €399 · billed monthly · next renewal 4 Jun</div>
                 <div style={{marginTop: 14, display:"flex", gap: 8}}>
                   <button className="btn btn--ghost btn--sm">Change plan</button>
@@ -444,11 +444,11 @@ function SettingsView() {
           {(tab === "brands" || tab === "api") && (
             <div style={{padding: 40, textAlign:"center"}}>
               <BrandolphAvatar size={56} />
-              <h3 style={{marginTop: 16}}>Tier 03 · Suite</h3>
+              <h3 style={{marginTop: 16}}>Tier 03 · The Colony 🐜</h3>
               <p style={{color:"var(--c-dim)", fontSize: 14, maxWidth: 380, margin:"8px auto 18px"}}>
-                <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>This panel lives in Suite.</em> Multi-brand workspaces, API + MCP tokens, and webhook config.
+                <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>This panel lives in The Colony 🐜.</em> Multi-brand workspaces, API + MCP tokens, and webhook config.
               </p>
-              <button className="btn btn--primary">See Suite plan</button>
+              <button className="btn btn--primary">See The Colony 🐜 plan</button>
             </div>
           )}
           {tab === "danger" && (

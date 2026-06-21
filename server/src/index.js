@@ -5,6 +5,7 @@ import { serve } from "@hono/node-server";
 
 import brandolph from "./routes/brandolph.js";
 import bios from "./routes/bios.js";
+import brands from "./routes/brands.js";
 import briefs from "./routes/briefs.js";
 import discovery from "./routes/discovery.js";
 import steward from "./routes/steward.js";
@@ -45,6 +46,7 @@ app.get("/", (c) =>
 
 app.route("/api/brandolph", brandolph);
 app.route("/api/bios", bios);
+app.route("/api/brands", brands);
 app.route("/api/briefs", briefs);
 app.route("/api/discovery", discovery);
 app.route("/api/steward", steward);

@@ -3,9 +3,9 @@ import { apiFetch, supabase } from "./lib/supabase-browser.js";
 const { AgentCard, BrandolphDot, Drawer, Icon, ModelChip, OutputCard, PageHeader, Reveal, StatusPill, useIsTeam, PinButton, usePins } = window;
 const { useState: useBrState, useEffect: useBrEffect } = React;
 
-/* useLiveBriefs — fetches real briefs + their runs + outputs from
-   Supabase via RLS (workspace auto-filtered). Each brief now carries
-   the actual runs (spec_id, model_used, cost) and outputs (body text,
+  /* useLiveBriefs — fetches real briefs + their runs + outputs from
+   Supabase via RLS (workspace auto-filtered). Each brief carries the
+   actual runs (spec_id, model_used, token counts) and outputs (body text,
    QA status) that were persisted by POST /api/runs/stream in P3. */
 function useLiveBriefs() {
   const [state, setState] = useBrState({ briefs: [], cert: null, brand: null, loading: true, error: null });
@@ -34,7 +34,7 @@ function useLiveBriefs() {
         .from("briefs")
         .select(`
           id, title, type, payload, mode, status, created_at,
-          runs ( id, specialist_id, spec_version, bio_version, model_used, status, cost_usd, prompt_tokens, completion_tokens, ended_at,
+          runs ( id, specialist_id, spec_version, bio_version, model_used, status, prompt_tokens, completion_tokens, ended_at,
                  outputs ( id, kind, body, status, rationale ) )
         `)
         .eq("brand_id", brand.id)
@@ -227,6 +227,45 @@ function relativeBucket(iso) {
   return "Older";
 }
 
+/* Per-day group key + eyebrow label for sticky date dividers.
+   key is a stable calendar-day sort key (YYYY-MM-DD, local), label is the
+   short eyebrow form ("JUN 3"). "Today" / "Yesterday" stay legible. */
+function dayGroupKey(iso) {
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d) ? d.toLocaleDateString("en-CA") : "0000-00-00";  /* local-day YYYY-MM-DD */
+}
+function dayGroupLabel(iso) {
+  if (!iso) return "Undated";
+  const d = new Date(iso);
+  if (isNaN(d)) return "Undated";
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (d.getTime() >= startToday) return "Today";
+  if (d.getTime() >= startToday - 86_400_000) return "Yesterday";
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+/* Bucket a list of items (each carrying created_at) into newest-first
+   calendar-day groups for sticky date dividers. */
+function groupByDay(items) {
+  const map = new Map();
+  for (const it of items) {
+    const key = dayGroupKey(it.created_at);
+    if (!map.has(key)) map.set(key, { key, label: dayGroupLabel(it.created_at), items: [] });
+    map.get(key).items.push(it);
+  }
+  return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
+}
+
+/* One source of truth for a brief row's status presentation — the left
+   accent stripe and the pill share these tokens so the stripe alone is
+   scannable. Colors reuse the existing pill palette; no new literals. */
+function briefStatusStyle(flagged) {
+  return flagged
+    ? { label: "flagged",  stripe: "var(--pink-500)",  bg: "var(--pink-50, rgba(244,143,177,0.12))",  fg: "var(--pink-700, var(--pink-500))" }
+    : { label: "approved", stripe: "var(--green-500)", bg: "var(--green-50, rgba(127,163,122,0.16))", fg: "var(--green-600)" };
+}
+
 function BriefsLibrary({ go }) {
   const { briefs, cert, brand, loading, error, reload } = useLiveBriefs();
   const [query, setQuery]     = useBrState("");
@@ -277,11 +316,19 @@ function BriefsLibrary({ go }) {
     return true;
   });
 
-  /* Date-bucket grouping */
-  const buckets = ["Today", "Yesterday", "This week", "This month", "Older"];
-  const grouped = buckets
-    .map((label) => ({ label, items: filtered.filter((b) => relativeBucket(b.created_at) === label) }))
-    .filter((g) => g.items.length > 0);
+  /* Per-day grouping for sticky date dividers (newest day first) */
+  const grouped = groupByDay(filtered);
+
+  /* A title is ambiguous when more than one filtered brief shares it —
+     those rows surface their discriminating metadata more prominently. */
+  const titleCounts = React.useMemo(() => {
+    const m = new Map();
+    filtered.forEach((b) => {
+      const t = briefTitle(b);
+      m.set(t, (m.get(t) || 0) + 1);
+    });
+    return m;
+  }, [filtered]);
 
   return (
     <div style={{padding:"24px 36px 60px"}}>
@@ -359,11 +406,19 @@ function BriefsLibrary({ go }) {
         </div>
       )}
 
-      {/* Date-bucketed brief cards */}
+      {/* Date-grouped brief cards — sticky per-day dividers */}
       <div style={{display:"flex", flexDirection:"column", gap: 26}}>
         {grouped.map((g) => (
-          <section key={g.label}>
-            <div className="eyebrow" style={{marginBottom: 10, color:"var(--c-faint)"}}>{g.label} · {g.items.length}</div>
+          <section key={g.key}>
+            <div className="eyebrow" style={{
+              position:"sticky", top: 0, zIndex: 5,
+              display:"flex", alignItems:"baseline", gap: 8, padding:"6px 0 8px",
+              marginBottom: 6, color:"var(--c-dim)",
+              background:"var(--c-bg)", borderBottom:"1px solid var(--c-line)",
+            }}>
+              <span>{g.label}</span>
+              <span style={{color:"var(--c-faint)"}}>· {g.items.length}</span>
+            </div>
             <div style={{display:"flex", flexDirection:"column", gap: 8}}>
               {g.items.map((b) => {
                 const runs    = b.runs || [];
@@ -372,14 +427,20 @@ function BriefsLibrary({ go }) {
                   return s + (a?.cr || 0);
                 }, 0);
                 const flagged = runs.some((r) => (r.outputs || []).some((o) => o.status !== "approved"));
+                const st      = briefStatusStyle(flagged);
                 const reqText = briefTitle(b);
                 const specs   = [...new Set(runs.map((r) => r.specialist_id))];
+                /* Disambiguate rows that share a title: lead with the
+                   existing discriminating metadata (mode + lead specialist)
+                   so two same-named briefs read apart at a glance. */
+                const ambiguous = (titleCounts.get(reqText) || 0) > 1;
+                const leadSpec  = specs.length ? specialistName(specs[0]) : "";
 
                 return (
                   <button key={b.id} onClick={() => openBrief(b.id)} className="card" style={{
                     width:"100%", textAlign:"left", padding: "12px 16px",
                     border:"1px solid var(--c-line)",
-                    borderLeft: `3px solid ${flagged ? "var(--pink-500)" : "var(--green-500)"}`,
+                    borderLeft: `3px solid ${st.stripe}`,
                     cursor:"pointer",
                     display:"flex", alignItems:"center", gap: 14,
                     transition:"transform 100ms ease, box-shadow 100ms ease",
@@ -387,8 +448,15 @@ function BriefsLibrary({ go }) {
                     onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 18px rgba(0,0,0,0.06)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = ""; }}>
                     <div style={{flex: 1, minWidth: 0}}>
-                      <div style={{fontSize: 13.5, color:"var(--c-ink)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-                        {reqText}
+                      <div style={{display:"flex", alignItems:"baseline", gap: 8, minWidth: 0}}>
+                        <span style={{fontSize: 13.5, color:"var(--c-ink)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+                          {reqText}
+                        </span>
+                        {ambiguous && (leadSpec || b.mode) && (
+                          <span className="eyebrow" style={{flexShrink: 0, color:"var(--c-dim)"}}>
+                            {[b.mode, leadSpec].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
                       </div>
                       <div style={{display:"flex", gap: 10, marginTop: 4, fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.04em", alignItems:"center"}}>
                         <span>{b.mode || "auto"}</span>
@@ -404,9 +472,8 @@ function BriefsLibrary({ go }) {
                     </div>
                     <span className="pill" style={{
                       height: 20, padding:"0 9px", fontSize: 10,
-                      background: flagged ? "var(--pink-50, rgba(244,143,177,0.12))" : "var(--green-50, rgba(127,163,122,0.16))",
-                      color: flagged ? "var(--pink-700, var(--pink-500))" : "var(--green-600)",
-                    }}>{flagged ? "flagged" : "approved"}</span>
+                      background: st.bg, color: st.fg,
+                    }}>{st.label}</span>
                     <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", minWidth: 50, textAlign:"right"}}>
                       {shortDate(b.created_at)}
                     </span>
@@ -639,7 +706,7 @@ function SpecialistsDirectory({ go }) {
                   borderLeft:`3px solid ${window.CI_DEPT_COLORS[a.dept] || "var(--neutral-400)"}`}}>
                 <div style={{flex:1, minWidth:0}}>
                   <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</div>
-                  <div className="eyebrow">{a.dept}</div>
+                  <div className="eyebrow" style={{color:"var(--c-dim)"}}>{a.dept}</div>
                 </div>
                 <PinButton kind="specialists" id={a.id} />
               </button>
@@ -659,7 +726,7 @@ function SpecialistsDirectory({ go }) {
                   borderLeft:`3px solid ${window.CI_DEPT_COLORS[a.dept] || "var(--neutral-400)"}`}}>
                 <div style={{flex:1, minWidth:0}}>
                   <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</div>
-                  <div className="eyebrow">{a.dept}</div>
+                  <div className="eyebrow" style={{color:"var(--c-dim)"}}>{a.dept}</div>
                 </div>
                 <span className="credit credit--pending" style={{fontSize:11}}>{usage[a.id]}×</span>
               </button>
@@ -702,10 +769,16 @@ function SpecialistsDirectory({ go }) {
           const list = filtered.filter(a => a.dept === d);
           if (!list.length) return null;
           return (
-            <section key={d} style={{marginBottom: 32}}>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom: 14}}>
-                <h3 style={{margin: 0, fontSize: 17, letterSpacing:"-0.005em"}}>{d}</h3>
-                <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.08em", textTransform:"uppercase"}}>{list.length} specialists · {list.filter(a => a.status === "live").length} live</span>
+            <section key={d} style={{marginBottom: 44}}>
+              <div style={{
+                display:"flex", justifyContent:"space-between", alignItems:"baseline", gap: 16,
+                marginBottom: 16, paddingBottom: 10, borderBottom:"1px solid var(--c-line)",
+              }}>
+                <h3 style={{margin: 0, fontSize: 17, letterSpacing:"-0.005em", display:"flex", alignItems:"center", gap: 9}}>
+                  <span style={{width: 7, height: 7, borderRadius: "50%", background: window.CI_DEPT_COLORS?.[d] || "var(--neutral-400)", flexShrink: 0}} />
+                  {d}
+                </h3>
+                <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-dim)", letterSpacing:"0.08em", textTransform:"uppercase"}}>{list.length} specialists · {list.filter(a => a.status === "live").length} live</span>
               </div>
               <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap: 12}}>
                 {list.map(a => <AgentCard key={a.id} agentId={a.id} showCaps onClick={() => setOpenId(a.id)} />)}
@@ -746,7 +819,7 @@ function SpecialistRow({ a, usage, last, onClick }) {
       <span style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", minWidth:48}}>{a.code}</span>
       <div style={{flex:"0 0 200px", minWidth:0}}>
         <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</div>
-        <div className="eyebrow">{a.dept}</div>
+        <div className="eyebrow" style={{color:"var(--c-dim)"}}>{a.dept}</div>
       </div>
       <div style={{flex:1, minWidth:0, fontSize:12.5, color:"var(--c-dim)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.job}</div>
       {isTeam && <ModelChip modelKey={a.model} />}
@@ -1535,7 +1608,6 @@ function BriefRunCanvas({ context, onClear, go }) {
   const [running, setRunning]     = useBrState(false);
   const [completed, setCompleted] = useBrState(false);
   const [err, setErr]             = useBrState(null);
-  const [totalCost, setTotalCost] = useBrState(0);
   const [openId, setOpenId]       = useBrState(null);            /* selected specialist id for the notepad drawer */
   const [openDeliverable, setOpenDeliverable] = useBrState(null);   /* clicked deliverable card → content drawer */
   const [openBrief, setOpenBrief] = useBrState(false);   /* clicked Brief node → brief drawer */
@@ -1850,8 +1922,6 @@ function BriefRunCanvas({ context, onClear, go }) {
       }
 
       const passed = qa?.passed !== false;
-      const cost   = done?.usage?.total_cost_usd ?? 0;
-      setTotalCost((c) => c + cost);
 
       const assetUrl = done?.output?.asset_url || null;
       setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
@@ -3478,9 +3548,22 @@ function Library({ go }) {
      and the cert state so we can render the moat attribution footer on
      every card. */
   const { briefs, cert, brand, loading, error, reload } = useLiveBriefs();
-  const [kind, setKind]     = useBrState("all");
-  const [query, setQuery]   = useBrState("");
-  const [selected, setSelected] = useBrState(null);    /* full-content drawer */
+
+  /* Three-level navigation: folder grid → folder detail → forefront viewer */
+  const [openFolderId, setOpenFolderId]   = useBrState(null);   /* a brief.id when a folder is open */
+  const [selectedOutput, setSelectedOutput] = useBrState(null); /* an item when the viewer is open */
+
+  /* Folder-detail filters (scoped to the open folder) */
+  const [kind, setKind]       = useBrState("all");
+  const [statusF, setStatusF] = useBrState("all");   /* all | approved | flagged */
+  const [query, setQuery]     = useBrState("");
+
+  /* Optimistic deletions — ids hidden locally until reload catches up */
+  const [deletedIds, setDeletedIds] = useBrState(() => new Set());
+
+  /* Toast — same lightweight pattern as Discovery (local state + timed clear) */
+  const [toast, setToast] = useBrState(null);
+  const flash = (msg) => { setToast(msg); clearTimeout(window.__libT); window.__libT = setTimeout(() => setToast(null), 2400); };
 
   /* Flatten: one entry per output, with brief/run context attached.
      Prefer edited_text (the user's notepad save) over the original
@@ -3507,31 +3590,19 @@ function Library({ go }) {
         }
       }
     }
-    return list.sort((a, b) => new Date(b.run.ended_at || 0) - new Date(a.run.ended_at || 0));
-  }, [briefs]);
+    return list
+      .filter((i) => !deletedIds.has(i.id))
+      .sort((a, b) => new Date(b.run.ended_at || 0) - new Date(a.run.ended_at || 0));
+  }, [briefs, deletedIds]);
 
-  const kinds = [...new Set(items.map((i) => i.kind))];
-
-  const q = query.trim().toLowerCase();
-  const filtered = items.filter((i) => {
-    if (kind !== "all" && i.kind !== kind) return false;
-    if (q) {
-      const text = `${i.text} ${i.brief.request || ""}`.toLowerCase();
-      if (!text.includes(q)) return false;
-    }
-    return true;
-  });
-
-  /* Group filtered items by brief. Briefs are the org unit; outputs are
-     children. Sort briefs by most-recent activity, sort outputs within a
-     brief by completion time (newest first). */
+  /* Group every item by brief — folders, newest-first by latest activity.
+     (Folder cards always show the whole brief; the per-folder filters only
+     apply once a folder is open.) */
   const briefGroups = React.useMemo(() => {
     const groups = new Map();
-    for (const o of filtered) {
+    for (const o of items) {
       const key = o.brief.id;
-      if (!groups.has(key)) {
-        groups.set(key, { brief: o.brief, items: [], latest: 0 });
-      }
+      if (!groups.has(key)) groups.set(key, { brief: o.brief, items: [], latest: 0 });
       const g = groups.get(key);
       g.items.push(o);
       const t = new Date(o.run.ended_at || 0).getTime();
@@ -3540,43 +3611,56 @@ function Library({ go }) {
     return Array.from(groups.values())
       .map((g) => ({ ...g, items: g.items.sort((a, b) => new Date(b.run.ended_at || 0) - new Date(a.run.ended_at || 0)) }))
       .sort((a, b) => b.latest - a.latest);
-  }, [filtered]);
+  }, [items]);
 
+  /* PRESERVE: the moat path back to the canvas. */
   const openBriefInCanvas = (briefId) => {
     try { sessionStorage.setItem("ci_run_context", JSON.stringify({ mode: "view", briefId, ts: Date.now() })); } catch {}
     go("canvas");
   };
 
-  /* Collapse state — first brief expanded by default, the rest collapsed
-     so the page lands quiet. Toggle via header click. */
-  const [collapsed, setCollapsed] = useBrState(() => new Set());
-  React.useEffect(() => {
-    if (briefGroups.length > 1) {
-      const initial = new Set(briefGroups.slice(1).map((g) => g.brief.id));
-      setCollapsed(initial);
-    }
-    /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [briefGroups.length]);
-  const toggleCollapsed = (id) => setCollapsed((s) => {
-    const next = new Set(s);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const allCollapsed = briefGroups.length > 0 && briefGroups.every((g) => collapsed.has(g.brief.id));
-  const expandAll  = () => setCollapsed(new Set());
-  const collapseAll = () => setCollapsed(new Set(briefGroups.map((g) => g.brief.id)));
+  const openFolder = briefGroups.find((g) => g.brief.id === openFolderId) || null;
 
-  const countFor = (k) => k === "all" ? items.length : items.filter((i) => i.kind === k).length;
+  /* When a folder closes, reset its scoped filters so the next one opens clean. */
+  const closeFolder = () => { setOpenFolderId(null); setKind("all"); setStatusF("all"); setQuery(""); };
+
+  /* Escape closes the viewer first, then the folder. */
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (selectedOutput) setSelectedOutput(null);
+      else if (openFolderId) closeFolder();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [selectedOutput, openFolderId]);
+
+  /* ── delete: optimistic remove + authed DELETE, with toast + rollback ── */
+  const deleteOutput = async (o) => {
+    setDeletedIds((s) => new Set(s).add(o.id));   /* optimistic */
+    setSelectedOutput(null);
+    try {
+      const res = await apiFetch(`/api/outputs/${o.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || "Delete failed");
+      flash("Deleted");
+      reload();   /* reconcile with the server */
+    } catch (e) {
+      setDeletedIds((s) => { const n = new Set(s); n.delete(o.id); return n; });   /* rollback */
+      flash(e.message || "Could not delete");
+    }
+  };
 
   return (
     <div style={{padding:"24px 36px 80px"}}>
       <PageHeader
         eyebrow={brand ? `Workspace · ${brand.name}` : "Workspace"}
         title="Library"
-        sub="Every output your Specialists have produced, with the full content. Click an item to read it in full and copy the body."
+        sub="Every brief your crew has produced, filed as a folder. Open one to browse its assets, read them in full, and put them back to work."
         right={<>
           <button className="btn btn--ghost btn--sm" onClick={reload}><Icon name="refresh" size={13} /> Reload</button>
-          <span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-faint)"}}>{items.length} items · {briefs.length} briefs</span>
+          <span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-faint)"}}>{items.length} assets · {briefGroups.length} folders</span>
         </>}
       />
 
@@ -3586,50 +3670,17 @@ function Library({ go }) {
         </div>
       )}
 
-      {/* Filter row */}
-      <div className="card" style={{padding: 12, marginBottom: 18, display:"flex", gap: 10, alignItems:"center", flexWrap:"wrap"}}>
-        <div style={{position:"relative", flex:"1 1 220px", minWidth: 220}}>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search outputs and briefs…"
-            style={{
-              width:"100%", height: 32, padding:"0 10px 0 32px",
-              border:"1px solid var(--c-line)", borderRadius: 8,
-              fontSize: 13, fontFamily:"inherit", background:"var(--c-bg)", color:"var(--c-ink)",
-              outline:"none",
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
-          />
-          <span style={{position:"absolute", left: 10, top:"50%", transform:"translateY(-50%)", color:"var(--c-faint)", pointerEvents:"none"}}>
-            <Icon name="filter" size={13} />
-          </span>
-        </div>
-        <div style={{display:"flex", gap: 4, flexWrap:"wrap"}}>
-          <button onClick={() => setKind("all")}
-            className={"pill" + (kind === "all" ? " pill--dark" : "")}
-            style={{cursor:"pointer", height: 28, padding:"0 12px"}}>All · {countFor("all")}</button>
-          {kinds.map((k) => (
-            <button key={k} onClick={() => setKind(k)}
-              className={"pill" + (kind === k ? " pill--dark" : "")}
-              style={{cursor:"pointer", height: 28, padding:"0 12px"}}>{k} · {countFor(k)}</button>
-          ))}
-        </div>
-        <span style={{marginLeft:"auto", fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>
-          {filtered.length} of {items.length}
-        </span>
-      </div>
-
-      {!loading && items.length === 0 && (
+      {/* Empty library */}
+      {!loading && briefGroups.length === 0 && (
         <div className="card" style={{padding:"56px 32px", textAlign:"center", maxWidth: 540, margin:"40px auto"}}>
           <h2 style={{
-            margin:"0 0 14px", fontFamily:"Georgia, serif", fontStyle:"italic",
-            fontSize: 28, lineHeight: 1.2, letterSpacing:"-0.005em", fontWeight: 400, color:"var(--c-ink)",
+            margin:"0 0 14px", fontFamily:"var(--font-serif)", fontStyle:"italic",
+            fontSize: 30, lineHeight: 1.2, letterSpacing:"-0.01em", fontWeight: 400, color:"var(--c-ink)",
           }}>
             The Library is waiting.
           </h2>
           <p style={{margin:"0 0 22px", fontSize: 14, color:"var(--c-dim)", lineHeight: 1.6}}>
-            Every output your crew produces lands here — with the brief that asked for it, the BIO version it was judged against, and the Steward who signed the canon. Run a brief and watch it populate.
+            Every output your crew produces lands here — filed under the brief that asked for it, the BIO version it was judged against, and the Steward who signed the canon. Run a brief and watch the shelves fill.
           </p>
           <div style={{display:"flex", gap: 10, justifyContent:"center"}}>
             <a href="#/home" className="btn btn--primary">
@@ -3639,293 +3690,378 @@ function Library({ go }) {
         </div>
       )}
 
-      {/* Expand/collapse all — small affordance for power users with many briefs */}
-      {briefGroups.length > 1 && (
-        <div style={{display:"flex", justifyContent:"flex-end", marginBottom: 8}}>
-          <button onClick={allCollapsed ? expandAll : collapseAll}
-            className="btn btn--ghost btn--sm"
-            style={{height: 26, fontSize: 11.5, padding:"0 10px"}}>
-            {allCollapsed ? "Expand all" : "Collapse all"}
-          </button>
+      {/* ════════ LEVEL 1 · FOLDER GRID ════════ */}
+      {!openFolder && briefGroups.length > 0 && (
+        <div className="lib-grid">
+          {briefGroups.map((g) => (
+            <LibraryFolderCard key={g.brief.id} group={g} onOpen={() => setOpenFolderId(g.brief.id)} />
+          ))}
         </div>
       )}
 
-      {/* Briefs are the organizational unit. Each section has a nice
-          editorial title + a chevron to collapse/expand its outputs. */}
-      <div style={{display:"flex", flexDirection:"column", gap: 28}}>
-        {briefGroups.map((group) => {
-          const isCollapsed = collapsed.has(group.brief.id);
-          const title = briefTitle(group.brief);
-          return (
-          <section key={group.brief.id}>
-            {/* Click anywhere on the header → toggle. The "Open in canvas"
-                button is stopPropagation'd. */}
-            <header
-              onClick={() => toggleCollapsed(group.brief.id)}
-              style={{
-                display:"flex", justifyContent:"space-between", alignItems:"flex-end",
-                gap: 18, paddingBottom: 12, marginBottom: isCollapsed ? 0 : 14,
-                borderBottom: "1px solid var(--c-line)",
-                cursor: "pointer", userSelect:"none",
-              }}>
-              <div style={{display:"flex", alignItems:"flex-start", gap: 10, minWidth: 0, flex: 1}}>
-                {/* Chevron — rotates 90° when expanded */}
-                <span style={{
-                  display:"inline-flex", alignItems:"center", justifyContent:"center",
-                  width: 18, height: 18, marginTop: 16, color:"var(--c-faint)",
-                  transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)",
-                  transition: "transform 160ms ease",
-                  fontFamily:"var(--font-mono)", fontSize: 12, lineHeight: 1,
-                }}>›</span>
-                <div style={{minWidth: 0, flex: 1}}>
-                  <div className="eyebrow" style={{marginBottom: 6, display:"flex", gap: 10, alignItems:"center"}}>
-                    <span>{shortDate(group.brief.created_at)}</span>
-                    <span style={{color:"var(--c-faint)"}}>·</span>
-                    <span>{group.items.length} {group.items.length === 1 ? "output" : "outputs"}</span>
-                  </div>
-                  <h2 style={{
-                    margin: 0,
-                    fontFamily: "Georgia, 'Times New Roman', serif",
-                    fontStyle: "italic", fontWeight: 400,
-                    fontSize: 22, lineHeight: 1.25, color: "var(--c-ink)",
-                    letterSpacing: "-0.005em",
-                    overflow: "hidden", textOverflow: "ellipsis",
-                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                  }}>{title}</h2>
-                </div>
-              </div>
-              <button onClick={(e) => { e.stopPropagation(); openBriefInCanvas(group.brief.id); }}
-                className="btn btn--ghost btn--sm"
-                style={{height: 30, flexShrink: 0}}>
-                Open in canvas <Icon name="arrow" size={12} />
-              </button>
-            </header>
+      {/* ════════ LEVEL 2 · FOLDER DETAIL ════════ */}
+      {openFolder && (
+        <LibraryFolderDetail
+          group={openFolder}
+          cert={cert}
+          kind={kind} setKind={setKind}
+          statusF={statusF} setStatusF={setStatusF}
+          query={query} setQuery={setQuery}
+          onBack={closeFolder}
+          onOpenCanvas={() => openBriefInCanvas(openFolder.brief.id)}
+          onSelect={setSelectedOutput}
+        />
+      )}
 
-            {/* Outputs grid for this brief — hidden when collapsed */}
-            {!isCollapsed && (
-            <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(320px, 1fr))", gap: 14}}>
-              {group.items.map((o) => {
-          const passed  = o.status === "approved";
-          const cleaned = humanize(o.text);
-          const preview = cleaned.length > 220 ? cleaned.slice(0, 220) + "…" : cleaned;
-          const agent = window.CI_AGENTS?.find((a) => a.id === o.run.specialist_id);
-          const accent = (agent && window.CI_DEPT_COLORS?.[agent.dept]) || (passed ? "var(--green-500)" : "var(--pink-500)");
-          return (
-            <button key={o.id} onClick={() => setSelected(o)} className="card" style={{
-              padding: 0, textAlign:"left", cursor:"pointer",
-              border: "1px solid var(--c-line)", borderLeft: `3px solid ${accent}`,
-              display:"flex", flexDirection:"column", overflow:"hidden",
-              transition: "transform 120ms ease, box-shadow 120ms ease",
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.06)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = ""; }}>
-              {/* Designed heading: specialist name + kind pill in corner */}
-              <header style={{
-                padding:"14px 16px 10px", borderBottom:"1px solid var(--c-line)",
-                display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap: 10,
-                background:"var(--c-bg)",
-              }}>
-                <div style={{minWidth: 0, flex: 1}}>
-                  <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17, color:"var(--c-ink)", lineHeight: 1.2, marginBottom: 2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
-                    {agent?.name || specialistName(o.run.specialist_id)}
-                  </div>
-                  <div style={{fontFamily:"var(--font-mono)", fontSize: 9.5, color:"var(--c-faint)", letterSpacing:"0.1em", textTransform:"uppercase"}}>
-                    {agent?.dept || ""}
-                  </div>
-                </div>
-                <div style={{display:"flex", flexDirection:"column", alignItems:"flex-end", gap: 4}}>
-                  <span className="pill" style={{
-                    height: 22, padding:"0 10px", fontSize: 10.5, letterSpacing:"0.04em",
-                    background: accent, color:"#fff", fontWeight: 500,
-                  }}>{o.kind}</span>
-                  {o.edited && (
-                    <span className="pill" style={{
-                      height: 18, padding:"0 8px", fontSize: 9.5, letterSpacing:"0.04em",
-                      background:"var(--neutral-50)", color:"var(--c-dim)", fontWeight: 500,
-                    }}>edited</span>
-                  )}
-                </div>
-              </header>
+      {/* ════════ LEVEL 3 · FOREFRONT VIEWER ════════ */}
+      {selectedOutput && (
+        <LibraryViewer
+          o={selectedOutput}
+          cert={cert}
+          go={go}
+          flash={flash}
+          onClose={() => setSelectedOutput(null)}
+          onDelete={deleteOutput}
+        />
+      )}
 
-              {/* Body — image preview OR editorial type */}
-              {o.assetUrl ? (
-                <div style={{
-                  flex: 1, minHeight: 180, background:"var(--neutral-50)",
-                  backgroundImage: `url("${o.assetUrl}")`,
-                  backgroundSize:"cover", backgroundPosition:"center",
-                }} />
-              ) : (
-                <div style={{padding: 16, flex: 1}}>
-                  <p style={{margin: 0, fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic", color:"var(--c-ink)", fontSize: 14, lineHeight: 1.55, whiteSpace:"pre-wrap"}}>
-                    {preview || <span style={{color:"var(--c-faint)"}}>(empty)</span>}
-                  </p>
-                </div>
-              )}
+      {/* Toast */}
+      {toast && <div className="lib-toast">{toast}</div>}
+    </div>
+  );
+}
 
-              {/* Footer — credits only, no $ */}
-              <footer style={{display:"flex", justifyContent:"space-between", padding: "10px 16px", borderTop:"1px dashed var(--c-line-2)", fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
-                <span>BIO v{o.run.bio_version}{cert ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span></> : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}</span>
-                <span style={{color: passed ? "var(--green-600)" : "var(--pink-500)"}}>{passed ? "approved" : "flagged"} · {agent?.cr ?? "?"} cr</span>
-              </footer>
-            </button>
-          );
-              })}
+/* Type breakdown helper — "4 copy · 2 image" from a folder's items. */
+function libKindBreakdown(items) {
+  const counts = {};
+  for (const o of items) counts[o.kind] = (counts[o.kind] || 0) + 1;
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`);
+}
+
+/* ── LEVEL 1 · folder card — stacked-paper motif, dept-accented ──────── */
+function LibraryFolderCard({ group, onOpen }) {
+  const { brief, items } = group;
+  const title   = briefTitle(brief);
+  const allOk   = items.every((o) => o.status === "approved");
+  const accent  = allOk ? "var(--green-500)" : "var(--pink-500)";
+  const breakdown = libKindBreakdown(items);
+
+  return (
+    <button className="lib-folder" style={{ "--accent": accent }} onClick={onOpen}>
+      <div className="lib-folder__stack">
+        <div className="lib-folder__leaf lib-folder__leaf--1" />
+        <div className="lib-folder__leaf lib-folder__leaf--2" />
+        <div className="lib-folder__cover">
+          <span className="lib-folder__tab" />
+          <div>
+            <div className="lib-folder__count">{items.length}</div>
+            <div className="lib-folder__break">
+              {items.length === 1 ? "asset" : "assets"} · {breakdown.slice(0, 3).join(" · ")}
             </div>
-            )}
-          </section>
-        );
-        })}
+          </div>
+          <h3 className="lib-folder__title">{title}</h3>
+        </div>
+      </div>
+      <div className="lib-folder__meta">
+        <span className="lib-folder__dot" />
+        <span>{shortDate(brief.created_at)}</span>
+        <span style={{ color: "var(--c-line-2)" }}>·</span>
+        <span style={{ color: allOk ? "var(--green-600)" : "var(--pink-500)" }}>{allOk ? "approved" : "needs review"}</span>
+      </div>
+    </button>
+  );
+}
+
+/* ── LEVEL 2 · folder detail — filter bar + asset grid ──────────────── */
+function LibraryFolderDetail({ group, cert, kind, setKind, statusF, setStatusF, query, setQuery, onBack, onOpenCanvas, onSelect }) {
+  const { brief, items } = group;
+  const title = briefTitle(brief);
+  const kindsHere = [...new Set(items.map((i) => i.kind))];
+
+  const q = query.trim().toLowerCase();
+  const filtered = items.filter((i) => {
+    if (kind !== "all" && i.kind !== kind) return false;
+    if (statusF === "approved" && i.status !== "approved") return false;
+    if (statusF === "flagged"  && i.status === "approved") return false;
+    if (q) {
+      const hay = `${i.text} ${i.brief.request || ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  return (
+    <div>
+      {/* Header — back, title + brief context, Open in canvas */}
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:18, marginBottom:18}}>
+        <div style={{minWidth:0, flex:1}}>
+          <button onClick={onBack} className="btn btn--ghost btn--sm"
+            style={{height:28, padding:"0 10px", fontSize:11.5, marginBottom:12}}>
+            <Icon name="arrowLeft" size={12} /> Library
+          </button>
+          <div className="eyebrow" style={{marginBottom:6, display:"flex", gap:10, alignItems:"center"}}>
+            <span>{shortDate(brief.created_at)}</span>
+            <span style={{color:"var(--c-faint)"}}>·</span>
+            <span>{items.length} {items.length === 1 ? "asset" : "assets"}</span>
+          </div>
+          <h2 style={{
+            margin:"0 0 8px", fontFamily:"var(--font-serif)", fontStyle:"italic", fontWeight:400,
+            fontSize:30, lineHeight:1.2, letterSpacing:"-0.01em", color:"var(--c-ink)",
+            display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden",
+          }}>{title}</h2>
+          {brief.request && (
+            <p style={{margin:0, maxWidth:680, fontSize:13.5, lineHeight:1.55, color:"var(--c-dim)"}}>{brief.request}</p>
+          )}
+        </div>
+        <button onClick={onOpenCanvas} className="btn btn--primary btn--sm" style={{flexShrink:0, height:32}}>
+          <Icon name="sparkles" size={13} /> Open in canvas
+        </button>
       </div>
 
-      {!loading && briefGroups.length === 0 && items.length > 0 && (
-        <div className="card" style={{padding: 32, textAlign:"center", color:"var(--c-faint)", marginTop: 14}}>
-          No outputs match the current filter.
+      {/* Filter bar — type chips (present kinds only) + status + search */}
+      <div className="card" style={{padding:12, marginBottom:22, display:"flex", gap:10, alignItems:"center", flexWrap:"wrap"}}>
+        <div style={{position:"relative", flex:"1 1 200px", minWidth:180}}>
+          <input
+            value={query} onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search this folder…"
+            onKeyDown={(e) => e.stopPropagation()}
+            style={{
+              width:"100%", height:32, padding:"0 10px 0 32px",
+              border:"1px solid var(--c-line)", borderRadius:8,
+              fontSize:13, fontFamily:"inherit", background:"var(--c-bg)", color:"var(--c-ink)", outline:"none",
+            }} />
+          <span style={{position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", color:"var(--c-faint)", pointerEvents:"none"}}>
+            <Icon name="filter" size={13} />
+          </span>
         </div>
-      )}
-
-      {/* Full-content drawer */}
-      {selected && (
-        <Drawer open={true} onClose={() => setSelected(null)}
-          title={selected.kind} eyebrow={`${specialistName(selected.run.specialist_id)} · BIO v${selected.run.bio_version}`}
-          footer={<>
-            {selected.assetUrl ? (
-              <a className="btn btn--primary btn--sm" href={selected.assetUrl} target="_blank" rel="noreferrer" download>
-                <Icon name="files" size={14} /> Download
-              </a>
-            ) : (
-              <button className="btn btn--ghost btn--sm" onClick={async () => { await navigator.clipboard?.writeText(selected.text); setSelected({ ...selected, _copied: true }); setTimeout(() => setSelected((s) => s && { ...s, _copied: false }), 1500); }}>
-                <Icon name="files" size={14} /> {selected._copied ? "Copied" : "Copy text"}
-              </button>
-            )}
-            {/* Reuse — start a new brief with this output as upstream context */}
-            <button className="btn btn--ghost btn--sm" onClick={() => {
-              const agentName = specialistName(selected.run.specialist_id);
-              const preview = selected.assetUrl
-                ? `[image from ${agentName}]`
-                : (selected.text.length > 600 ? selected.text.slice(0, 600) + "…" : selected.text);
-              const prefill = `Continuing from ${agentName}'s output:\n\n${preview}\n\n— The next ask is: `;
-              try { sessionStorage.setItem("ci_home_prefill", JSON.stringify({ text: prefill, ts: Date.now() })); } catch {}
-              setSelected(null);
-              go("home");
-            }}>
-              <Icon name="refresh" size={14} /> Reuse
+        <div style={{display:"flex", gap:4, flexWrap:"wrap"}}>
+          <button onClick={() => setKind("all")}
+            className={"pill" + (kind === "all" ? " pill--dark" : "")}
+            style={{cursor:"pointer", height:28, padding:"0 12px"}}>All · {items.length}</button>
+          {kindsHere.map((k) => (
+            <button key={k} onClick={() => setKind(k)}
+              className={"pill" + (kind === k ? " pill--dark" : "")}
+              style={{cursor:"pointer", height:28, padding:"0 12px"}}>
+              {k} · {items.filter((i) => i.kind === k).length}
             </button>
-            <button className="btn btn--ghost" onClick={() => setSelected(null)}>Close</button>
-          </>}>
-          <div className="eyebrow" style={{marginBottom: 6}}>Brief</div>
-          <p style={{margin: 0, marginBottom: 18, fontSize: 13.5, color:"var(--c-dim)", lineHeight: 1.55}}>{selected.brief.request || "(no brief text)"}</p>
-          <div className="eyebrow" style={{marginBottom: 6}}>Output</div>
-          {selected.assetUrl ? (
-            <a href={selected.assetUrl} target="_blank" rel="noreferrer"
-               style={{display:"block", borderRadius: 10, overflow:"hidden", border:"1px solid var(--c-line)"}}>
-              <img src={selected.assetUrl} alt={selected.kind} style={{display:"block", width:"100%", height:"auto"}} />
-            </a>
-          ) : (
-            <div style={{
-              padding: 16, background:"var(--c-bg)", border:"1px solid var(--c-line)", borderRadius: 10,
-              fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic",
-              fontSize: 15.5, lineHeight: 1.65, color:"var(--c-ink)", whiteSpace:"pre-wrap",
-            }}>{humanize(selected.text)}</div>
-          )}
-          {selected.rationale && (
-            <>
-              <div className="eyebrow" style={{marginTop: 14, marginBottom: 6}}>QA notes</div>
-              <p style={{margin: 0, fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5, fontStyle:"italic"}}>{selected.rationale}</p>
-            </>
-          )}
-          <div style={{
-            marginTop: 16, padding:"10px 12px",
-            borderTop:"1px dashed var(--c-line-2)",
-            display:"flex", justifyContent:"space-between", gap: 8,
-            fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.04em",
-          }}>
-            <span>
-              Composed by <span style={{color:"var(--c-ink)"}}>{specialistName(selected.run.specialist_id)}</span> ·
-              BIO v{selected.run.bio_version}
-              {cert ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span> · {shortDate(cert.at)}</> : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
-            </span>
-            <span>{(window.CI_AGENTS?.find((a) => a.id === selected.run.specialist_id)?.cr) ?? "?"} cr</span>
-          </div>
-        </Drawer>
+          ))}
+        </div>
+        <div style={{display:"flex", gap:4, marginLeft:"auto"}}>
+          {["all", "approved", "flagged"].map((s) => (
+            <button key={s} onClick={() => setStatusF(s)}
+              className={"pill" + (statusF === s ? " pill--dark" : "")}
+              style={{cursor:"pointer", height:28, padding:"0 12px", textTransform:"capitalize"}}>{s}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Asset grid — sheets for text, thumbnails for images */}
+      {filtered.length === 0 ? (
+        <div className="card" style={{padding:"40px 32px", textAlign:"center", color:"var(--c-faint)"}}>
+          {items.length === 0 ? "This folder is empty." : "No assets match the current filter."}
+        </div>
+      ) : (
+        <div className="lib-assets">
+          {filtered.map((o) => <LibraryAssetCard key={o.id} o={o} onSelect={() => onSelect(o)} />)}
+        </div>
       )}
     </div>
   );
 }
 
-function LibraryOutput({ o, go, flash, isTeam, briefs, menuOpen, onMenu, closeMenu }) {
-  const agent = window.CI_AGENTS.find(a => a.id === o.agentId);
-  const isUpload = o.kind === "upload";
+/* One asset card — "sheet of paper" for text, thumbnail for image. */
+function LibraryAssetCard({ o, onSelect }) {
+  const passed = o.status === "approved";
+  const agent  = window.CI_AGENTS?.find((a) => a.id === o.run.specialist_id);
+  const dotCls = "lib-status-dot" + (passed ? "" : " lib-status-dot--flag");
 
-  const download = () => {
-    const blob = new Blob([`${o.type}\n\n${o.body}\n\n— ${o.meta}`], { type:"text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = o.type.replace(/[^a-z0-9]+/gi, "-").toLowerCase().replace(/^-|-$/g, "") + ".txt";
-    a.click();
-    URL.revokeObjectURL(url);
-    flash("Downloaded " + o.type);
-  };
+  /* Image asset — thumbnail, or a styled placeholder w/ visual direction */
+  if (o.kind === "image") {
+    return (
+      <button className="lib-thumb" onClick={onSelect}>
+        {o.assetUrl ? (
+          <img className="lib-thumb__img" src={o.assetUrl} alt={o.kind} loading="lazy" />
+        ) : (
+          <div className="lib-thumb__placeholder">
+            <div className="lib-sheet__eyebrow" style={{marginBottom:2}}>
+              <span className={dotCls} /> Visual direction
+            </div>
+            <p style={{
+              margin:0, fontFamily:"var(--font-serif)", fontSize:14, lineHeight:1.5, color:"var(--c-ink)",
+              display:"-webkit-box", WebkitLineClamp:5, WebkitBoxOrient:"vertical", overflow:"hidden",
+            }}>{humanize(o.text) || "(no direction)"}</p>
+          </div>
+        )}
+        <div className="lib-thumb__foot">
+          <span className={dotCls} />
+          <span>{o.kind}</span>
+          {o.edited && <span style={{color:"var(--yellow-700)"}}>· edited</span>}
+          <span style={{marginLeft:"auto"}}>{agent?.name || specialistName(o.run.specialist_id)}</span>
+        </div>
+      </button>
+    );
+  }
 
-  const Action = ({ icon, label, onClick, primary }) => (
-    <button onClick={onClick}
-      className={"btn btn--sm " + (primary ? "btn--ghost" : "btn--ghost")}
-      style={{height:28, padding:"0 9px", fontSize:11.5, gap:5}}>
-      <Icon name={icon} size={13} /> {label}
+  /* Text asset — a real sheet of paper */
+  const cleaned = humanize(o.text);
+  return (
+    <button className="lib-sheet" onClick={onSelect}>
+      <div className="lib-sheet__eyebrow">
+        <span className={dotCls} />
+        <span>{o.kind}</span>
+        {o.edited && <span style={{color:"var(--yellow-700)"}}>· edited</span>}
+      </div>
+      <p className="lib-sheet__body">{cleaned || <span style={{color:"var(--c-faint)"}}>(empty)</span>}</p>
+      <div className="lib-sheet__foot">
+        <span>{agent?.name || specialistName(o.run.specialist_id)}</span>
+        <span style={{marginLeft:"auto"}}>BIO v{o.run.bio_version}</span>
+      </div>
     </button>
   );
+}
+
+/* ── LEVEL 3 · forefront viewer — large asset + 4-action bar ─────────── */
+function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
+  const [confirmDel, setConfirmDel] = useBrState(false);
+  const passed  = o.status === "approved";
+  const agent   = window.CI_AGENTS?.find((a) => a.id === o.run.specialist_id);
+  const isImage = o.kind === "image";
+  const safeName = (s) => (s || "asset").replace(/[^a-z0-9]+/gi, "-").toLowerCase().replace(/^-|-$/g, "");
+
+  /* Reuse — hand off to Create. (Create-side consumption of this context
+     is a follow-up; for now we seed sessionStorage and route home.) */
+  const reuse = () => {
+    try {
+      sessionStorage.setItem("ci_run_context", JSON.stringify({
+        mode: "reuse", briefId: o.brief.id, outputId: o.id, seedText: o.text, ts: Date.now(),
+      }));
+    } catch {}
+    onClose();
+    go("home");
+  };
+
+  const copyPrompt = async () => {
+    const prompt = isImage
+      ? (o.text || "")
+      : (o.brief.request || "") + (o.rationale ? "\n\n" + o.rationale : "");
+    try { await navigator.clipboard?.writeText(prompt); flash("Prompt copied"); }
+    catch { flash("Could not copy"); }
+  };
+
+  const download = () => {
+    const base = `${safeName(briefTitle(o.brief))}-${o.kind}`;
+    if (isImage && o.assetUrl) {
+      const a = document.createElement("a");
+      a.href = o.assetUrl; a.download = base; a.target = "_blank"; a.rel = "noreferrer";
+      a.click();
+      flash("Downloading");
+      return;
+    }
+    const blob = new Blob([o.text || ""], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = base + ".txt";
+    a.click();
+    URL.revokeObjectURL(url);
+    flash("Downloaded");
+  };
 
   return (
-    <div className="card" style={{padding:16, display:"flex", flexDirection:"column", gap:10, position:"relative"}}>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8}}>
-        <span className="eyebrow eyebrow--yellow" style={{maxWidth:"62%"}}>{o.type}</span>
-        <div style={{display:"flex", alignItems:"center", gap:6}}>
-          {o.status && <StatusPill status={o.status} />}
-          <PinButton kind="outputs" id={o.id} />
+    <div className="lib-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={"lib-modal" + (isImage && o.assetUrl ? " lib-modal--image" : "")} onClick={(e) => e.stopPropagation()}>
+        {/* Head */}
+        <div style={{flex:"none", display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16, padding:"18px 22px 14px", borderBottom:"1px solid var(--c-line)"}}>
+          <div style={{minWidth:0}}>
+            <div className="eyebrow" style={{marginBottom:6, display:"flex", gap:8, alignItems:"center"}}>
+              <span className={"lib-status-dot" + (passed ? "" : " lib-status-dot--flag")} />
+              <span>{o.kind}</span>
+              <span style={{color:"var(--c-faint)"}}>·</span>
+              <span style={{color: passed ? "var(--green-600)" : "var(--pink-500)"}}>{passed ? "approved" : "flagged"}</span>
+              {o.edited && <span style={{color:"var(--yellow-700)"}}>· edited</span>}
+            </div>
+            <h2 style={{margin:0, fontFamily:"var(--font-serif)", fontStyle:"italic", fontWeight:400, fontSize:24, lineHeight:1.2, color:"var(--c-ink)"}}>
+              {agent?.name || specialistName(o.run.specialist_id)}
+            </h2>
+          </div>
+          <button onClick={onClose} className="btn btn--ghost btn--sm" style={{flexShrink:0, height:30, width:30, padding:0, justifyContent:"center"}} aria-label="Close">
+            <Icon name="close" size={14} />
+          </button>
         </div>
-      </div>
 
-      <p style={{
-        margin:0, fontSize:13.5, lineHeight:1.5, color:"var(--c-dim)",
-        display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden",
-      }}>{o.body}</p>
+        {/* Body — large asset; flex:1 so the modal never exceeds 92vh,
+            long text scrolls here, and the action bar stays pinned below */}
+        <div style={{
+          flex:1, minHeight:0, overflowY:"auto",
+          padding: isImage && o.assetUrl ? "16px 18px" : "20px 22px",
+          ...(isImage && o.assetUrl ? { display:"flex", flexDirection:"column" } : null),
+        }}>
+          {isImage && o.assetUrl ? (
+            /* Frameless lightbox — full image fits, centered, on the dim backdrop */
+            <div style={{flex:1, minHeight:0, display:"flex", alignItems:"center", justifyContent:"center"}}>
+              <img src={o.assetUrl} alt={o.kind} style={{display:"block", maxWidth:"100%", maxHeight:"62vh", width:"auto", height:"auto", margin:"0 auto", objectFit:"contain", borderRadius:8}} />
+            </div>
+          ) : isImage ? (
+            <div style={{padding:22, background:"var(--c-yellow-tint)", border:"1px solid var(--yellow-200)", borderRadius:10}}>
+              <div className="eyebrow" style={{marginBottom:8}}>Visual direction</div>
+              <p style={{margin:0, fontFamily:"var(--font-serif)", fontSize:17, lineHeight:1.6, color:"var(--c-ink)", whiteSpace:"pre-wrap"}}>{humanize(o.text) || "(no direction)"}</p>
+            </div>
+          ) : (
+            /* Full sheet of paper */
+            <div style={{
+              padding:"28px 30px", background:"#FFFFFF", border:"1px solid var(--c-line)", borderRadius:6,
+              boxShadow:"var(--shadow-sm)",
+              fontFamily:"var(--font-serif)", fontSize:18, lineHeight:1.7, color:"var(--c-ink)", whiteSpace:"pre-wrap",
+            }}>{humanize(o.text) || <span style={{color:"var(--c-faint)"}}>(empty)</span>}</div>
+          )}
 
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:8,
-        fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.03em"}}>
-        <span>{isUpload ? "Client upload" : (agent ? agent.name : "Brandolph")}</span>
-        <span>{o.meta}</span>
-      </div>
-
-      {/* Actions */}
-      <div style={{display:"flex", flexWrap:"wrap", gap:6, paddingTop:10, borderTop:"1px dashed var(--c-line-2)"}}>
-        <Action icon="download" label="Download" onClick={download} primary />
-        {!isUpload && <Action icon="refresh" label="Reuse" onClick={() => flash("Saved as a starting point for a new brief")} />}
-        <div style={{position:"relative"}}>
-          <Action icon="plus" label="Add to project" onClick={onMenu} />
-          {menuOpen && (
+          {o.rationale && (
             <>
-              <div onClick={closeMenu} style={{position:"fixed", inset:0, zIndex:40}} />
-              <div style={{
-                position:"absolute", top:"calc(100% + 4px)", left:0, zIndex:41, minWidth:220,
-                background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:10,
-                boxShadow:"var(--shadow-lg)", padding:6,
-              }}>
-                <div className="eyebrow" style={{padding:"6px 8px"}}>Add to project</div>
-                {briefs.filter(b => b.id !== o.briefId).map(b => (
-                  <button key={b.id} onClick={() => { closeMenu(); flash("Added to “" + b.title + "”"); }}
-                    style={{display:"block", width:"100%", textAlign:"left", border:"none", background:"transparent",
-                      padding:"8px 8px", borderRadius:7, fontSize:13, color:"var(--c-ink)", cursor:"pointer"}}
-                    onMouseEnter={e => e.currentTarget.style.background = "var(--neutral-50)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    {b.title}
-                  </button>
-                ))}
-              </div>
+              <div className="eyebrow" style={{marginTop:16, marginBottom:6}}>QA notes</div>
+              <p style={{margin:0, fontSize:13, color:"var(--c-dim)", lineHeight:1.55, fontStyle:"italic"}}>{o.rationale}</p>
             </>
           )}
+
+          {/* Moat attribution */}
+          <div style={{
+            marginTop:18, paddingTop:12, borderTop:"1px dashed var(--c-line-2)",
+            display:"flex", justifyContent:"space-between", gap:8, flexWrap:"wrap",
+            fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)", letterSpacing:"0.04em",
+          }}>
+            <span>
+              Composed by <span style={{color:"var(--c-ink)"}}>{specialistName(o.run.specialist_id)}</span> · BIO v{o.run.bio_version}
+              {cert
+                ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span></>
+                : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+            </span>
+            <span>{agent?.cr ?? "?"} cr</span>
+          </div>
         </div>
-        {!isUpload && <Action icon="craft" label="Send to polish" onClick={() => { flash("Sent to Humans for finishing"); go("craft"); }} />}
-        {!isUpload && <Action icon="sparkles" label="Revise" onClick={() => flash("Brandolph is revising this — check back shortly")} />}
+
+        {/* Action bar — Reuse · Copy prompt · Download · Delete — pinned, always visible */}
+        <div style={{flex:"none", display:"flex", gap:8, flexWrap:"wrap", padding:"14px 22px", borderTop:"1px solid var(--c-line)", background:"var(--c-bg)"}}>
+          <button className="btn btn--primary btn--sm" onClick={reuse}>
+            <Icon name="refresh" size={13} /> Reuse
+          </button>
+          <button className="btn btn--ghost btn--sm" onClick={copyPrompt}>
+            <Icon name="files" size={13} /> Copy prompt
+          </button>
+          <button className="btn btn--ghost btn--sm" onClick={download}>
+            <Icon name="download" size={13} /> Download
+          </button>
+          <div style={{marginLeft:"auto", display:"flex", gap:8, alignItems:"center"}}>
+            {confirmDel ? (
+              <>
+                <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)"}}>Delete this asset?</span>
+                <button className="btn btn--ghost btn--sm" onClick={() => setConfirmDel(false)}>Cancel</button>
+                <button className="btn btn--danger btn--sm" onClick={() => onDelete(o)}>Delete</button>
+              </>
+            ) : (
+              <button className="btn btn--danger btn--sm" onClick={() => setConfirmDel(true)}>
+                <Icon name="close" size={13} /> Delete
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

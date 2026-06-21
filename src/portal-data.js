@@ -9,7 +9,7 @@ window.CI_BRAND = {
   bioCompleteness: 91,
   bioVersion: 7,                                      /* rev-2 §5.5 — surfaces on OutputCard footer */
   bioLastUpdated: "Updated 14 May — 09:42",
-  tier: "Tier 02 — Brandolph",
+  tier: "Tier 02 — The River 🌊",
   /* Brand Steward — the senior human who certified this brand's BIO.
      Per rev-2 §5.1: a Steward is a team_member with role 'steward'.
      This mock represents the certification record post-onboarding.
@@ -21,7 +21,7 @@ window.CI_USER = {
   name: "Marina Reyes",
   role: "Founder",
   email: "marina@vinilo.coffee",
-  avatar: "intelligence/assets/profile-3.jpg",
+  avatar: "caastor/assets/profile-3.jpg",
 };
 
 window.CI_CREDITS = {
@@ -157,7 +157,10 @@ window.CI_DEPT_META = {
 };
 
 /* Subscription tier labels (for "unlocks from" copy). */
-window.CI_TIERS = { "00":"Free", "01":"Studio", "02":"Brandolph", "03":"Suite" };
+window.CI_TIERS = { "00":"The Creek 🏞️", "01":"The Dam 🦫", "02":"The River 🌊", "03":"The Colony 🐜" };
+
+// mirror of server/src/lib/plan-limits.js BRAND_LIMITS — keep in sync
+window.CI_BRAND_LIMITS = { "00": 1, "01": 2, "02": 3, "03": Infinity };
 
 /* Pins — favorite outputs + preferred specialists, persisted locally. */
 window.CI_PINS = {
@@ -177,9 +180,9 @@ window.CI_PINS = {
 /* Brand workspaces — multi-brand is a higher-plan (Suite) feature. The
    first is the active/seeded one; the rest demonstrate the switcher. */
 window.CI_WORKSPACES = [
-  { id:"vinilo", name:"Vinilo",          initial:"V", bio:91, plan:"Tier 02 · Brandolph", campaigns:9 },
-  { id:"lumen",  name:"Lúmen Studio",    initial:"L", bio:64, plan:"Tier 01 · Studio",    campaigns:3 },
-  { id:"otono",  name:"Otoño Skincare",  initial:"O", bio:78, plan:"Tier 02 · Brandolph", campaigns:6 },
+  { id:"vinilo", name:"Vinilo",          initial:"V", bio:91, plan:"Tier 02 · The River 🌊", campaigns:9 },
+  { id:"lumen",  name:"Lúmen Studio",    initial:"L", bio:64, plan:"Tier 01 · The Dam 🦫",    campaigns:3 },
+  { id:"otono",  name:"Otoño Skincare",  initial:"O", bio:78, plan:"Tier 02 · The River 🌊", campaigns:6 },
 ];
 
 /* ── Specialist prompting (Phase A) ───────────────────────────────── */
@@ -764,11 +767,11 @@ window.CI_JOBS = [
 ];
 
 window.CI_TEAM = [
-  { id:"t1", name:"Aitana V.", role:"Senior designer",   load:0.78, slots:3, jobsThisMonth:14, photo:"intelligence/assets/profile-1.jpg" },
-  { id:"t2", name:"Marc P.",   role:"Senior designer",   load:0.62, slots:5, jobsThisMonth:11, photo:"intelligence/assets/profile-2.jpg" },
-  { id:"t3", name:"Diego M.",  role:"Brand strategist",  load:0.91, slots:1, jobsThisMonth:9,  photo:"intelligence/assets/profile-3.jpg" },
-  { id:"t4", name:"Lia R.",    role:"Copywriter",        load:0.34, slots:7, jobsThisMonth:18, photo:"intelligence/assets/profile-4.jpg" },
-  { id:"t5", name:"Nuria T.",  role:"Art director",      load:0.55, slots:4, jobsThisMonth:7,  photo:"intelligence/assets/profile-5.jpg" },
+  { id:"t1", name:"Aitana V.", role:"Senior designer",   load:0.78, slots:3, jobsThisMonth:14, photo:"caastor/assets/profile-1.jpg" },
+  { id:"t2", name:"Marc P.",   role:"Senior designer",   load:0.62, slots:5, jobsThisMonth:11, photo:"caastor/assets/profile-2.jpg" },
+  { id:"t3", name:"Diego M.",  role:"Brand strategist",  load:0.91, slots:1, jobsThisMonth:9,  photo:"caastor/assets/profile-3.jpg" },
+  { id:"t4", name:"Lia R.",    role:"Copywriter",        load:0.34, slots:7, jobsThisMonth:18, photo:"caastor/assets/profile-4.jpg" },
+  { id:"t5", name:"Nuria T.",  role:"Art director",      load:0.55, slots:4, jobsThisMonth:7,  photo:"caastor/assets/profile-5.jpg" },
 ];
 
 /* Craft packs ----------------------------------------------------- */

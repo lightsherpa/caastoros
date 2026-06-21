@@ -9,7 +9,7 @@ const { useState: useDState, useEffect: useDEffect } = React;
    Polls every `pollMs` while `pendingCert` is true (BIO not yet certified
    by Steward, or no BIO at all yet). Returns { brandId, bio, cert, refresh }. */
 function useLiveBio({ pollMs = 6000 } = {}) {
-  const [state, setState] = useDState({ brandId: null, brandName: null, brandUrl: null, bio: null, cert: null, error: null, loading: true });
+  const [state, setState] = useDState({ brandId: null, brandName: null, brandUrl: null, bio: null, cert: null, reviewPending: false, focusCount: 0, error: null, loading: true });
 
   const tick = React.useCallback(async () => {
     try {
@@ -32,10 +32,10 @@ function useLiveBio({ pollMs = 6000 } = {}) {
       const res = await apiFetch(`/api/bios/${brand.id}`);
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setState({ brandId: brand.id, brandName: brand.name, brandUrl: brand.url, bio: null, cert: null, loading: false, error: j.error || `HTTP ${res.status}` });
+        setState({ brandId: brand.id, brandName: brand.name, brandUrl: brand.url, bio: null, cert: null, focusCount: 0, loading: false, error: j.error || `HTTP ${res.status}` });
         return;
       }
-      const { bio } = await res.json();
+      const { bio, reviewPending, focusCount } = await res.json();
       let certInfo = null;
       if (bio?.certified) {
         let certName = "your Brand Steward";
@@ -43,9 +43,9 @@ function useLiveBio({ pollMs = 6000 } = {}) {
           const { data: tm } = await supabase.from("team_members").select("first_name, name").eq("id", bio.certified_by).maybeSingle();
           certName = tm?.first_name || tm?.name || certName;
         }
-        certInfo = { byName: certName, at: bio.certified_at };
+        certInfo = { byName: certName, at: bio.certified_at, notes: bio.steward_notes || null };
       }
-      setState({ brandId: brand.id, brandName: brand.name, brandUrl: brand.url, bio, cert: certInfo, loading: false, error: null });
+      setState({ brandId: brand.id, brandName: brand.name, brandUrl: brand.url, bio, cert: certInfo, reviewPending: !!reviewPending, focusCount: Number(focusCount) || 0, loading: false, error: null });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e?.message || String(e) }));
     }
@@ -110,10 +110,9 @@ function DiscoveryStepper({ step }) {
 }
 
 /* Three-bucket source intake drop zone (rev-2 §5.3) — labelled per bucket
-   so Steward review (P1.5) can read by department without re-bucketing.
-   Mock-side only: files stay in local state, no upload yet. The `bucket`
-   contract here is what `POST /api/bios/:brandId/sources` will consume at
-   P1-003 (carries through as `uploads.bucket_hint` and `bio_sources.bucket`). */
+   so Steward review can read by department without re-bucketing. Files
+   upload to /api/bios/:brandId/sources/upload and land in Supabase Storage
+   plus bio_sources/uploads rows with the selected bucket. */
 const BUCKETS = [
   { key:"foundations", label:"Brand foundations", help:"Brand book, decks, manifestos, “about us” docs",       readBy:"All specialists" },
   { key:"visual",      label:"Visual references", help:"Moodboards, examples of work you admire",                       readBy:"Design dept" },
@@ -174,37 +173,83 @@ function BucketDropZone({ bucket, files, onAdd, onRemove }) {
   );
 }
 
-function DiscoveryStep1({ onNext }) {
+function DiscoveryStep1({ onNext, newBrand = false }) {
   /* Three-bucket source state (rev-2 §5.3). Empty arrays on mount.
      `Start extraction` fires the compile-bio Inngest event via
      /api/discovery/start; the SPA can then poll bios for the result. */
   const [uploadsByBucket, setUploadsByBucket] = useDState({ foundations: [], visual: [], voice: [] });
+  const [brandName, setBrandName] = useDState("");
   const [url, setUrl] = useDState("vinilo.coffee");
+  const [instagram, setInstagram] = useDState("");
   const [busy, setBusy] = useDState(false);
   const [error, setError] = useDState(null);
+  const [uploading, setUploading] = useDState(false);
   const addToBucket = (key) => (newFiles) =>
     setUploadsByBucket(prev => ({ ...prev, [key]: [...prev[key], ...newFiles] }));
   const removeFromBucket = (key) => (idx) =>
     setUploadsByBucket(prev => ({ ...prev, [key]: prev[key].filter((_, i) => i !== idx) }));
   const handleStart = async () => {
+    if (newBrand && !brandName.trim()) { setError("Brand name is required."); return; }
     setBusy(true); setError(null);
     try {
       const cleaned = url.trim().replace(/^https?:\/\//i, "");
       const targetUrl = cleaned.startsWith("http") ? cleaned : `https://${cleaned}`;
+      /* New-brand mode: create the brand first, then run the same
+         discovery flow targeting it. Existing onboarding (newBrand=false)
+         skips this block entirely and behaves exactly as before. */
+      let newBrandId = null;
+      if (newBrand) {
+        const created = await apiFetch("/api/brands", {
+          method: "POST",
+          body: JSON.stringify({ name: brandName.trim() }),
+        });
+        if (created.status === 402) {
+          /* Over plan limit — bounce to upgrade, don't create/scrape. */
+          window.location.hash = "#/upgrade";
+          return;
+        }
+        if (!created.ok) {
+          const err = await created.json().catch(() => ({ error: `HTTP ${created.status}` }));
+          throw new Error(err.error || `HTTP ${created.status}`);
+        }
+        const { brand } = await created.json();
+        newBrandId = brand.id;
+        window.setCurrentBrandId?.(brand.id);
+      }
       const res = await apiFetch("/api/discovery/start", {
         method: "POST",
-        body: JSON.stringify({ url: targetUrl }),
+        body: JSON.stringify({ url: targetUrl, instagram, ...(newBrandId ? { brandId: newBrandId } : {}) }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
       const { eventId, brandId } = await res.json();
+      const filesToUpload = BUCKETS.flatMap((bucket) =>
+        uploadsByBucket[bucket.key].map((file) => ({ bucket: bucket.key, file }))
+      );
+      if (brandId && filesToUpload.length) {
+        setUploading(true);
+        for (const item of filesToUpload) {
+          const form = new FormData();
+          form.set("bucket", item.bucket);
+          form.set("file", item.file);
+          const up = await apiFetch(`/api/bios/${brandId}/sources/upload`, {
+            method: "POST",
+            body: form,
+          });
+          if (!up.ok) {
+            const err = await up.json().catch(() => ({ error: `HTTP ${up.status}` }));
+            throw new Error(`Upload failed for ${item.file.name}: ${err.error || `HTTP ${up.status}`}`);
+          }
+        }
+      }
       console.log("[Discovery] fired", { eventId, brandId, url: targetUrl });
       onNext();
     } catch (err) {
       setError(err?.message || String(err));
     } finally {
+      setUploading(false);
       setBusy(false);
     }
   };
@@ -218,8 +263,10 @@ function DiscoveryStep1({ onNext }) {
           fontSize: 38, letterSpacing:"-0.01em", lineHeight: 1.15,
           margin:0, marginBottom: 14, color:"var(--c-ink)",
         }}>
-          <em style={{background:"var(--yellow-200)", padding:"0 4px", fontStyle:"normal", fontWeight:500}}>Point us at your brand.</em>
-          {" "}Brandolph will read the rest.
+          <em style={{background:"var(--yellow-200)", padding:"0 4px", fontStyle:"normal", fontWeight:500}}>
+            {newBrand ? "Add a brand." : "Point us at your brand."}
+          </em>
+          {" "}{newBrand ? "Name it, point us at it, and Brandolph reads the rest." : "Brandolph will read the rest."}
         </h1>
         <p style={{fontSize: 16, color:"var(--c-dim)", lineHeight: 1.55, marginBottom: 30}}>
           A URL is enough. If you have guidelines, hand them over. If you don't — we'll work from what's already public, and tell you what we couldn't find.
@@ -229,6 +276,14 @@ function DiscoveryStep1({ onNext }) {
       <Reveal delay={150}>
         <div className="card" style={{padding: 28}}>
           <div style={{display:"flex", flexDirection:"column", gap: 18}}>
+            {newBrand && (
+              <div>
+                <label style={{display:"block", fontSize:12, fontWeight:500, color:"var(--c-ink)", marginBottom: 8}}>
+                  Brand name <span style={{color:"var(--pink-500)"}}>·</span>
+                </label>
+                <input className="input" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. Vinilo Coffee" />
+              </div>
+            )}
             <div>
               <label style={{display:"block", fontSize:12, fontWeight:500, color:"var(--c-ink)", marginBottom: 8}}>
                 Primary website URL <span style={{color:"var(--pink-500)"}}>·</span>
@@ -239,7 +294,7 @@ function DiscoveryStep1({ onNext }) {
               <label style={{display:"block", fontSize:12, fontWeight:500, color:"var(--c-ink)", marginBottom: 8}}>
                 Instagram handle <span style={{color:"var(--c-faint)", fontWeight:400}}>· optional</span>
               </label>
-              <input className="input" defaultValue="@vinilo.coffee" placeholder="@handle" />
+              <input className="input" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@handle" />
             </div>
 
             <div>
@@ -267,11 +322,11 @@ function DiscoveryStep1({ onNext }) {
           }}>
             <div style={{display:"flex", gap: 14, alignItems:"center"}}>
               <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>
-                ⏱ ~40s · 🔒 Nothing saved until you confirm{totalFiles > 0 ? ` · ${totalFiles} file${totalFiles===1?"":"s"} ready` : ""}
+                ⏱ ~40s · 🔒 Sources save to your BIO ledger{totalFiles > 0 ? ` · ${totalFiles} file${totalFiles===1?"":"s"} ready` : ""}
               </span>
             </div>
-            <button className="btn btn--primary" onClick={handleStart} disabled={busy || !url.trim()}>
-              {busy ? "Starting…" : <>Start extraction <Icon name="arrow" size={14} /></>}
+            <button className="btn btn--primary" onClick={handleStart} disabled={busy || !url.trim() || (newBrand && !brandName.trim())}>
+              {uploading ? "Uploading sources…" : busy ? "Starting…" : <>Start extraction <Icon name="arrow" size={14} /></>}
             </button>
           </div>
           {error && (
@@ -310,12 +365,10 @@ function DiscoveryStep2Running({ onDone }) {
   useDEffect(() => {
     let alive = true;
     let baselineVersion = null;
-    let pollCount = 0;
     const startedAt = Date.now();
 
     const tick = async () => {
       if (!alive) return;
-      pollCount++;
       setElapsed(Math.floor((Date.now() - startedAt) / 1000));
       /* Crude stage progression based on elapsed time — real status
          tracking would require Inngest's GraphQL API. For visual
@@ -342,9 +395,14 @@ function DiscoveryStep2Running({ onDone }) {
           baselineVersion = v ?? 0;
         } else if ((v ?? 0) > baselineVersion) {
           setStage("done");
-          /* Brief beat so the user sees "done" before transition */
-          setTimeout(() => { if (alive) onDone(); }, 400);
-          alive = false;
+          alive = false;                 /* stop further polling */
+          clearTimeout(fallback);        /* the 90s safety net is no longer needed */
+          /* Brief beat so the user sees "done", then advance to Confirm.
+             Fire onDone UNCONDITIONALLY — do NOT gate on `alive`, which we
+             just set false. Gating here was the freeze bug: a new BIO landing
+             before the 90s fallback set alive=false, which then blocked BOTH
+             this transition and the fallback → the flow stuck on "done". */
+          setTimeout(onDone, 400);
         }
       } catch (e) { /* network blip — keep polling */ }
     };
@@ -620,7 +678,7 @@ function DiscoveryStep2Results({ onConfirm }) {
                         aspectRatio:"1/1", borderRadius: 10, overflow:"hidden",
                         position:"relative", border:"1px solid var(--c-line)",
                       }}>
-                        <img src={`intelligence/assets/profile-${n}.jpg`} alt="" style={{width:"100%", height:"100%", objectFit:"cover", filter:"sepia(0.05) saturate(0.9)"}} />
+                        <img src={`caastor/assets/profile-${n}.jpg`} alt="" style={{width:"100%", height:"100%", objectFit:"cover", filter:"sepia(0.05) saturate(0.9)"}} />
                         <div style={{position:"absolute", bottom:8, left:8, right:8, background:"rgba(0,0,0,0.66)", color:"#fff", padding:"4px 8px", borderRadius: 4, fontSize: 10, fontFamily:"var(--font-mono)", letterSpacing:"0.06em", textTransform:"uppercase"}}>
                           {d.imagery[i]}
                         </div>
@@ -717,13 +775,13 @@ function DiscoveryStep3({ go }) {
   );
 }
 
-function Discovery({ go }) {
+function Discovery({ go, newBrand = false }) {
   const [step, setStep] = useDState(1);
   const [phase, setPhase] = useDState("form"); // form | running | results
   return (
     <div style={{padding:"24px 36px 60px", maxWidth: 1180, margin:"0 auto"}}>
       <DiscoveryStepper step={step} />
-      {step === 1 && <DiscoveryStep1 onNext={() => { setStep(2); setPhase("running"); }} />}
+      {step === 1 && <DiscoveryStep1 newBrand={newBrand} onNext={() => { setStep(2); setPhase("running"); }} />}
       {step === 2 && phase === "running"  && <DiscoveryStep2Running onDone={() => setPhase("results")} />}
       {step === 2 && phase === "results"  && <DiscoveryStep2Results onConfirm={() => setStep(3)} />}
       {step === 3 && <DiscoveryStep3 go={go} />}
@@ -803,36 +861,49 @@ const BIO_GRADE = "Warm, slightly sunny. Editorial framing. Hands + craft + low-
    the same shape the API expects. */
 function payloadToFields(payload) {
   const p = payload || {};
+  /* Live confidence map: payload.confidence["<section>.<key>"] = { conf, source }.
+     Old BIOs have no map → cf() returns {} → conf/source stay undefined and the
+     downstream Confidence/EditableField components render exactly as before. */
+  const cmap = p.confidence || {};
+  const cf = (section, key) => cmap[`${section}.${key}`] || {};
+  const field = (section, key, label, extra = {}) => {
+    const { conf, source } = cf(section, key);
+    return { label, conf, source, ...extra };
+  };
   return {
     identity: [
-      { label:"Positioning", value: p.identity?.positioning || "", italic: true },
-      { label:"Category",    value: p.identity?.category || "" },
-      { label:"Founded",     value: p.identity?.founded || "" },
-      { label:"Pillars",     multi: true, value: p.identity?.pillars || [] },
+      { ...field("identity", "positioning", "Positioning", { italic: true }), value: p.identity?.positioning || "" },
+      { ...field("identity", "category", "Category"), value: p.identity?.category || "" },
+      { ...field("identity", "founded", "Founded"),   value: p.identity?.founded || "" },
+      { ...field("identity", "pillars", "Pillars", { multi: true }), value: p.identity?.pillars || [] },
     ],
     audience: [
-      { label:"Primary",   value: p.audience?.primary || "" },
-      { label:"Secondary", value: p.audience?.secondary || "" },
-      { label:"Tertiary",  value: p.audience?.tertiary || "" },
-      { label:"Jobs to be done", multi: true, value: p.audience?.jtbd || [] },
+      { ...field("audience", "primary", "Primary"),     value: p.audience?.primary || "" },
+      { ...field("audience", "secondary", "Secondary"), value: p.audience?.secondary || "" },
+      { ...field("audience", "tertiary", "Tertiary"),   value: p.audience?.tertiary || "" },
+      { ...field("audience", "jtbd", "Jobs to be done", { multi: true }), value: p.audience?.jtbd || [] },
     ],
     voice: [
-      { label:"Register",  value: p.voice?.register || "" },
-      { label:"Forbidden", multi: true, value: p.voice?.forbidden || [] },
-      { label:"Rhythm",    value: p.voice?.rhythm || "" },
-      { label:"Signatures", multi: true, value: p.voice?.signatures || [] },
+      { ...field("voice", "register", "Register"),    value: p.voice?.register || "" },
+      { ...field("voice", "forbidden", "Forbidden", { multi: true }), value: p.voice?.forbidden || [] },
+      { ...field("voice", "rhythm", "Rhythm"),        value: p.voice?.rhythm || "" },
+      { ...field("voice", "signatures", "Signatures", { multi: true }), value: p.voice?.signatures || [] },
     ],
     goals: [
-      { label:"North star",  value: p.goals?.northStar || "" },
-      { label:"This quarter", value: p.goals?.q2 || "" },
-      { label:"Next quarter", value: p.goals?.q3 || "" },
+      { ...field("goals", "northStar", "North star"), value: p.goals?.northStar || "" },
+      { ...field("goals", "q2", "This quarter"),      value: p.goals?.q2 || "" },
+      { ...field("goals", "q3", "Next quarter"),      value: p.goals?.q3 || "" },
     ],
     strategic: {
       watchouts: p.strategic?.watchouts || [],
       notList:   p.strategic?.notList || [],
-      /* These two aren't in the API payload yet — keep empty so the UI
-         hides them rather than showing stale mock content. */
-      gaps:      [],
+      /* Gaps now come from the live payload's `missing` list (each
+         { field, why }). The Gaps list + StringListEditor render plain
+         strings, so flatten each entry to "field — why". Old BIOs have no
+         `missing` → empty → UI hides it. Tolerate plain strings too. */
+      gaps:      (p.missing || []).map(m =>
+                   typeof m === "string" ? m
+                   : [m?.field, m?.why].filter(Boolean).join(" — ")),
       diagnosis: "",
     },
     /* Visual tab consumes these arrays directly. */
@@ -844,10 +915,16 @@ function payloadToFields(payload) {
   };
 }
 
-function fieldsToPayload(bio) {
+function fieldsToPayload(bio, prevPayload) {
   const getStr = (fields, label) => fields.find(f => f.label === label)?.value || "";
   const getArr = (fields, label) => fields.find(f => f.label === label)?.value || [];
+  /* Confidence + missing are Brandolph/Steward-side metadata, not user-editable
+     here. Carry them through on save so a user edit never clobbers them. */
+  const carry = {};
+  if (prevPayload?.confidence) carry.confidence = prevPayload.confidence;
+  if (prevPayload?.missing) carry.missing = prevPayload.missing;
   return {
+    ...carry,
     identity: {
       positioning: getStr(bio.identity, "Positioning"),
       category:    getStr(bio.identity, "Category"),
@@ -892,6 +969,7 @@ function BioViewer({ go, bioScore = 91 }) {
   const [editing, setEditing] = useDState(false);
   const [saving, setSaving] = useDState(false);
   const [saveErr, setSaveErr] = useDState(null);
+  const [reviewBusy, setReviewBusy] = useDState(false);
 
   /* Live cert state + payload — polls /api/bios/:brandId. The BIO body
      below renders from `live.bio.payload`; the cert chip from `live.cert`. */
@@ -925,7 +1003,7 @@ function BioViewer({ go, bioScore = 91 }) {
     if (!bio || !live.brandId) return;
     setSaving(true); setSaveErr(null);
     try {
-      const payload = fieldsToPayload(bio);
+      const payload = fieldsToPayload(bio, live.bio?.payload);
       const res = await apiFetch(`/api/bios/${live.brandId}`, {
         method: "PATCH",
         body: JSON.stringify({ payload, score }),
@@ -943,6 +1021,25 @@ function BioViewer({ go, bioScore = 91 }) {
   };
 
   const flash = (msg) => { setToast(msg); clearTimeout(window.__bioT); window.__bioT = setTimeout(() => setToast(null), 2800); };
+
+  /* Client-initiated human review of the CURRENT BIO — no edit required.
+     Enqueues a Steward job server-side (idempotent). */
+  const requestReview = async () => {
+    if (!live.brandId || reviewBusy) return;
+    setReviewBusy(true);
+    try {
+      const res = await apiFetch(`/api/bios/${live.brandId}/request-review`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      flash(json.reused ? "A human review is already in progress." : "Sent to your Brand Steward for review.");
+      live.refresh();
+    } catch (e) {
+      flash(`Couldn't request review: ${e?.message || e}`);
+    } finally {
+      setReviewBusy(false);
+    }
+  };
+
   const addReference = async (labelArg, kind) => {
     const ref = (labelArg ?? feed).trim();
     if (!ref || reading || !live.brandId) return;
@@ -977,7 +1074,11 @@ function BioViewer({ go, bioScore = 91 }) {
   ];
 
   const conf = score;
-  const tone = conf >= 85 ? { color:"var(--green-600)", word:"complete" } : conf >= 65 ? { color:"var(--orange-600)", word:"in progress" } : { color:"var(--pink-500)", word:"thin" };
+  const tone = conf >= 85
+    ? { color:"var(--green-600)", word:"well sourced", hint:"Brandolph has enough evidence to trust this." }
+    : conf >= 65
+    ? { color:"var(--orange-600)", word:"filling in", hint:"Getting there — a few more sources will firm it up." }
+    : { color:"var(--pink-500)", word:"needs more sources", hint:"Feed Brandolph more pages or files to raise this." };
 
   return (
     <div style={{padding:"24px 36px 60px"}}>
@@ -998,6 +1099,8 @@ function BioViewer({ go, bioScore = 91 }) {
               <div style={{fontSize: 13.5, color:"var(--c-ink)", fontWeight: 500}}>
                 {live.cert ? (
                   <>Certified by <span style={{color:"var(--green-600)"}}>{live.cert.byName}</span> · {formatCertDate(live.cert.at)}</>
+                ) : live.reviewPending && live.bio ? (
+                  <>Your Brand Steward is reviewing this BIO</>
                 ) : live.bio ? (
                   <>Awaiting certification by your Brand Steward</>
                 ) : (
@@ -1009,11 +1112,21 @@ function BioViewer({ go, bioScore = 91 }) {
                   {live.brandName} · BIO v{live.bio.version} · score {live.bio.score ?? "—"}/100
                 </div>
               )}
+              {!live.cert && live.focusCount > 0 && (
+                <div style={{fontSize: 12, color:"var(--c-dim)", marginTop: 6, lineHeight: 1.5}}>
+                  Brandolph flagged {live.focusCount} area{live.focusCount === 1 ? "" : "s"} for your Steward to confirm.
+                </div>
+              )}
+              {live.cert?.notes && (
+                <div style={{fontSize: 12.5, color:"var(--c-dim)", marginTop: 6, lineHeight: 1.5, fontStyle:"italic", borderLeft:"2px solid var(--green-300, rgba(127,163,122,0.4))", paddingLeft: 10}}>
+                  “{live.cert.notes}” <span style={{fontStyle:"normal", color:"var(--c-faint)"}}>— {live.cert.byName}</span>
+                </div>
+              )}
             </div>
           </div>
           {!live.cert && live.bio && (
-            <span style={{fontSize: 11.5, color:"var(--c-dim)", fontStyle:"italic"}}>
-              within 24h
+            <span style={{fontSize: 11.5, color:"var(--c-dim)", fontStyle:"italic", whiteSpace:"nowrap"}}>
+              {live.reviewPending ? "in review" : "within 24h"}
             </span>
           )}
         </div>
@@ -1028,8 +1141,15 @@ function BioViewer({ go, bioScore = 91 }) {
               <Counter to={conf} />
             </span>
             <div>
-              <div style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)", letterSpacing:"0.06em", textTransform:"uppercase"}}>OF 100 · {tone.word}</div>
-              <div style={{fontSize: 14, color:"var(--c-dim)", marginTop: 4}}>{live.cert ? `Certified ${formatCertDate(live.cert.at)}` : live.bio ? `BIO v${live.bio.version} · uncertified` : ""}</div>
+              <div style={{fontFamily:"var(--font-mono)", fontSize:11, color: tone.color, letterSpacing:"0.06em", textTransform:"uppercase"}} title={tone.hint}>OF 100 · {tone.word}</div>
+              <div style={{fontSize: 13, color:"var(--c-faint)", marginTop: 4, lineHeight: 1.5, maxWidth: 320}}>{tone.hint}</div>
+              <div style={{fontSize: 14, color:"var(--c-dim)", marginTop: 6}}>
+                {live.cert
+                  ? `Certified ${formatCertDate(live.cert.at)}`
+                  : live.bio
+                  ? <>Uncertified <span style={{color:"var(--c-faint)", fontFamily:"var(--font-mono)", fontSize:11}} title={`BIO version ${live.bio.version}`}>· v{live.bio.version}</span></>
+                  : ""}
+              </div>
             </div>
           </div>
           <div style={{marginTop: 14, height: 6, background:"var(--neutral-50)", borderRadius:999, overflow:"hidden", maxWidth: 600}}>
@@ -1058,6 +1178,13 @@ function BioViewer({ go, bioScore = 91 }) {
           <button className="btn btn--ghost btn--sm" onClick={() => go("discovery")}>
             <Icon name="refresh" size={14} /> Re-run discovery
           </button>
+          {live.bio && (
+            <button className="btn btn--ghost btn--sm" onClick={requestReview}
+              disabled={reviewBusy || live.reviewPending}
+              title={live.reviewPending ? "A human review is already in progress" : "Send this BIO to your Brand Steward for a human review — no edit required"}>
+              <Icon name="mail" size={14} /> {live.reviewPending ? "In review…" : reviewBusy ? "Sending…" : "Request human review"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1100,6 +1227,16 @@ function BioViewer({ go, bioScore = 91 }) {
             ))}
           </div>
           <div style={{padding: 28}}>
+            {["identity","audience","voice","goals"].includes(tab) && (
+              <div style={{display:"grid", gridTemplateColumns:"180px 1fr 110px", gap:18, paddingBottom:10, marginBottom:2, borderBottom:"1px solid var(--c-line)", alignItems:"baseline"}}>
+                <div className="eyebrow" style={{margin:0}}>Field</div>
+                <div className="eyebrow" style={{margin:0}}>What we know</div>
+                <div style={{textAlign:"right"}}>
+                  <div className="eyebrow" style={{margin:0}} title="How sure Brandolph is about this field, based on its sources. Red = thin evidence, green = well sourced.">Confidence</div>
+                  <div style={{fontFamily:"var(--font-mono)", fontSize:9.5, color:"var(--c-faint)", letterSpacing:"0.04em", textTransform:"uppercase", marginTop:3}}>low → high</div>
+                </div>
+              </div>
+            )}
             {tab === "identity"    && <BioFieldList items={bio.identity}    editing={editing} onChange={v => patch("identity", v)} />}
             {tab === "audience"    && <BioFieldList items={bio.audience}    editing={editing} onChange={v => patch("audience", v)} />}
             {tab === "competitive" && (

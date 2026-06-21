@@ -13,6 +13,8 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
+import { assertCreditsAvailable, creditErrorResponse } from "../lib/credits.js";
+import { craftEnabled } from "../lib/plan-limits.js";
 
 const app = new Hono();
 const POLISH_CR = 40;
@@ -26,6 +28,25 @@ async function loadOutput(outputId) {
   return { output: data, error };
 }
 
+async function requireCraftTeam(c, next) {
+  const auth = c.get("auth");
+  if (auth?.role === "admin") {
+    await next();
+    return;
+  }
+
+  const { data } = await supabaseAdmin
+    .from("team_members")
+    .select("id, roles, active")
+    .eq("user_id", auth.userId)
+    .maybeSingle();
+  const roles = data?.roles || [];
+  const allowed = data?.active && roles.some((r) => r === "craft" || r === "steward" || r === "lead_steward");
+  if (!allowed) return c.json({ error: "Craft team role required" }, 403);
+  c.set("craftMember", data);
+  await next();
+}
+
 /* POST /api/craft — contract a human to polish ONE deliverable. */
 app.post("/", requireAuth, async (c) => {
   const { workspaceId, userId } = c.get("auth");
@@ -37,9 +58,21 @@ app.post("/", requireAuth, async (c) => {
   if (error || !output) return c.json({ error: "Output not found" }, 404);
   if (output.brief?.brand?.workspace_id !== workspaceId) return c.json({ error: "Forbidden" }, 403);
 
+  // Tier gate: human craft is a paid entitlement that unlocks at The River ('02') and up.
+  const { data: ws } = await supabaseAdmin.from("workspaces").select("tier").eq("id", workspaceId).maybeSingle();
+  if (!craftEnabled(ws?.tier)) {
+    return c.json({ error: "Human craft is available from The River and up.", code: "CRAFT_TIER_LOCKED", minTier: "02" }, 403);
+  }
+
   const ob = output.body || {};
   const deliverables = Array.isArray(ob.deliverables) ? [...ob.deliverables] : null;
   if (!deliverables || !deliverables[slot]) return c.json({ error: "Deliverable not found at slot" }, 404);
+  if (deliverables[slot]?.craft && deliverables[slot].craft.status !== "cancelled") {
+    return c.json({ error: "Deliverable is already in human craft", code: "CRAFT_ALREADY_REQUESTED" }, 409);
+  }
+
+  const creditCheck = await assertCreditsAvailable(workspaceId, POLISH_CR);
+  if (!creditCheck.ok) return creditErrorResponse(c, creditCheck);
 
   const nowIso = new Date().toISOString();
   deliverables[slot] = {
@@ -58,12 +91,16 @@ app.post("/", requireAuth, async (c) => {
     .from("outputs").update({ body: { ...ob, deliverables } }).eq("id", outputId);
   if (updErr) return c.json({ error: updErr.message }, 500);
 
-  /* Real ledger debit — spend credits on the polish (best-effort; never blocks). */
-  try {
-    await supabaseAdmin.from("ledger").insert({
-      workspace_id: workspaceId, credits: POLISH_CR, kind: "craft", balance_after: null,
-    });
-  } catch (e) { /* non-fatal */ }
+  const { error: ledgerErr } = await supabaseAdmin.from("ledger").insert({
+    workspace_id: workspaceId,
+    credits: POLISH_CR,
+    kind: "craft",
+    balance_after: creditCheck.balance - POLISH_CR,
+  });
+  if (ledgerErr) {
+    await supabaseAdmin.from("outputs").update({ body: ob }).eq("id", outputId);
+    return c.json({ error: ledgerErr.message }, 500);
+  }
 
   return c.json({ ok: true, status: "queued", credits: POLISH_CR, craft: deliverables[slot].craft });
 });
@@ -71,7 +108,7 @@ app.post("/", requireAuth, async (c) => {
 /* GET /api/craft/queue — pending craft jobs in the caller's workspace, flattened
    to one entry per in-flight deliverable. (Scans recent outputs; fine at this
    scale, swap for a craft_jobs table if volume grows.) */
-app.get("/queue", requireAuth, async (c) => {
+app.get("/queue", requireAuth, requireCraftTeam, async (c) => {
   const { workspaceId } = c.get("auth");
   const { data: rows } = await supabaseAdmin
     .from("outputs")
@@ -101,7 +138,7 @@ app.get("/queue", requireAuth, async (c) => {
 });
 
 /* PATCH /api/craft/deliver — a human returns the polished version. */
-app.patch("/deliver", requireAuth, async (c) => {
+app.patch("/deliver", requireAuth, requireCraftTeam, async (c) => {
   const { workspaceId, userId } = c.get("auth");
   const payload = await c.req.json().catch(() => ({}));
   const { outputId, slot } = payload || {};

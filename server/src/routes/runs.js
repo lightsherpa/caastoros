@@ -35,6 +35,7 @@ import { visionQa } from "../lib/qa-vision.js";
 import { recordSignal } from "../lib/brandolph-memory.js";
 import { generate as generateImage, isImageRoute } from "../lib/models/fal-image.js";
 import { maxTokensForDeliverables, parseDeliverables, buildDeliverableContract, falSizeForPlatform } from "../lib/deliverables.js";
+import { assertCreditsAvailable, creditErrorResponse, estimateRunCredits } from "../lib/credits.js";
 
 const app = new Hono();
 
@@ -89,6 +90,9 @@ app.post("/stream", requireAuth, async (c) => {
      the platform. No deliverableSpec → legacy single-output behavior. */
   const dlv = (deliverableSpec && typeof deliverableSpec === "object") ? deliverableSpec : null;
   const isDeliverableText = !isImage && !!dlv && Number(dlv.count) >= 1;
+  const creditsDebited = estimateRunCredits({ specPayload: spec.payload, deliverableSpec: dlv, isDeliverableText });
+  const creditCheck = await assertCreditsAvailable(workspaceId, creditsDebited);
+  if (!creditCheck.ok) return creditErrorResponse(c, creditCheck);
 
   /* Clone the spec so we don't mutate the cached payload — downstream
      adapters read modelRouting.primary off this object. */
@@ -388,18 +392,12 @@ app.post("/stream", requireAuth, async (c) => {
       /* 6c. Ledger debit — only for completed/approved runs. Flagged
          runs still debit (work was done) but the ledger note carries
          the flag for transparency. */
-      /* TODO (Plan 4 — credit model): deliverable runs produce N items from one
-         call but currently debit a flat cr_estimate. Reconcile with estimateCr
-         (count × per-item) when the review/estimate/adjust flow is wired, so an
-         N-item run charges what the user approved. The multiplier policy (linear
-         vs bulk) is a product decision that lands in Plan 4 — do not silently N× here. */
-      const creditsDebited = spec.payload?.cr_estimate ?? 8;
       await supabaseAdmin.from("ledger").insert({
         workspace_id: workspaceId,
         run_id: runId,
         credits: creditsDebited,
         kind: qa.passed ? "run" : "run_flagged",
-        balance_after: null,                                /* computed via view in P7 */
+        balance_after: creditCheck.balance - creditsDebited,
       });
 
       /* Brandolph memory · signal this run + any re-run/revision context. */
@@ -454,7 +452,13 @@ app.post("/stream", requireAuth, async (c) => {
           runId,
           briefId,
           outputId: outputRow?.id,
-          usage: { ...usage, total_cost_usd: totalCost, qa_cost_usd: qaCost },
+          usage: usage ? {
+            provider: usage.provider,
+            model: usage.model,
+            prompt_tokens: usage.prompt_tokens,
+            completion_tokens: usage.completion_tokens,
+            cached_tokens: usage.cached_tokens,
+          } : null,
           qa,
           output: isImage
             ? { kind: outputKind, asset_url: imageResult?.asset_url, width: imageResult?.width, height: imageResult?.height, status: qa.passed ? "approved" : "flagged",
@@ -507,7 +511,7 @@ app.get("/:id", requireAuth, async (c) => {
     .from("runs")
     .select(`
       id, brief_id, specialist_id, spec_version, bio_version, model_used,
-      status, prompt_tokens, completion_tokens, cached_tokens, cost_usd,
+      status, prompt_tokens, completion_tokens, cached_tokens,
       latency_ms, started_at, ended_at,
       brief:briefs ( id, title, brand_id, payload )
     `)

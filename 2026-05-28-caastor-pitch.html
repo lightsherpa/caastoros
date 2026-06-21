@@ -1,0 +1,2485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CaastorOS — Investor Brief 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans+Condensed:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --yellow:      #F8C036;
+      --yellow-pale: #FDF4D8;
+      --yellow-dim:  #C49726;
+      --ink:         #0E0D0C;
+      --ink-2:       #161514;
+      --dim:         #6B6B6B;
+      --faint:       #999894;
+      --line:        rgba(255,255,255,0.07);
+      --line-2:      rgba(255,255,255,0.04);
+      --mint:        #5EC4A8;
+      --purple:      #9B7FE8;
+      --pink:        #E86F8A;
+      --blue:        #5B9BD5;
+      --orange:      #E8874A;
+      --green:       #5EC477;
+      --white:       #F5F4F0;
+      --font-sans:   'IBM Plex Sans Condensed', system-ui, sans-serif;
+      --font-body:   'IBM Plex Sans', system-ui, sans-serif;
+      --font-mono:   'IBM Plex Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--ink);
+      color: var(--white);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── NAV ────────────────────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 52px; height: 54px;
+      background: rgba(14,13,12,0.9);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--white);
+    }
+
+    .nav-mark {
+      width: 30px; height: 30px;
+      background: var(--yellow); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .nav-mark svg { width: 16px; height: 16px; }
+
+    .nav-wordmark {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 15px; letter-spacing: -0.01em;
+      line-height: 1;
+    }
+
+    .nav-sub {
+      font-family: var(--font-mono); font-size: 9px;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--faint); display: block; margin-top: 2px;
+    }
+
+    .nav-links {
+      display: flex; gap: 28px; list-style: none;
+    }
+
+    .nav-links a {
+      font-family: var(--font-mono); font-size: 10.5px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--faint); text-decoration: none;
+      transition: color 160ms;
+    }
+    .nav-links a:hover { color: var(--white); }
+
+    .nav-cta {
+      background: var(--yellow); color: var(--ink);
+      padding: 7px 16px; border-radius: 4px;
+      font-family: var(--font-mono); font-size: 10.5px;
+      font-weight: 600; letter-spacing: 0.08em;
+      text-decoration: none; transition: opacity 160ms;
+    }
+    .nav-cta:hover { opacity: 0.85; }
+
+    /* ── SHARED LAYOUT ────────────────────────────────────────── */
+    .wrap {
+      max-width: 1200px; margin: 0 auto;
+      padding-left: 52px; padding-right: 52px;
+    }
+
+    section {
+      padding: 112px 52px;
+      max-width: 1200px; margin: 0 auto;
+    }
+
+    section.full-bleed {
+      max-width: none; padding: 0;
+    }
+
+    .section-inner {
+      max-width: 1200px; margin: 0 auto;
+      padding: 112px 52px;
+    }
+
+    .ruled { border-top: 1px solid var(--line); }
+
+    /* ── TYPE ───────────────────────────────────────────────────── */
+    .eyebrow {
+      font-family: var(--font-mono); font-size: 10.5px;
+      letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--yellow); display: block; margin-bottom: 18px;
+    }
+
+    .eyebrow--dim { color: var(--faint); }
+
+    h2 {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(30px, 4.5vw, 52px);
+      line-height: 1.05; letter-spacing: -0.02em;
+      color: var(--white);
+    }
+
+    h2 em { font-style: italic; color: var(--yellow); }
+
+    h3 {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(18px, 2.5vw, 24px);
+      letter-spacing: -0.01em; color: var(--white);
+    }
+
+    .body {
+      font-family: var(--font-body); font-weight: 300;
+      font-size: 16px; line-height: 1.75;
+      color: var(--faint);
+    }
+
+    .body strong { color: var(--white); font-weight: 500; }
+    .body + .body { margin-top: 14px; }
+
+    /* ── HERO ───────────────────────────────────────────────────── */
+    #hero {
+      min-height: 100vh; position: relative;
+      display: flex; flex-direction: column;
+      justify-content: flex-end; overflow: hidden;
+      padding: 0 52px 88px;
+    }
+
+    .hero-grid {
+      position: absolute; inset: 0; opacity: 0.035;
+      background-image:
+        linear-gradient(rgba(248,192,54,1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(248,192,54,1) 1px, transparent 1px);
+      background-size: 56px 56px;
+      pointer-events: none;
+    }
+
+    .hero-radial {
+      position: absolute; top: -20vh; left: 50%;
+      transform: translateX(-50%);
+      width: 900px; height: 700px;
+      background: radial-gradient(ellipse at center,
+        rgba(248,192,54,0.09) 0%,
+        rgba(248,192,54,0.03) 40%,
+        transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-content { position: relative; z-index: 1; max-width: 1000px; }
+
+    /* Brandolph mascot in hero */
+    .hero-mascot {
+      position: absolute; bottom: 0; right: 52px; z-index: 2;
+      width: clamp(220px, 22vw, 380px);
+      pointer-events: none;
+      /* subtle drop shadow to ground it */
+      filter: drop-shadow(0 32px 64px rgba(248,192,54,0.18)) drop-shadow(0 8px 24px rgba(0,0,0,0.5));
+      animation: mascot-float 6s ease-in-out infinite;
+    }
+
+    @keyframes mascot-float {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-12px); }
+    }
+
+    /* inline SVG mascot fill */
+    .hero-mascot .st3 { fill: #F8C036; }
+
+    .hero-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(248,192,54,0.1);
+      border: 1px solid rgba(248,192,54,0.2);
+      padding: 5px 14px; border-radius: 20px;
+      font-family: var(--font-mono); font-size: 10.5px;
+      letter-spacing: 0.1em; color: var(--yellow);
+      margin-bottom: 40px;
+    }
+
+    .chip-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--yellow);
+      animation: blink 2.4s ease-in-out infinite;
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    h1 {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(44px, 7.5vw, 96px);
+      line-height: 0.97; letter-spacing: -0.025em;
+      color: var(--white); margin-bottom: 28px;
+    }
+
+    h1 em { color: var(--yellow); font-style: normal; }
+
+    .hero-sub {
+      font-family: var(--font-body); font-weight: 300;
+      font-size: clamp(16px, 1.8vw, 20px);
+      color: var(--faint); line-height: 1.6;
+      max-width: 680px; margin-bottom: 48px;
+    }
+
+    .hero-sub strong { color: var(--white); font-weight: 400; }
+
+    .btn-row { display: flex; gap: 14px; flex-wrap: wrap; }
+
+    .btn-y {
+      background: var(--yellow); color: var(--ink);
+      padding: 13px 26px; border-radius: 5px;
+      font-family: var(--font-mono); font-size: 11px;
+      font-weight: 600; letter-spacing: 0.07em;
+      text-decoration: none; display: inline-block;
+      transition: opacity 160ms;
+    }
+    .btn-y:hover { opacity: 0.85; }
+
+    .btn-o {
+      border: 1px solid rgba(255,255,255,0.18); color: var(--faint);
+      padding: 12px 22px; border-radius: 5px;
+      font-family: var(--font-mono); font-size: 11px;
+      letter-spacing: 0.07em;
+      text-decoration: none; display: inline-block;
+      transition: all 160ms;
+    }
+    .btn-o:hover { border-color: rgba(255,255,255,0.36); color: var(--white); }
+
+    /* ── ONE-LINER BAND ─────────────────────────────────────────── */
+    #one-liner {
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 48px 52px;
+      background: rgba(248,192,54,0.04);
+    }
+
+    .one-liner-text {
+      font-family: var(--font-sans); font-style: italic;
+      font-size: clamp(18px, 2.5vw, 28px);
+      line-height: 1.4; letter-spacing: -0.01em;
+      color: var(--white); max-width: 960px;
+      margin: 0 auto; text-align: center;
+    }
+
+    .one-liner-text strong {
+      font-style: normal; color: var(--yellow);
+    }
+
+    /* ── PROBLEM ────────────────────────────────────────────────── */
+    .two-col {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 80px; align-items: start;
+    }
+
+    .pain-list { list-style: none; display: flex; flex-direction: column; gap: 14px; margin-top: 36px; }
+
+    .pain-item {
+      display: flex; gap: 16px;
+      padding: 18px 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.015);
+    }
+
+    .pain-n {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--yellow); flex-shrink: 0; padding-top: 1px;
+    }
+
+    .pain-body { font-size: 14px; color: var(--faint); line-height: 1.55; }
+    .pain-body strong { color: var(--white); display: block; margin-bottom: 3px; }
+
+    /* ── LAYERS ─────────────────────────────────────────────────── */
+    .layer-grid {
+      display: grid; grid-template-columns: repeat(2,1fr);
+      gap: 1px; background: var(--line);
+      border-radius: 12px; overflow: hidden;
+      margin-top: 52px; margin-bottom: 60px;
+    }
+
+    .lc {
+      padding: 36px 30px;
+      position: relative;
+    }
+
+    .lc--l1 { background: rgba(248,192,54,0.05); }
+    .lc--l2 { background: rgba(94,196,168,0.04); }
+    .lc--l3 { background: rgba(155,127,232,0.04); }
+    .lc--l4 { background: rgba(91,155,213,0.04); }
+
+    .lc-badge {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.14em; font-weight: 600;
+      padding: 4px 10px; border-radius: 3px;
+      display: inline-block; margin-bottom: 18px;
+    }
+
+    .lc-badge--l1 { background: rgba(248,192,54,0.16); color: var(--yellow); }
+    .lc-badge--l2 { background: rgba(94,196,168,0.16); color: var(--mint); }
+    .lc-badge--l3 { background: rgba(155,127,232,0.16); color: var(--purple); }
+    .lc-badge--l4 { background: rgba(91,155,213,0.16); color: var(--blue); }
+
+    .lc-title {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 22px; color: var(--white);
+      letter-spacing: -0.01em; margin-bottom: 8px;
+    }
+
+    .lc-role {
+      font-family: var(--font-mono); font-size: 10.5px;
+      letter-spacing: 0.08em; color: var(--faint); margin-bottom: 14px;
+    }
+
+    .lc-desc { font-size: 13.5px; color: var(--faint); line-height: 1.6; }
+    .lc-desc strong { color: var(--white); }
+
+    .lc-feats { list-style: none; margin-top: 18px; display: flex; flex-direction: column; gap: 7px; }
+
+    .lc-feats li {
+      font-size: 12.5px; color: var(--faint); line-height: 1.4;
+      padding-left: 14px; position: relative;
+    }
+
+    .lc-feats li::before {
+      content: "—"; position: absolute; left: 0;
+      color: rgba(255,255,255,0.2);
+    }
+
+    /* ── DEPARTMENTS ────────────────────────────────────────────── */
+    .dept-grid {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 10px;
+    }
+
+    .dept-card {
+      padding: 18px 18px 16px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: rgba(255,255,255,0.015);
+      transition: border-color 140ms, background 140ms;
+    }
+    .dept-card:hover {
+      border-color: rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.03);
+    }
+
+    .dept-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      margin-bottom: 10px; display: block;
+    }
+
+    .dept-name {
+      font-family: var(--font-sans); font-weight: 600;
+      font-size: 14px; color: var(--white); margin-bottom: 5px;
+    }
+
+    .dept-count {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.1em; color: var(--faint); margin-bottom: 9px;
+      text-transform: uppercase;
+    }
+
+    .dept-agents {
+      font-size: 11.5px; color: var(--dim); line-height: 1.45;
+    }
+
+    /* ── CANVAS ─────────────────────────────────────────────────── */
+    #canvas { border-top: 1px solid var(--line); }
+
+    .canvas-visual {
+      margin-top: 48px;
+      border: 1px solid var(--line); border-radius: 12px;
+      background: rgba(255,255,255,0.015); overflow: hidden;
+    }
+
+    .canvas-topbar {
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .canvas-topbar-left {
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    .canvas-title-tag {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.08em; color: var(--faint);
+    }
+
+    .canvas-brief-pill {
+      background: rgba(248,192,54,0.1);
+      border: 1px solid rgba(248,192,54,0.2);
+      padding: 3px 10px; border-radius: 3px;
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.06em; color: var(--yellow);
+    }
+
+    .canvas-body {
+      padding: 32px 28px;
+      display: grid;
+      grid-template-columns: repeat(4,1fr); gap: 12px;
+    }
+
+    .canvas-node {
+      border: 1px solid var(--line); border-radius: 8px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.02);
+      cursor: pointer;
+      transition: border-color 140ms, background 140ms;
+    }
+    .canvas-node:hover { border-color: rgba(248,192,54,0.3); background: rgba(248,192,54,0.04); }
+
+    .canvas-node--active {
+      border-color: rgba(248,192,54,0.35);
+      background: rgba(248,192,54,0.05);
+    }
+
+    .canvas-node--done {
+      border-color: rgba(94,196,168,0.3);
+      background: rgba(94,196,168,0.04);
+    }
+
+    .cn-dept {
+      font-family: var(--font-mono); font-size: 9px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 6px;
+    }
+
+    .cn-name {
+      font-family: var(--font-sans); font-weight: 600;
+      font-size: 13px; color: var(--white); margin-bottom: 8px;
+    }
+
+    .cn-status {
+      display: flex; align-items: center; gap: 5px;
+      font-family: var(--font-mono); font-size: 9px;
+      letter-spacing: 0.06em;
+    }
+
+    .cn-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+    }
+
+    .cn-dot--run { background: var(--yellow); animation: blink 1.2s ease-in-out infinite; }
+    .cn-dot--done { background: var(--mint); }
+    .cn-dot--wait { background: rgba(255,255,255,0.2); }
+
+    .canvas-actions {
+      display: flex; gap: 6px; margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .cn-action {
+      font-family: var(--font-mono); font-size: 9px;
+      letter-spacing: 0.04em; color: var(--faint);
+      border: 1px solid var(--line); border-radius: 3px;
+      padding: 2px 7px;
+    }
+
+    .canvas-note {
+      padding: 14px 28px;
+      border-top: 1px solid var(--line);
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.06em; color: var(--faint);
+      display: flex; gap: 20px;
+    }
+
+    .canvas-note span { color: var(--yellow); }
+
+    /* ── BIO ─────────────────────────────────────────────────────── */
+    #bio { border-top: 1px solid var(--line); }
+
+    .bio-layout {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 80px; align-items: center;
+    }
+
+    .bio-card {
+      border: 1px solid var(--line); border-radius: 12px;
+      padding: 28px; background: rgba(255,255,255,0.02);
+    }
+
+    .bio-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding-bottom: 18px; border-bottom: 1px solid var(--line);
+      margin-bottom: 18px;
+    }
+
+    .bio-brand { font-family: var(--font-sans); font-weight: 700; font-size: 17px; color: var(--white); }
+    .bio-url { font-family: var(--font-mono); font-size: 10px; color: var(--faint); margin-top: 3px; }
+
+    .bio-cert {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(94,196,168,0.1);
+      border: 1px solid rgba(94,196,168,0.2);
+      padding: 4px 10px; border-radius: 4px;
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.08em; color: var(--mint);
+    }
+
+    .bio-cert-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--mint);
+    }
+
+    .bio-field {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 9px 0; border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .bio-field:last-of-type { border-bottom: none; }
+
+    .bf-key { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); letter-spacing: 0.06em; }
+    .bf-val { color: var(--white); font-size: 13px; text-align: right; max-width: 60%; }
+
+    .bio-palette { display: flex; gap: 5px; margin-top: 16px; }
+    .bio-swatch { flex:1; height: 24px; border-radius: 3px; }
+
+    .bio-voice { margin-top: 16px; display: flex; flex-direction: column; gap: 7px; }
+
+    .bv-row {
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono); font-size: 9.5px; color: var(--faint);
+    }
+    .bv-label { width: 52px; flex-shrink: 0; }
+    .bv-track { flex:1; height: 2px; background: rgba(255,255,255,0.07); border-radius: 1px; }
+    .bv-fill { height: 100%; border-radius: 1px; background: var(--yellow); }
+
+    .bio-brandolph {
+      margin-top: 16px; padding: 12px 14px;
+      background: rgba(248,192,54,0.06);
+      border-left: 2px solid var(--yellow);
+      border-radius: 0 6px 6px 0;
+    }
+
+    .bb-label {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.1em; color: var(--yellow); margin-bottom: 5px;
+    }
+
+    .bb-quote { font-size: 12.5px; font-style: italic; color: var(--faint); line-height: 1.5; }
+
+    .cert-box {
+      margin-top: 32px; padding: 22px 24px;
+      border: 1px solid rgba(94,196,168,0.2);
+      border-radius: 8px; background: rgba(94,196,168,0.04);
+    }
+
+    .cert-title {
+      font-family: var(--font-sans); font-weight: 600;
+      font-size: 15px; color: var(--white); margin-bottom: 8px;
+    }
+
+    .cert-desc { font-size: 14px; color: var(--faint); line-height: 1.6; }
+    .cert-desc strong { color: var(--white); }
+
+    /* ── MOAT ────────────────────────────────────────────────────── */
+    #moat { border-top: 1px solid var(--line); }
+
+    .moat-grid {
+      display: grid; grid-template-columns: repeat(2,1fr);
+      gap: 2px; margin-top: 52px;
+      border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    }
+
+    .moat-card {
+      padding: 38px 34px;
+      background: rgba(255,255,255,0.01);
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      transition: background 160ms;
+    }
+    .moat-card:hover { background: rgba(255,255,255,0.025); }
+    .moat-card:nth-child(2n) { border-right: none; }
+    .moat-card:nth-last-child(-n+2) { border-bottom: none; }
+
+    .mc-n {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.14em; color: var(--yellow); margin-bottom: 14px;
+    }
+
+    .mc-title {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 21px; color: var(--white);
+      letter-spacing: -0.01em; margin-bottom: 10px;
+    }
+
+    .mc-desc { font-size: 14px; color: var(--faint); line-height: 1.65; }
+    .mc-desc strong { color: var(--white); }
+
+    /* ── USP TABLE ──────────────────────────────────────────────── */
+    #usp { border-top: 1px solid var(--line); }
+
+    .usp-table {
+      width: 100%; border-collapse: collapse;
+      margin-top: 48px; font-size: 13.5px;
+    }
+
+    .usp-table thead th {
+      padding: 14px 18px; text-align: left;
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--faint); border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .usp-table thead th:last-child {
+      color: var(--yellow);
+    }
+
+    .usp-table tbody tr {
+      border-bottom: 1px solid var(--line);
+      transition: background 120ms;
+    }
+
+    .usp-table tbody tr:last-child { border-bottom: none; }
+    .usp-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+    .usp-table td {
+      padding: 14px 18px; color: var(--faint); line-height: 1.45;
+    }
+
+    .usp-table td:first-child {
+      color: var(--white); font-weight: 500; font-size: 14px;
+    }
+
+    .usp-table td:last-child {
+      color: var(--yellow); font-weight: 500;
+    }
+
+    .usp-no { color: rgba(255,255,255,0.2) !important; }
+
+    /* ── FLOW ────────────────────────────────────────────────────── */
+    #flow { border-top: 1px solid var(--line); }
+
+    .flow-grid {
+      display: grid; grid-template-columns: repeat(4,1fr);
+      gap: 2px; margin-top: 52px;
+      border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    }
+
+    .flow-step {
+      padding: 30px 26px;
+      border-right: 1px solid var(--line);
+      background: rgba(255,255,255,0.01);
+    }
+
+    .flow-step:last-child, .flow-step:nth-child(4) { border-right: none; }
+
+    .fs-row2 {
+      display: grid; grid-template-columns: repeat(4,1fr);
+      gap: 2px; border-top: 2px solid var(--line);
+    }
+
+    .fs-n {
+      font-family: var(--font-mono); font-size: 26px; font-weight: 600;
+      color: rgba(248,192,54,0.15); line-height: 1; margin-bottom: 14px;
+    }
+
+    .fs-title {
+      font-family: var(--font-sans); font-weight: 600;
+      font-size: 15px; color: var(--white); margin-bottom: 7px;
+    }
+
+    .fs-desc { font-size: 12.5px; color: var(--faint); line-height: 1.5; }
+
+    .fs-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      margin-top: 12px; font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.06em; color: var(--yellow);
+      background: rgba(248,192,54,0.07); padding: 2px 7px; border-radius: 3px;
+    }
+
+    .flow-metrics {
+      display: grid; grid-template-columns: repeat(3,1fr);
+      gap: 2px; border: 1px solid var(--line); border-radius: 8px;
+      overflow: hidden; margin-top: 20px;
+    }
+
+    .fm {
+      padding: 24px 22px; text-align: center;
+      border-right: 1px solid var(--line);
+    }
+
+    .fm:last-child { border-right: none; }
+
+    .fm-val {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 32px; letter-spacing: -0.03em;
+      color: var(--yellow); line-height: 1; margin-bottom: 6px;
+    }
+
+    .fm-label {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);
+    }
+
+    /* ── ROUTING ─────────────────────────────────────────────────── */
+    #routing { border-top: 1px solid var(--line); }
+
+    .routing-grid {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 12px;
+      margin-top: 48px;
+    }
+
+    .route-card {
+      padding: 22px 20px;
+      border: 1px solid var(--line); border-radius: 8px;
+      background: rgba(255,255,255,0.015);
+    }
+
+    .route-provider {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 10px;
+    }
+
+    .route-name {
+      font-family: var(--font-sans); font-weight: 600;
+      font-size: 15px; color: var(--white); margin-bottom: 6px;
+    }
+
+    .route-models {
+      font-size: 12px; color: var(--dim); line-height: 1.5;
+    }
+
+    .route-use {
+      margin-top: 10px; padding-top: 10px;
+      border-top: 1px dashed var(--line);
+      font-size: 11.5px; color: var(--faint);
+    }
+
+    .routing-stat {
+      margin-top: 36px; padding: 24px 28px;
+      border: 1px solid rgba(248,192,54,0.18);
+      border-radius: 8px; background: rgba(248,192,54,0.04);
+      display: flex; align-items: flex-start; gap: 24px;
+    }
+
+    .rs-val {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 44px; letter-spacing: -0.03em; color: var(--yellow);
+      line-height: 1; flex-shrink: 0;
+    }
+
+    .rs-body { font-size: 14px; color: var(--faint); line-height: 1.6; }
+    .rs-body strong { color: var(--white); }
+
+    /* ── BUSINESS MODEL ─────────────────────────────────────────── */
+    #biz { border-top: 1px solid var(--line); }
+
+    .biz-grid {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 2px;
+      border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+      margin-top: 52px;
+    }
+
+    .biz-tier {
+      padding: 30px 26px;
+      border-right: 1px solid var(--line);
+      background: rgba(255,255,255,0.01);
+    }
+
+    .biz-tier:last-child { border-right: none; }
+
+    .biz-tier--highlight { background: rgba(248,192,54,0.04); }
+
+    .bt-num {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.14em; color: var(--faint); margin-bottom: 14px;
+    }
+
+    .bt-title {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 17px; color: var(--white); margin-bottom: 8px;
+    }
+
+    .bt-desc { font-size: 13px; color: var(--faint); line-height: 1.55; }
+    .bt-desc strong { color: var(--white); }
+
+    /* ── TRACTION ────────────────────────────────────────────────── */
+    #traction {
+      border-top: 1px solid var(--line);
+      background: rgba(255,255,255,0.01);
+    }
+
+    .stats-row {
+      display: grid; grid-template-columns: repeat(5,1fr); gap: 2px;
+      border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+      margin-top: 52px;
+    }
+
+    .stat-cell {
+      padding: 32px 24px; text-align: center;
+      border-right: 1px solid var(--line);
+    }
+
+    .stat-cell:last-child { border-right: none; }
+
+    .sc-val {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(28px, 4vw, 48px);
+      letter-spacing: -0.03em; color: var(--yellow);
+      line-height: 1; margin-bottom: 7px;
+    }
+
+    .sc-label {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);
+    }
+
+    /* ── WHAT'S LIVE ─────────────────────────────────────────────── */
+    #live { border-top: 1px solid var(--line); }
+
+    .live-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 48px;
+      margin-top: 52px;
+    }
+
+    .live-col-title {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .live-col-title--live { color: var(--mint); }
+    .live-col-title--next { color: var(--purple); }
+
+    .live-items { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+
+    .live-item {
+      display: flex; gap: 10px;
+      font-size: 14px; color: var(--faint); line-height: 1.45;
+    }
+
+    .live-item::before {
+      content: "✓"; color: var(--mint); font-size: 12px;
+      flex-shrink: 0; padding-top: 1px;
+    }
+
+    .next-item {
+      display: flex; gap: 10px;
+      font-size: 14px; color: var(--faint); line-height: 1.45;
+    }
+
+    .next-item::before {
+      content: "→"; color: var(--purple); font-size: 12px;
+      flex-shrink: 0; padding-top: 1px;
+    }
+
+    /* ── WHY NOW ─────────────────────────────────────────────────── */
+    #why { border-top: 1px solid var(--line); }
+
+    .why-grid {
+      display: grid; grid-template-columns: repeat(2,1fr); gap: 16px;
+      margin-top: 48px;
+    }
+
+    .why-card {
+      padding: 26px 24px;
+      border: 1px solid var(--line); border-radius: 8px;
+      background: rgba(255,255,255,0.015);
+    }
+
+    .wy-title {
+      font-family: var(--font-sans); font-weight: 600;
+      font-size: 15px; color: var(--white); margin-bottom: 7px;
+    }
+
+    .wy-desc { font-size: 13.5px; color: var(--faint); line-height: 1.55; }
+    .wy-desc strong { color: var(--white); }
+
+    /* ── CTA ─────────────────────────────────────────────────────── */
+    #cta {
+      border-top: 1px solid var(--line);
+      text-align: center;
+      background: linear-gradient(180deg, transparent, rgba(248,192,54,0.04) 60%, transparent);
+    }
+
+    .cta-h {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(34px, 5.5vw, 68px);
+      letter-spacing: -0.025em; line-height: 1.0;
+      color: var(--white); margin-bottom: 20px;
+    }
+
+    .cta-h em { color: var(--yellow); font-style: normal; }
+
+    .cta-sub {
+      font-size: 17px; color: var(--faint); line-height: 1.55;
+      max-width: 520px; margin: 0 auto 44px;
+    }
+
+    .contact-grid {
+      display: grid; grid-template-columns: repeat(3,1fr); gap: 20px;
+      margin-top: 52px; padding-top: 40px;
+      border-top: 1px solid var(--line); text-align: left;
+    }
+
+    .contact-block { font-family: var(--font-mono); font-size: 11px; }
+    .contact-label { letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 7px; }
+    .contact-val { font-size: 13px; color: var(--white); text-decoration: none; display: block; }
+    .contact-val:hover { color: var(--yellow); }
+
+    /* ── FOOTER ──────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 28px 52px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint);
+    }
+
+    /* ── HERO TAGLINE ────────────────────────────────────────────── */
+    .hero-tagline {
+      display: flex; flex-direction: column; gap: 4px;
+      margin-top: 44px; margin-bottom: 36px;
+    }
+    .hero-tag-line {
+      display: inline-block; align-self: flex-start;
+      background: var(--yellow); color: var(--ink);
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(13px, 1.6vw, 18px);
+      letter-spacing: 0.04em; text-transform: uppercase;
+      padding: 4px 14px 5px; border-radius: 3px;
+    }
+    .hero-tag-line:nth-child(2) { margin-left: 28px; background: var(--mint); }
+    .hero-tag-line:nth-child(3) { margin-left: 56px; }
+
+    /* ── PROBLEM STATS ───────────────────────────────────────────── */
+    .problem-stats {
+      display: flex; gap: 40px; margin-top: 36px;
+      border-top: 1px solid var(--line); padding-top: 32px;
+    }
+    .ps-item {}
+    .ps-val {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(28px, 3.5vw, 44px); letter-spacing: -0.03em;
+      line-height: 1; color: var(--yellow);
+    }
+    .ps-label {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--faint); margin-top: 5px;
+    }
+
+    /* ── COMPROMISE ──────────────────────────────────────────────── */
+    #compromise { padding: 100px 52px; }
+    .comp-grid {
+      display: grid; grid-template-columns: repeat(3,1fr); gap: 2px;
+      background: var(--line); border-radius: 12px; overflow: hidden;
+      margin-top: 52px;
+    }
+    .comp-card {
+      padding: 36px 30px 32px;
+    }
+    .comp-card--a { background: rgba(155,127,232,0.06); }
+    .comp-card--b { background: rgba(248,192,54,0.04); }
+    .comp-card--c { background: rgba(232,111,138,0.06); }
+    .comp-label {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 3px;
+      display: inline-block; margin-bottom: 20px;
+    }
+    .comp-label--a { background: rgba(155,127,232,0.2); color: var(--purple); }
+    .comp-label--b { background: rgba(248,192,54,0.2); color: var(--yellow); }
+    .comp-label--c { background: rgba(232,111,138,0.2); color: var(--pink); }
+    .comp-headline {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 22px; letter-spacing: -0.01em; margin-bottom: 6px;
+    }
+    .comp-sub {
+      font-family: var(--font-sans); font-weight: 400;
+      font-size: 17px; color: var(--faint); margin-bottom: 22px;
+      font-style: italic;
+    }
+    .comp-examples {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 6px;
+    }
+    .comp-ex-text { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.5; }
+
+    /* ── INSIGHT SLIDE ───────────────────────────────────────────── */
+    #insight {
+      padding: 120px 52px; text-align: center;
+      background: rgba(248,192,54,0.02);
+      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    }
+    .insight-eyebrow {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--yellow); margin-bottom: 32px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .insight-eyebrow::before, .insight-eyebrow::after {
+      content: ""; display: block; width: 40px; height: 1px;
+      background: var(--yellow); opacity: 0.4;
+    }
+    .insight-h {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(36px, 6vw, 80px); letter-spacing: -0.03em;
+      line-height: 1.0; color: var(--white); max-width: 900px; margin: 0 auto;
+    }
+    .insight-h em { color: var(--mint); font-style: normal; }
+    .insight-sub {
+      font-size: 18px; color: var(--faint); max-width: 560px;
+      margin: 28px auto 0; line-height: 1.6;
+    }
+
+    /* ── PRICING TIERS ───────────────────────────────────────────── */
+    .tier-grid {
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 2px;
+      background: var(--line); border-radius: 12px; overflow: hidden;
+      margin-top: 52px;
+    }
+    .tier-card {
+      padding: 32px 26px 28px;
+      background: var(--ink-2);
+      position: relative;
+    }
+    .tier-card--flagship {
+      background: rgba(248,192,54,0.06);
+    }
+    .tier-flag {
+      display: inline-block; background: var(--yellow); color: var(--ink);
+      font-family: var(--font-mono); font-size: 9px; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 3px; margin-bottom: 16px;
+    }
+    .tier-num {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 8px;
+    }
+    .tier-name {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 20px; color: var(--white); margin-bottom: 12px;
+    }
+    .tier-price {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(28px, 3vw, 40px); letter-spacing: -0.03em;
+      color: var(--yellow); line-height: 1;
+    }
+    .tier-card--flagship .tier-price { color: var(--yellow); }
+    .tier-mo {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--faint);
+    }
+    .tier-credits {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.06em; color: var(--mint);
+      margin: 10px 0 14px;
+    }
+    .tier-desc {
+      font-size: 13px; color: var(--faint); line-height: 1.55;
+      border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px;
+    }
+    .tier-desc strong { color: var(--white); }
+    .tier-badge {
+      font-family: var(--font-mono); font-size: 9px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--faint); margin-top: 14px; display: block;
+    }
+
+    /* ── UNIT ECONOMICS ──────────────────────────────────────────── */
+    #unit-econ { padding: 100px 52px; }
+    .ue-layout {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+      background: var(--line); border-radius: 12px; overflow: hidden;
+      margin-top: 52px;
+    }
+    .ue-panel {
+      padding: 36px 32px;
+    }
+    .ue-panel--old { background: rgba(232,111,138,0.04); }
+    .ue-panel--new { background: rgba(94,196,168,0.06); }
+    .ue-label {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 12px;
+    }
+    .ue-total {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(28px, 3.5vw, 48px); letter-spacing: -0.03em;
+      margin-bottom: 24px;
+    }
+    .ue-panel--old .ue-total { color: var(--pink); }
+    .ue-panel--new .ue-total { color: var(--mint); }
+    .ue-line {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 9px 0; border-bottom: 1px solid var(--line);
+      font-size: 14px; color: var(--faint);
+    }
+    .ue-line:last-of-type { border-bottom: none; }
+    .ue-line strong { color: var(--white); }
+    .ue-line-price { font-family: var(--font-mono); font-size: 13px; }
+    .ue-panel--old .ue-line-price { color: var(--pink); }
+    .ue-panel--new .ue-line-price { color: var(--mint); }
+    .ue-callout {
+      margin-top: 20px; padding: 12px 16px;
+      background: rgba(94,196,168,0.08);
+      border: 1px solid rgba(94,196,168,0.2); border-radius: 6px;
+      font-family: var(--font-mono); font-size: 11px; color: var(--mint);
+      line-height: 1.5;
+    }
+    .ue-callout strong { color: var(--white); }
+
+    /* ── MARKET ──────────────────────────────────────────────────── */
+    #market { padding: 100px 52px; }
+    .market-layout {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 60px;
+      margin-top: 52px; align-items: center;
+    }
+    .tam-circles {
+      display: flex; flex-direction: column; gap: 16px;
+    }
+    .tam-row {
+      display: flex; align-items: center; gap: 20px;
+    }
+    .tam-bar-wrap {
+      flex: 1; height: 6px; background: var(--line);
+      border-radius: 3px; overflow: hidden;
+    }
+    .tam-bar {
+      height: 100%; border-radius: 3px;
+      background: var(--yellow);
+    }
+    .tam-info { min-width: 140px; }
+    .tam-label {
+      font-family: var(--font-mono); font-size: 9px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--faint);
+    }
+    .tam-val {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 22px; letter-spacing: -0.02em; color: var(--white);
+    }
+    .wedge-list { display: flex; flex-direction: column; gap: 20px; }
+    .wedge-item {}
+    .wedge-title {
+      font-family: var(--font-sans); font-weight: 600;
+      font-size: 15px; margin-bottom: 4px;
+    }
+    .wedge-title.y { color: var(--yellow); }
+    .wedge-title.m { color: var(--mint); }
+    .wedge-title.b { color: var(--blue); }
+    .wedge-desc { font-size: 14px; color: var(--faint); line-height: 1.55; }
+
+    /* ── CLIENT LOGOS (traction) ─────────────────────────────────── */
+    .client-row {
+      display: grid; grid-template-columns: repeat(6,1fr); gap: 2px;
+      background: var(--line); border-radius: 8px; overflow: hidden;
+      margin-top: 36px;
+    }
+    .client-cell {
+      padding: 18px 10px; text-align: center;
+      background: var(--ink-2);
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--faint);
+    }
+    .client-cell--more { color: rgba(255,255,255,0.25); font-style: italic; }
+
+    /* ── SEED ASK ────────────────────────────────────────────────── */
+    #ask { padding: 100px 52px; }
+    .ask-layout {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 60px;
+      margin-top: 52px;
+    }
+    .ask-amount {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(52px, 8vw, 108px); letter-spacing: -0.04em;
+      line-height: 0.95; color: var(--yellow); margin-bottom: 10px;
+    }
+    .ask-sub {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 32px;
+    }
+    .ask-runway {
+      font-family: var(--font-mono); font-size: 10px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 16px;
+    }
+    .fund-item {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 14px;
+    }
+    .fund-pct {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 18px; color: var(--yellow); min-width: 44px;
+      letter-spacing: -0.02em;
+    }
+    .fund-bar-wrap {
+      flex: 1; height: 4px; background: var(--line); border-radius: 2px;
+    }
+    .fund-bar { height: 100%; border-radius: 2px; background: var(--yellow); }
+    .fund-label { font-size: 13px; color: var(--faint); min-width: 220px; }
+    .fund-label strong { color: var(--white); display: block; }
+
+    /* ── LEADERSHIP TEAM ─────────────────────────────────────────── */
+    #team { padding: 100px 52px; }
+    .leadership-grid {
+      display: grid; grid-template-columns: repeat(2,1fr); gap: 2px;
+      background: var(--line); border-radius: 12px; overflow: hidden;
+      margin-top: 52px;
+    }
+    .lead-card {
+      padding: 32px 28px 28px;
+      background: var(--ink-2);
+    }
+    .lead-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      margin-bottom: 16px; object-fit: cover;
+      border: 2px solid var(--line);
+    }
+    .lead-avatar--placeholder {
+      width: 52px; height: 52px; border-radius: 50%;
+      margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-sans); font-weight: 700; font-size: 18px;
+      color: var(--ink);
+    }
+    .lead-title {
+      font-family: var(--font-mono); font-size: 9.5px;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--faint); margin-bottom: 6px;
+    }
+    .lead-name {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: 18px; color: var(--white); margin-bottom: 10px;
+    }
+    .lead-desc { font-size: 13px; color: var(--faint); line-height: 1.55; }
+    .lead-desc strong { color: var(--white); }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────────── */
+    @media (max-width: 960px) {
+      nav { padding: 0 24px; }
+      .nav-links { display: none; }
+      section { padding: 72px 24px; }
+      #hero { padding: 0 24px 60px; }
+      #one-liner { padding: 40px 24px; }
+      .two-col, .bio-layout { grid-template-columns: 1fr; gap: 36px; }
+      .layer-grid { grid-template-columns: 1fr; }
+      .lc:not(:last-child) { border-right: none; border-bottom: 1px solid var(--line); }
+      .dept-grid { grid-template-columns: repeat(2,1fr); }
+      .canvas-body { grid-template-columns: repeat(2,1fr); }
+      .moat-grid { grid-template-columns: 1fr; }
+      .moat-card { border-right: none !important; }
+      .flow-grid, .fs-row2 { grid-template-columns: repeat(2,1fr); }
+      .flow-step:nth-child(2) { border-right: none; }
+      .routing-grid { grid-template-columns: repeat(2,1fr); }
+      .biz-grid { grid-template-columns: repeat(2,1fr); }
+      .biz-tier:nth-child(2) { border-right: none; }
+      .stats-row { grid-template-columns: repeat(3,1fr); }
+      .stat-cell:nth-child(3) { border-right: none; }
+      .stat-cell:nth-child(4), .stat-cell:nth-child(5) { border-top: 1px solid var(--line); }
+      .live-grid { grid-template-columns: 1fr; gap: 32px; }
+      .why-grid { grid-template-columns: 1fr; }
+      .contact-grid { grid-template-columns: 1fr; gap: 24px; }
+      footer { flex-direction: column; gap: 10px; text-align: center; }
+      .comp-grid { grid-template-columns: 1fr; }
+      .tier-grid { grid-template-columns: repeat(2,1fr); }
+      .ue-layout { grid-template-columns: 1fr; }
+      .market-layout { grid-template-columns: 1fr; gap: 40px; }
+      .ask-layout { grid-template-columns: 1fr; gap: 40px; }
+      .leadership-grid { grid-template-columns: 1fr; }
+      .client-row { grid-template-columns: repeat(3,1fr); }
+      .problem-stats { flex-direction: column; gap: 24px; }
+      #compromise { padding: 72px 24px; }
+      #insight { padding: 80px 24px; }
+      #unit-econ { padding: 72px 24px; }
+      #market { padding: 72px 24px; }
+      #ask { padding: 72px 24px; }
+      #team { padding: 72px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#hero" class="nav-logo">
+    <img src="intelligence/assets/logo-full-yellow.png" alt="CaastorOS" style="height:28px; width:auto; display:block;" />
+    <span class="nav-sub" style="margin-top:1px;">Investor Brief · 2026</span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#product">Product</a></li>
+    <li><a href="#canvas">Canvas</a></li>
+    <li><a href="#moat">Moat</a></li>
+    <li><a href="#biz">Pricing</a></li>
+    <li><a href="#traction">Traction</a></li>
+    <li><a href="#ask">The Ask</a></li>
+  </ul>
+  <a href="#cta" class="nav-cta">Request access →</a>
+</nav>
+
+
+<!-- HERO -->
+<div id="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-radial"></div>
+
+  <div class="hero-content">
+    <div class="hero-chip">
+      <span class="chip-dot"></span>
+      CaastorOS · Private Preview · 2026
+    </div>
+
+    <h1>
+      The operating system<br />
+      for <em>brand intelligence.</em>
+    </h1>
+
+    <div class="hero-tagline">
+      <span class="hero-tag-line">Big Ideas.</span>
+      <span class="hero-tag-line">Brilliant Execution.</span>
+      <span class="hero-tag-line">Zero Drama.</span>
+    </div>
+
+    <p class="hero-sub">
+      A senior-human-certified Brand Intelligence Object at the centre. An AI brand director who reads it before every brief. 55 specialist agents who execute from it. An interactive canvas that makes the work visible. <strong>Every piece of creative a brand ships — on-brand, fast, and economic.</strong>
+    </p>
+
+    <div class="btn-row">
+      <a href="#cta" class="btn-y">Request access</a>
+      <a href="#canvas" class="btn-o">See the canvas ↓</a>
+    </div>
+  </div>
+
+  <!-- Brandolph mascot — inline yellow SVG -->
+  <svg class="hero-mascot" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 984 1176" aria-label="Brandolph" role="img">
+    <g>
+      <path class="st3" d="M708,216c0-19.9-16.1-36-36-36s-36,16.1-36,36H276c0-19.9-16.1-36-36-36s-36,16.1-36,36c0,19.9,16.1,36,36,36v684h504V216H708z"/>
+      <g>
+        <g>
+          <rect x="414" y="255.4" transform="matrix(0.2873 -0.9578 0.9578 0.2873 -5.2749 628.9104)" width="12" height="125.3"/>
+        </g>
+        <g>
+          <rect x="632.3" y="276" transform="matrix(0.9192 -0.3938 0.3938 0.9192 -56.2662 289.8156)" width="91.4" height="12"/>
+        </g>
+      </g>
+      <path d="M684,714c-66.4,0-90-54.9-90-102V494.5l58.2-58.2l-8.5-8.5l-56.1,56.1l-67.8-56.5l-7.7,9.2l69.8,58.2V612c0,60.1-37,102-90,102c-55.8,0-90.5-56.5-90.9-57.1l-10.3,6.2c1.5,2.6,38.5,62.9,101.1,62.9c10.6,0,20.6-1.5,30-4.3V846h120V718.2c11.9,5,25.8,7.8,42,7.8V714z M534,717.3c21-9.5,37.6-26.2,48-48.2V834h-48V717.3z M630,834h-36V670.2c7.7,16.8,19.4,31.7,36,41.8V834z"/>
+      <g>
+        <g>
+          <rect x="420" y="360" width="24" height="36"/>
+        </g>
+        <g>
+          <rect x="672" y="360" width="24" height="36"/>
+        </g>
+      </g>
+      <g>
+        <g>
+          <path d="M456,522c-41.9,0-66-41.6-66-114s24.1-114,66-114s66,41.6,66,114S497.9,522,456,522z M456,306c-34.3,0-54,37.2-54,102s19.7,102,54,102s54-37.2,54-102S490.3,306,456,306z"/>
+        </g>
+        <g>
+          <path d="M708,522c-41.9,0-66-41.6-66-114s24.1-114,66-114s66,41.6,66,114S749.9,522,708,522z M708,306c-34.3,0-54,37.2-54,102s19.7,102,54,102s54-37.2,54-102S742.3,306,708,306z"/>
+        </g>
+        <g>
+          <rect x="252" y="366" width="144" height="12"/>
+        </g>
+        <g>
+          <path d="M645.3,377.4C645.1,377.3,622,366,588,366c-46.1,0-69.1,11.3-69.3,11.4l-5.4-10.7c1-0.5,25.8-12.6,74.7-12.6c37,0,61.7,12.1,62.7,12.6L645.3,377.4z"/>
+        </g>
+      </g>
+    </g>
+  </svg>
+</div>
+
+
+<!-- ONE-LINER BAND -->
+<div id="one-liner">
+  <div class="wrap">
+    <p class="one-liner-text">
+      "CaastorOS is the operating system for brand intelligence: <strong>a certified Brand Intelligence Object, a senior AI brand director, 55 specialist agents, and an interactive canvas</strong> — so every piece of brand work a company ships is on-brand, fast, and economic."
+    </p>
+  </div>
+</div>
+
+
+<!-- PROBLEM -->
+<section id="problem" class="ruled">
+  <span class="eyebrow">The Problem</span>
+  <div class="two-col">
+    <div>
+      <h2>Modern brand work<br />is broken in <em>three places at once.</em></h2>
+      <p class="body" style="margin-top: 20px;">
+        The companies that win — the ones with a coherent voice, a visual identity that holds, and creative output that compounds quarter after quarter — have one thing that growing brands don't. <strong>A real, governed brand system.</strong>
+      </p>
+      <p class="body">
+        Not a PDF. Not a Notion page. Not a Slack channel full of references. A first-class object that every downstream tool reads from, writes back to, and cannot violate.
+      </p>
+      <p class="body">
+        CaastorOS fixes all three breakdowns with a single architectural move: <strong>make the brand a first-class certified object that every AI specialist must read from before it produces anything.</strong>
+      </p>
+    </div>
+    <ul class="pain-list">
+      <li class="pain-item">
+        <span class="pain-n">01</span>
+        <div class="pain-body">
+          <strong>The brand is not a system</strong>
+          It lives in PDFs, decks, Notion pages, the founder's head, and an agency Slack channel. Nothing is queryable. Nothing is enforceable. Every new piece of work re-invents the brand from scratch.
+        </div>
+      </li>
+      <li class="pain-item">
+        <span class="pain-n">02</span>
+        <div class="pain-body">
+          <strong>AI tooling produces generic output</strong>
+          ChatGPT, Midjourney, Jasper, Copy.ai — all stateless. No persistent brand context. Output drifts. There is no refusal layer. The model happily generates work that violates the brand.
+        </div>
+      </li>
+      <li class="pain-item">
+        <span class="pain-n">03</span>
+        <div class="pain-body">
+          <strong>Senior brand thinking doesn't scale</strong>
+          A CMO or brand director cannot personally touch every asset. Junior teams and freelancers fill the gap. The brand erodes one Instagram post at a time.
+        </div>
+      </li>
+    </ul>
+
+    <div class="problem-stats">
+      <div class="ps-item">
+        <div class="ps-val">10×</div>
+        <div class="ps-label">More formats per cycle</div>
+      </div>
+      <div class="ps-item">
+        <div class="ps-val" style="color:var(--pink);">62%</div>
+        <div class="ps-label">Briefs miss deadline</div>
+      </div>
+      <div class="ps-item">
+        <div class="ps-val" style="color:var(--faint);">€8.6k</div>
+        <div class="ps-label">Avg. agency retainer / mo</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- THE COMPROMISE -->
+<section id="compromise" class="ruled">
+  <span class="eyebrow">Today's Options</span>
+  <h2>Three half-solutions.<br /><em>Each one trades something.</em></h2>
+
+  <div class="comp-grid">
+    <div class="comp-card comp-card--a">
+      <span class="comp-label comp-label--a">A · Strategy Tool</span>
+      <div class="comp-headline">Thinks.</div>
+      <div class="comp-sub">Doesn't ship.</div>
+      <div class="comp-examples">Examples</div>
+      <div class="comp-ex-text">Brand strategy consultancies. Positioning frameworks. "Generative ideation" sandboxes.</div>
+    </div>
+    <div class="comp-card comp-card--b">
+      <span class="comp-label comp-label--b">B · Design Platform</span>
+      <div class="comp-headline">Ships.</div>
+      <div class="comp-sub">Doesn't think.</div>
+      <div class="comp-examples">Examples</div>
+      <div class="comp-ex-text">Design-on-subscription services. Outsourced production studios. AI image tools.</div>
+    </div>
+    <div class="comp-card comp-card--c">
+      <span class="comp-label comp-label--c">C · Agency</span>
+      <div class="comp-headline">Both.</div>
+      <div class="comp-sub">Slow + expensive.</div>
+      <div class="comp-examples">Examples</div>
+      <div class="comp-ex-text">Brand & creative agencies. 5+ people between you and the work. €8k–€80k retainers.</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- THE INSIGHT -->
+<section id="insight">
+  <div class="insight-eyebrow">The Insight</div>
+  <h2 class="insight-h">What if you didn't<br /><em>have to compromise?</em></h2>
+  <p class="insight-sub">
+    One platform that thinks strategically, ships at platform speed, and finishes with human craft. From one credit pool.
+  </p>
+</section>
+
+
+<!-- PRODUCT: LAYERS -->
+<section id="product" class="ruled">
+  <span class="eyebrow">The Product</span>
+  <h2>Four layers. One operating system.<br /><em>No other product assembles all four.</em></h2>
+  <p class="body" style="margin-top: 18px; max-width: 640px;">
+    Each layer exists somewhere in the market. A certified brand object. A senior AI director. A specialist crew. A visible parallel workspace. <strong>Only CaastorOS assembles all four into a single governed system.</strong>
+  </p>
+
+  <div class="layer-grid">
+    <div class="lc lc--l1">
+      <span class="lc-badge lc-badge--l1">L1 · Strategy</span>
+      <div class="lc-title">Brandolph</div>
+      <div class="lc-role">The AI brand director</div>
+      <p class="lc-desc">
+        A composite AI brand director built from the operating principles of six defining figures in branding history — encoded internally, never disclosed on the product surface.
+        <strong>He doesn't generate. He directs.</strong>
+      </p>
+      <ul class="lc-feats">
+        <li><strong>Sharpens the brief</strong> — takes a one-line ask and produces a CMO-grade brief: title, tension, refusals, crew composition</li>
+        <li><strong>Assembles the crew</strong> — selects which specialists run, in what order, with what dependencies</li>
+        <li><strong>Learns per brand</strong> — maintains <code style="font-size:11px;color:var(--yellow);">brand_signals</code> + <code style="font-size:11px;color:var(--yellow);">brand_specialist_stats</code>. Each brand's Brandolph gets cheaper and sharper over time</li>
+      </ul>
+    </div>
+
+    <div class="lc lc--l2">
+      <span class="lc-badge lc-badge--l2">L2 · Execution</span>
+      <div class="lc-title">55 Specialists</div>
+      <div class="lc-role">AI creative crew · 7 departments</div>
+      <p class="lc-desc">
+        Seven specialist departments, each with a clear remit and a structured spec — system prompt, output schema, model route, cost cap, refusal rules.
+        <strong>Every specialist reads the BIO before producing anything.</strong>
+      </p>
+      <ul class="lc-feats">
+        <li>Strategy — positioning, territory, audience, commercial</li>
+        <li>Concept — big idea, naming, tagline, manifesto</li>
+        <li>Copy — headlines, long-form, email, social, UX, QA</li>
+        <li>Visual — hero KV, editorial, style frames, ad creative, packaging</li>
+        <li>Web & UX — landing pages, component specs, IA, accessibility</li>
+        <li>Research & Ops — competitive scan, trend watch, audit</li>
+        <li>Motion & Sound — coming soon</li>
+      </ul>
+    </div>
+
+    <div class="lc lc--l3">
+      <span class="lc-badge lc-badge--l3">BIO · Foundation</span>
+      <div class="lc-title">The BIO</div>
+      <div class="lc-role">Brand Intelligence Object</div>
+      <p class="lc-desc">
+        A structured, versioned, queryable representation of the brand. Not a guidelines PDF — <strong>a certified database object</strong> with fields for positioning, voice, visual system, audience, channel strategy, and commercial reality.
+      </p>
+      <ul class="lc-feats">
+        <li>Positioning, tension, promise, proof</li>
+        <li>Voice — tone, syntax, banned phrases, signature moves</li>
+        <li>Visual — palette, type, motion, composition rules, "never do this"</li>
+        <li>Audience cohorts and their actual language</li>
+        <li>Channel strategy and platform-native conventions</li>
+        <li><strong>Senior-human certified before AI execution unlocks</strong></li>
+      </ul>
+    </div>
+
+    <div class="lc lc--l4">
+      <span class="lc-badge lc-badge--l4">L3 · Workspace</span>
+      <div class="lc-title">The Canvas</div>
+      <div class="lc-role">Interactive parallel workspace</div>
+      <p class="lc-desc">
+        Not a chat thread. Not a list. An <strong>interactive canvas where every specialist appears as a node</strong> — visible, manipulable, parallel. The moat after the BIO.
+      </p>
+      <ul class="lc-feats">
+        <li><strong>Re-run</strong> — swap the model per node (premium / cheaper / different provider)</li>
+        <li><strong>Revise</strong> — give feedback to a single specialist without restarting</li>
+        <li><strong>Reuse</strong> — route any output as input to a downstream specialist</li>
+        <li>Everyone else ships a chat box. CaastorOS ships a canvas.</li>
+        <li><strong>Turns a brief from a conversation into a visible parallel workspace</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Departments grid -->
+  <span class="eyebrow eyebrow--dim">L2 · 7 Specialist Departments · 55 Agents (50 live)</span>
+  <div class="dept-grid">
+    <div class="dept-card">
+      <span class="dept-dot" style="background:#F8C036;"></span>
+      <div class="dept-name">Strategy</div>
+      <div class="dept-count">4 specialists · live</div>
+      <div class="dept-agents">Positioning Architect · Territory Mapper · Audience Decoder · Commercial Strategist</div>
+    </div>
+    <div class="dept-card">
+      <span class="dept-dot" style="background:#9B7FE8;"></span>
+      <div class="dept-name">Concept</div>
+      <div class="dept-count">5 specialists · live</div>
+      <div class="dept-agents">Big Idea · Campaign Concept · Naming · Tagline · Manifesto</div>
+    </div>
+    <div class="dept-card">
+      <span class="dept-dot" style="background:#5EC477;"></span>
+      <div class="dept-name">Copy</div>
+      <div class="dept-count">6 specialists · live</div>
+      <div class="dept-agents">Headlines · Long-form · Social Captions · Product Copy · Email · Voice QA</div>
+    </div>
+    <div class="dept-card">
+      <span class="dept-dot" style="background:#E86F8A;"></span>
+      <div class="dept-name">Visual</div>
+      <div class="dept-count">10 specialists · live</div>
+      <div class="dept-agents">Hero KV · Editorial Image · Style Frames · Social Post · Ad Creative · Lifestyle · Email Designer · Iconography · Product Mockup · Mood Board</div>
+    </div>
+    <div class="dept-card">
+      <span class="dept-dot" style="background:#5B9BD5;"></span>
+      <div class="dept-name">Web & UX</div>
+      <div class="dept-count">5 specialists · live</div>
+      <div class="dept-agents">Landing Page Architect · Component Spec · Microcopy · Information Architecture · Accessibility QA</div>
+    </div>
+    <div class="dept-card">
+      <span class="dept-dot" style="background:#E8874A;"></span>
+      <div class="dept-name">Research & Ops</div>
+      <div class="dept-count">4 specialists · live</div>
+      <div class="dept-agents">Competitive Scan · Trend Watch · Audit · Brief Builder</div>
+    </div>
+    <div class="dept-card" style="opacity:0.55;">
+      <span class="dept-dot" style="background:#888;"></span>
+      <div class="dept-name">Motion & Sound</div>
+      <div class="dept-count">Coming soon</div>
+      <div class="dept-agents">Video · Sound Design · Motion Graphics</div>
+    </div>
+    <div class="dept-card" style="background:transparent; border-style:dashed; display:flex; align-items:center; justify-content:center;">
+      <div style="text-align:center;">
+        <div style="font-family:var(--font-mono);font-size:22px;color:rgba(255,255,255,0.1);margin-bottom:6px;">55</div>
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--faint);">Total specialists</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CANVAS -->
+<section id="canvas" class="ruled">
+  <span class="eyebrow">The Canvas · The single most important surface</span>
+  <div class="two-col">
+    <div>
+      <h2>Not a chat box.<br /><em>A visible, parallel workspace.</em></h2>
+      <p class="body" style="margin-top: 20px;">
+        After Brandolph assembles the crew, the user lands on an <strong>interactive canvas</strong> — not a chat thread, not a list view. Specialists appear as nodes. The brief is visible. Work runs in parallel or in sequence with dependencies.
+      </p>
+      <p class="body">
+        Each node is live. Click any specialist to see its output, re-run with a different model, revise with feedback, or reuse its output as input for a downstream specialist.
+      </p>
+      <p class="body">
+        <strong>The canvas is the moat after the BIO.</strong> Everyone else in the AI-for-marketing space ships a chat box. We ship a canvas. Chat-based tools cannot replicate this without re-architecting their entire UX. Once a team works this way, going back feels primitive.
+      </p>
+
+      <div style="margin-top: 28px; display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:12px; align-items:flex-start; font-size:14px; color:var(--faint);">
+          <span style="color:var(--yellow); font-family:var(--font-mono); font-size:11px; flex-shrink:0; padding-top:1px;">→</span>
+          <span><strong style="color:var(--white);">Re-run with a different model</strong> — premium, cheaper, or different provider per node</span>
+        </div>
+        <div style="display:flex; gap:12px; align-items:flex-start; font-size:14px; color:var(--faint);">
+          <span style="color:var(--yellow); font-family:var(--font-mono); font-size:11px; flex-shrink:0; padding-top:1px;">→</span>
+          <span><strong style="color:var(--white);">Revise with feedback</strong> — "make this 30% shorter, less corporate" applied to one node</span>
+        </div>
+        <div style="display:flex; gap:12px; align-items:flex-start; font-size:14px; color:var(--faint);">
+          <span style="color:var(--yellow); font-family:var(--font-mono); font-size:11px; flex-shrink:0; padding-top:1px;">→</span>
+          <span><strong style="color:var(--white);">Reuse as input</strong> — pipe approved output directly into a downstream specialist</span>
+        </div>
+        <div style="display:flex; gap:12px; align-items:flex-start; font-size:14px; color:var(--faint);">
+          <span style="color:var(--yellow); font-family:var(--font-mono); font-size:11px; flex-shrink:0; padding-top:1px;">→</span>
+          <span><strong style="color:var(--white);">Library</strong> — all approved outputs land grouped by brief, available for re-use</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <!-- Canvas mock -->
+      <div class="canvas-visual">
+        <div class="canvas-topbar">
+          <div class="canvas-topbar-left">
+            <span class="canvas-title-tag">Canvas ·</span>
+            <span class="canvas-brief-pill">Social content — launch week</span>
+          </div>
+          <div style="display:flex;gap:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--faint);">
+            <span>7 specialists</span>
+            <span style="color:var(--line);">·</span>
+            <span style="color:var(--mint);">4 done</span>
+            <span style="color:var(--line);">·</span>
+            <span style="color:var(--yellow);">2 running</span>
+          </div>
+        </div>
+
+        <div class="canvas-body">
+          <!-- Node 1 - done -->
+          <div class="canvas-node canvas-node--done">
+            <div class="cn-dept">Strategy</div>
+            <div class="cn-name">Positioning Architect</div>
+            <div class="cn-status">
+              <span class="cn-dot cn-dot--done"></span>
+              <span style="color:var(--mint);">Approved</span>
+            </div>
+            <div class="canvas-actions">
+              <span class="cn-action">Reuse →</span>
+            </div>
+          </div>
+          <!-- Node 2 - done -->
+          <div class="canvas-node canvas-node--done">
+            <div class="cn-dept">Concept</div>
+            <div class="cn-name">Campaign Concept</div>
+            <div class="cn-status">
+              <span class="cn-dot cn-dot--done"></span>
+              <span style="color:var(--mint);">Approved</span>
+            </div>
+            <div class="canvas-actions">
+              <span class="cn-action">Reuse →</span>
+            </div>
+          </div>
+          <!-- Node 3 - running -->
+          <div class="canvas-node canvas-node--active">
+            <div class="cn-dept">Copy</div>
+            <div class="cn-name">Social Captions</div>
+            <div class="cn-status">
+              <span class="cn-dot cn-dot--run"></span>
+              <span style="color:var(--yellow);">Running…</span>
+            </div>
+            <div class="canvas-actions">
+              <span class="cn-action" style="opacity:0.4;">Re-run</span>
+              <span class="cn-action" style="opacity:0.4;">Revise</span>
+            </div>
+          </div>
+          <!-- Node 4 - running -->
+          <div class="canvas-node canvas-node--active">
+            <div class="cn-dept">Visual</div>
+            <div class="cn-name">Hero KV</div>
+            <div class="cn-status">
+              <span class="cn-dot cn-dot--run"></span>
+              <span style="color:var(--yellow);">Running…</span>
+            </div>
+            <div class="canvas-actions">
+              <span class="cn-action" style="opacity:0.4;">Re-run</span>
+            </div>
+          </div>
+          <!-- Node 5 - wait -->
+          <div class="canvas-node">
+            <div class="cn-dept">Copy</div>
+            <div class="cn-name">Headlines</div>
+            <div class="cn-status">
+              <span class="cn-dot cn-dot--wait"></span>
+              <span>Waiting on Concept</span>
+            </div>
+          </div>
+          <!-- Node 6 - wait -->
+          <div class="canvas-node">
+            <div class="cn-dept">Visual</div>
+            <div class="cn-name">Social Post Designer</div>
+            <div class="cn-status">
+              <span class="cn-dot cn-dot--wait"></span>
+              <span>Waiting on Hero KV</span>
+            </div>
+          </div>
+          <!-- Node 7 - done -->
+          <div class="canvas-node canvas-node--done">
+            <div class="cn-dept">Copy</div>
+            <div class="cn-name">Voice QA</div>
+            <div class="cn-status">
+              <span class="cn-dot cn-dot--done"></span>
+              <span style="color:var(--mint);">Pass · drift 0.14</span>
+            </div>
+          </div>
+          <!-- brandolph -->
+          <div class="canvas-node" style="border-color:rgba(248,192,54,0.25);background:rgba(248,192,54,0.04);">
+            <div class="cn-dept">L1 · Brandolph</div>
+            <div class="cn-name">Brief orchestration</div>
+            <div class="cn-status">
+              <span class="cn-dot" style="background:var(--yellow);"></span>
+              <span style="color:var(--yellow);">Directing</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="canvas-note">
+          <span>Brief · <span>Social content — launch week</span></span>
+          <span>Credits · <span>34 cr</span> spent</span>
+          <span>Models · <span>Sonnet · Flux · Haiku</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- BIO -->
+<section id="bio" class="ruled">
+  <span class="eyebrow">The BIO · Brand Intelligence Object</span>
+  <div class="bio-layout">
+    <div>
+      <h2>Certified. Queryable.<br /><em>Impossible to switch away from.</em></h2>
+      <p class="body" style="margin-top: 20px;">
+        The BIO is CaastorOS's core architectural concept. It is not a brand guidelines PDF. It is a <strong>structured, versioned, queryable database object</strong> — compiled from everything public about a brand and then certified by a senior human brand director before AI execution unlocks.
+      </p>
+      <p class="body">
+        Every specialist agent reads the BIO before producing anything. This is why CaastorOS output is on-brand from day one — and why it gets sharper with every brief.
+      </p>
+
+      <div class="cert-box" style="margin-top: 28px;">
+        <div class="cert-title">Senior-human certification — the trust moat</div>
+        <p class="cert-desc">
+          Every BIO is <strong>reviewed and certified by a real senior brand director</strong> before the AI specialist crew is unlocked. This is the unfair advantage no AI tool has. CMOs trust it. Agencies adopt it. Founders ship without review. <strong>That trust is bought by the certification layer — and the certification layer is what justifies the price.</strong>
+        </p>
+      </div>
+
+      <div style="margin-top: 28px; display:flex; gap:32px;">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:26px;font-weight:600;color:var(--yellow);line-height:1;">~40s</div>
+          <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--faint);margin-top:4px;">Time to first BIO</div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:26px;font-weight:600;color:var(--yellow);line-height:1;">94+</div>
+          <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--faint);margin-top:4px;">Signals extracted</div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:26px;font-weight:600;color:var(--yellow);line-height:1;">∞</div>
+          <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--faint);margin-top:4px;">Gets better over time</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BIO card -->
+    <div class="bio-card">
+      <div class="bio-header">
+        <div>
+          <div class="bio-brand">Vinilo Coffee</div>
+          <div class="bio-url">vinilo.coffee · Barcelona, ES</div>
+        </div>
+        <div class="bio-cert">
+          <span class="bio-cert-dot"></span>
+          Senior-certified · BIO 91
+        </div>
+      </div>
+
+      <div class="bio-field">
+        <span class="bf-key">Positioning</span>
+        <span class="bf-val">Specialty coffee for slow Tuesdays.</span>
+      </div>
+      <div class="bio-field">
+        <span class="bf-key">Signals extracted</span>
+        <span class="bf-val" style="color:var(--mint);">94 · 1 flag</span>
+      </div>
+      <div class="bio-field">
+        <span class="bf-key">Audience segments</span>
+        <span class="bf-val">Café regulars · Subscribers · Wholesale</span>
+      </div>
+      <div class="bio-field">
+        <span class="bf-key">Banned phrases</span>
+        <span class="bf-val" style="color:var(--pink);">"unlock" · "limited" · "exclusive"</span>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--faint);margin-bottom:9px;">Brand Palette</div>
+        <div class="bio-palette">
+          <div class="bio-swatch" style="background:#1F1A14;" title="Espresso"></div>
+          <div class="bio-swatch" style="background:#C97B3F;" title="Ember"></div>
+          <div class="bio-swatch" style="background:#F4ECDD;" title="Cream"></div>
+          <div class="bio-swatch" style="background:#7FA37A;" title="Sage"></div>
+          <div class="bio-swatch" style="background:#E8A020;" title="Honey"></div>
+        </div>
+      </div>
+
+      <div class="bio-voice" style="margin-top:16px;">
+        <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--faint);margin-bottom:8px;">Voice Profile</div>
+        <div class="bv-row"><span class="bv-label">Formality</span><div class="bv-track"><div class="bv-fill" style="width:40%;"></div></div><span>0.4</span></div>
+        <div class="bv-row"><span class="bv-label">Warmth</span><div class="bv-track"><div class="bv-fill" style="width:75%;"></div></div><span>0.75</span></div>
+        <div class="bv-row"><span class="bv-label">Urgency</span><div class="bv-track"><div class="bv-fill" style="width:15%;"></div></div><span>0.15</span></div>
+      </div>
+
+      <div class="bio-brandolph">
+        <div class="bb-label">Brandolph · L1 · Live read</div>
+        <div class="bb-quote">"The pricing relaunch is two cards short of ready. Email 2 reads dutiful, not persuasive. I'd assign Sonnet a second pass before we ship."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- MOAT -->
+<section id="moat" class="ruled">
+  <span class="eyebrow">The Moat</span>
+  <h2>Four reinforcing advantages.<br /><em>Each defensible alone. Together, very hard to copy.</em></h2>
+  <p class="body" style="margin-top: 16px; max-width: 600px;">
+    CaastorOS is not just a better tool. It is a system that becomes more valuable over time — for every brand individually, and across the portfolio.
+  </p>
+
+  <div class="moat-grid">
+    <div class="moat-card">
+      <div class="mc-n">01 · DATA MOAT</div>
+      <div class="mc-title">The certified BIO creates lock-in</div>
+      <p class="mc-desc">
+        Every brand on the platform produces a structured, certified object that no other AI tool has access to. Switching cost is real: <strong>rebuilding a BIO elsewhere means re-doing the certification work.</strong> Once the BIO is the source of truth, every downstream tool — Figma plugins, Canva exports, CMS integrations — routes through CaastorOS. The brand cannot leave without losing its institutional memory.
+      </p>
+    </div>
+    <div class="moat-card">
+      <div class="mc-n">02 · LEARNING MOAT</div>
+      <div class="mc-title">Brandolph's memory compounds per brand</div>
+      <p class="mc-desc">
+        <code style="font-size:12px;color:var(--yellow);background:rgba(248,192,54,0.1);padding:1px 5px;border-radius:3px;">brand_signals</code> + <code style="font-size:12px;color:var(--yellow);background:rgba(248,192,54,0.1);padding:1px 5px;border-radius:3px;">brand_specialist_stats</code> mean that for each brand, the system learns which specialists to escalate, downgrade, or skip entirely. <strong>A six-month-old brand on CaastorOS has a Brandolph who knows them deeply.</strong> A new entrant starts from cold. The gap widens every brief.
+      </p>
+    </div>
+    <div class="moat-card">
+      <div class="mc-n">03 · EXPERIENCE MOAT</div>
+      <div class="mc-title">The canvas changes how teams think about briefs</div>
+      <p class="mc-desc">
+        Chat-based AI tools cannot replicate the canvas without re-architecting their entire UX. <strong>The canvas transforms a brief from a back-and-forth conversation into a visible, manipulable, parallel workspace.</strong> Once a team works this way, going back to chat feels primitive. The experience moat is a retention engine.
+      </p>
+    </div>
+    <div class="moat-card">
+      <div class="mc-n">04 · TRUST MOAT</div>
+      <div class="mc-title">Senior-human certification is the unfair advantage</div>
+      <p class="mc-desc">
+        Every other AI tool ships ungoverned output and asks the user to fix it. CaastorOS ships output that has been pre-cleared by a senior brand director's certified rules. <strong>CMOs trust it. Agencies adopt it. Founders ship it without review.</strong> That trust is bought by the certification layer — and the certification layer is what justifies the price and the switching cost simultaneously.
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<!-- USP TABLE -->
+<section id="usp" class="ruled">
+  <span class="eyebrow">Competitive USP</span>
+  <h2>What only CaastorOS does.</h2>
+  <p class="body" style="margin-top: 16px; max-width: 600px;">
+    The individual pieces exist elsewhere in the market. The assembly — certified object, senior AI director, specialist crew, parallel canvas — exists nowhere else.
+  </p>
+
+  <table class="usp-table">
+    <thead>
+      <tr>
+        <th>Capability</th>
+        <th>Generic AI tools<br/><span style="font-weight:400;opacity:0.7;">ChatGPT · Jasper · Copy.ai · Midjourney</span></th>
+        <th>Agency / Studio</th>
+        <th>CaastorOS</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Persistent, structured brand object</td>
+        <td class="usp-no">No</td>
+        <td>In humans' heads</td>
+        <td>Yes — certified BIO</td>
+      </tr>
+      <tr>
+        <td>Refusal layer (brand can say "no")</td>
+        <td class="usp-no">No</td>
+        <td>Yes (slow, human)</td>
+        <td>Yes — enforced by spec</td>
+      </tr>
+      <tr>
+        <td>Senior brand thinking</td>
+        <td class="usp-no">No</td>
+        <td>Yes (expensive, slow)</td>
+        <td>Yes — encoded in Brandolph</td>
+      </tr>
+      <tr>
+        <td>Specialist depth across disciplines</td>
+        <td class="usp-no">No — one model, all tasks</td>
+        <td>Yes (humans)</td>
+        <td>Yes — 55 specialist agents</td>
+      </tr>
+      <tr>
+        <td>Visible parallel workspace</td>
+        <td class="usp-no">No — chat only</td>
+        <td class="usp-no">No — decks &amp; email</td>
+        <td>Yes — interactive canvas</td>
+      </tr>
+      <tr>
+        <td>Brand-specific learning over time</td>
+        <td class="usp-no">No</td>
+        <td>Partially (institutional memory)</td>
+        <td>Yes — Brandolph memory layer</td>
+      </tr>
+      <tr>
+        <td>Cost per asset</td>
+        <td>$0 software / $20+ inference</td>
+        <td>$200–$5,000 per asset</td>
+        <td>Cents to single dollars</td>
+      </tr>
+      <tr>
+        <td>Time per asset</td>
+        <td>Minutes (low quality)</td>
+        <td>Days to weeks</td>
+        <td>Minutes (brand-grade)</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- FLOW -->
+<section id="flow" class="ruled">
+  <span class="eyebrow">The Flow</span>
+  <h2>From brief to ship-ready asset.<br /><em>Minutes, not weeks.</em></h2>
+
+  <div class="flow-grid">
+    <div class="flow-step">
+      <div class="fs-n">01</div>
+      <div class="fs-title">BIO Intake</div>
+      <p class="fs-desc">Founder or CMO uploads brand assets and answers ~30 BIO questions. The system extracts 94+ signals in ~40 seconds from public sources.</p>
+      <span class="fs-tag">BIO Compiler</span>
+    </div>
+    <div class="flow-step">
+      <div class="fs-n">02</div>
+      <div class="fs-title">Certification</div>
+      <p class="fs-desc">A senior human brand director reviews and certifies the BIO. AI execution is locked until certification is complete. This is the trust layer.</p>
+      <span class="fs-tag">Senior Human · L3</span>
+    </div>
+    <div class="flow-step">
+      <div class="fs-n">03</div>
+      <div class="fs-title">Brief → Sharpen</div>
+      <p class="fs-desc">User types a brief. Brandolph sharpens it: title, tension, refusals, and crew of 4–8 specialists — a CMO-grade brief from a single line.</p>
+      <span class="fs-tag">Brandolph · L1</span>
+    </div>
+    <div class="flow-step">
+      <div class="fs-n">04</div>
+      <div class="fs-title">Canvas opens</div>
+      <p class="fs-desc">Specialists run in parallel or sequence with dependencies on the interactive canvas. Each node is live, revisable, re-runnable.</p>
+      <span class="fs-tag">Specialists · L2</span>
+    </div>
+    <div class="flow-step">
+      <div class="fs-n">05</div>
+      <div class="fs-title">Review & Iterate</div>
+      <p class="fs-desc">User reviews each node — approve, revise, re-run with different model, or reuse as input for a downstream specialist. No chat. No back-and-forth.</p>
+      <span class="fs-tag">Canvas</span>
+    </div>
+    <div class="flow-step">
+      <div class="fs-n">06</div>
+      <div class="fs-title">Library</div>
+      <p class="fs-desc">Approved outputs land in the Library, grouped by brief. Available for re-use, versioned, traceable to the BIO state at time of creation.</p>
+      <span class="fs-tag">Library</span>
+    </div>
+    <div class="flow-step">
+      <div class="fs-n">07</div>
+      <div class="fs-title">Brandolph learns</div>
+      <p class="fs-desc">Memory updates after every brief — which specialists worked, what got edited, what got escalated. Next brief is cheaper and sharper.</p>
+      <span class="fs-tag">Memory layer</span>
+    </div>
+    <div class="flow-step" style="border-right:none;">
+      <div class="fs-n">→</div>
+      <div class="fs-title">Compounds</div>
+      <p class="fs-desc">The system gets smarter per brand over time. Output quality improves. Inference cost drops. The BIO deepens. The moat widens.</p>
+      <span class="fs-tag">Per-brand flywheel</span>
+    </div>
+  </div>
+
+  <div class="flow-metrics">
+    <div class="fm">
+      <div class="fm-val">Minutes</div>
+      <div class="fm-label">Brief to ship-ready asset</div>
+    </div>
+    <div class="fm">
+      <div class="fm-val">Cents–$</div>
+      <div class="fm-label">Cost per brief</div>
+    </div>
+    <div class="fm">
+      <div class="fm-val">Enforced</div>
+      <div class="fm-label">Brand consistency — by BIO, not hoped for</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ROUTING -->
+<section id="routing" class="ruled">
+  <span class="eyebrow">Cost-Optimized Hybrid Model Routing</span>
+  <h2>The right model for the right task.<br /><em>The only way the unit economics work at scale.</em></h2>
+  <p class="body" style="margin-top: 16px; max-width: 680px;">
+    Per-specialist model choice is tuned to the actual cognitive load of the task. A Voice QA pass runs on Gemini Flash — cheap, fast, multimodal. A Big Idea runs on Sonnet. A hero image runs on Flux Schnell unless the user explicitly upgrades. <strong>Clients never choose a model. Brandolph does.</strong>
+  </p>
+
+  <div class="routing-grid">
+    <div class="route-card">
+      <div class="route-provider">Anthropic Direct</div>
+      <div class="route-name">Claude Suite</div>
+      <div class="route-models">Opus 4 · Sonnet 4.6 · Haiku 4.5</div>
+      <div class="route-use">High-stakes strategy, complex concept, long-form. Where quality is the job.</div>
+    </div>
+    <div class="route-card">
+      <div class="route-provider">OpenRouter</div>
+      <div class="route-name">Multi-provider</div>
+      <div class="route-models">GPT-5 · Gemini Pro · Gemini Flash</div>
+      <div class="route-use">Conversion copy, QA passes, multimodal checks. Cost-performance optimised.</div>
+    </div>
+    <div class="route-card">
+      <div class="route-provider">fal.ai</div>
+      <div class="route-name">Image Generation</div>
+      <div class="route-models">Flux 2 · Flux Schnell · Recraft · GPT-Image</div>
+      <div class="route-use">Visual specialists. Default to Schnell; premium upgrade available per node.</div>
+    </div>
+    <div class="route-card">
+      <div class="route-provider">Direct Vendor APIs</div>
+      <div class="route-name">Specialist Tools</div>
+      <div class="route-models">ElevenLabs · v0 · Gamma · Framer · Exa</div>
+      <div class="route-use">Where economics or capability demand direct integration.</div>
+    </div>
+  </div>
+
+  <div class="routing-stat">
+    <div class="rs-val">~$170K</div>
+    <div class="rs-body">
+      <strong>Projected monthly inference savings at 10,000 brands</strong> vs. a naive Anthropic-only routing strategy — with no quality regression measured by Brandolph's own approval / flag / edit telemetry. This is not a cost-cutting hack. It is the architecture that makes the unit economics work at scale.
+    </div>
+  </div>
+</section>
+
+
+<!-- BUSINESS MODEL -->
+<section id="biz" class="ruled">
+  <span class="eyebrow">Business Model</span>
+  <h2>One credit pool.<br /><em>AI and human from the same balance.</em></h2>
+  <p class="body" style="margin-top: 16px; max-width: 640px;">
+    Four tiers, one architecture. Inference cost is aggressively optimised, Brandolph's memory makes each brand cheaper over time, and BIO certification is a one-time-then-edit motion.
+  </p>
+
+  <div class="tier-grid">
+    <div class="tier-card">
+      <div class="tier-num">Tier 00</div>
+      <div class="tier-name">Discover</div>
+      <div class="tier-price">€0</div>
+      <div class="tier-credits">30 credits · one-time</div>
+      <div class="tier-desc">Free entry. One brand intake, audit, and strategic diagnosis. <strong>No credit card.</strong></div>
+      <span class="tier-badge">No credit card</span>
+    </div>
+    <div class="tier-card">
+      <div class="tier-num">Tier 01</div>
+      <div class="tier-name">Strategy</div>
+      <div class="tier-price">€290 <span class="tier-mo">/mo</span></div>
+      <div class="tier-credits">250 credits / mo</div>
+      <div class="tier-desc">Full AI strategy and creative suite. 55 specialists. <strong>No human craft yet.</strong></div>
+      <span class="tier-badge">For founders + indie teams</span>
+    </div>
+    <div class="tier-card tier-card--flagship">
+      <div class="tier-flag">Flagship</div>
+      <div class="tier-num">Tier 02</div>
+      <div class="tier-name">Brandolph</div>
+      <div class="tier-price">€790 <span class="tier-mo">/mo</span></div>
+      <div class="tier-credits">900 credits + 300 rollover</div>
+      <div class="tier-desc">The full platform. <strong>AI strategy + execution + human craft from the same pool.</strong></div>
+      <span class="tier-badge">Most popular</span>
+    </div>
+    <div class="tier-card">
+      <div class="tier-num">Tier 03</div>
+      <div class="tier-name">Embedded</div>
+      <div class="tier-price">€1,790 <span class="tier-mo">/mo</span></div>
+      <div class="tier-credits">2,500 credits + 800 rollover</div>
+      <div class="tier-desc">Priority queue. <strong>Dedicated creative director.</strong> Replaces a fractional CMO stack.</div>
+      <span class="tier-badge">Enterprise</span>
+    </div>
+  </div>
+</section>
+
+
+<!-- UNIT ECONOMICS -->
+<section id="unit-econ" class="ruled">
+  <span class="eyebrow">Unit Economics</span>
+  <h2>€8,600/mo of capacity.<br /><em>For €1,790.</em></h2>
+  <p class="body" style="margin-top: 16px; max-width: 620px;">
+    The Tier 03 Embedded plan replaces the entire traditional brand stack. 4+ vendors, 5+ people between you and the work, briefs translated twice — collapsed into one subscription.
+  </p>
+
+  <div class="ue-layout">
+    <div class="ue-panel ue-panel--old">
+      <div class="ue-label">Traditional Stack · The old way</div>
+      <div class="ue-total">€8,600<span style="font-size:0.5em;font-weight:400;color:var(--faint);">/mo</span></div>
+      <div class="ue-line"><strong>Fractional CMO</strong> <span class="ue-line-price">€3,500</span></div>
+      <div class="ue-line"><strong>Design retainer</strong> <span class="ue-line-price">€3,800</span></div>
+      <div class="ue-line"><strong>Strategy tools + AI seats</strong> <span class="ue-line-price">€800</span></div>
+      <div class="ue-line"><strong>Production overhead</strong> <span class="ue-line-price">€500</span></div>
+      <div style="margin-top:16px; padding:12px 14px; background:rgba(232,111,138,0.08); border-radius:6px; font-size:12px; color:rgba(255,255,255,0.45);">4+ vendors. 5+ people between you and the work. Briefs translated twice.</div>
+    </div>
+    <div class="ue-panel ue-panel--new">
+      <div class="ue-label">CaastorOS Tier 03 · Embedded</div>
+      <div class="ue-total">€1,790<span style="font-size:0.5em;font-weight:400;color:var(--faint);">/mo</span></div>
+      <div class="ue-line"><strong>Strategic operator (Brandolph)</strong> <span class="ue-line-price">included</span></div>
+      <div class="ue-line"><strong>55 specialists · 9 models · routed</strong> <span class="ue-line-price">included</span></div>
+      <div class="ue-line"><strong>Human creative director</strong> <span class="ue-line-price">included</span></div>
+      <div class="ue-line"><strong>2,500 credits + 800 rollover</strong> <span class="ue-line-price">included</span></div>
+      <div class="ue-callout"><strong>79% cost replacement.</strong> One subscription. No people in the middle.</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- TRACTION -->
+<section id="traction" class="ruled">
+  <span class="eyebrow">Traction · Already Moving</span>
+  <h2>200+ brands already run<br /><em>their creative on CaastorOS.</em></h2>
+  <p class="body" style="margin-top: 16px; max-width: 620px;">
+    Built on top of a real creative operation with 200+ brands served across GCC and Europe. The human craft team — now embedded in the platform — has delivered brand identities, campaigns, packaging, and guidelines. This is not a concept. <strong>The product is live and shipping.</strong>
+  </p>
+
+  <div class="stats-row">
+    <div class="stat-cell">
+      <div class="sc-val" style="color:var(--yellow);">200+</div>
+      <div class="sc-label">Active brands</div>
+    </div>
+    <div class="stat-cell">
+      <div class="sc-val" style="color:var(--mint);">2×</div>
+      <div class="sc-label">Regions live — GCC + Europe</div>
+    </div>
+    <div class="stat-cell">
+      <div class="sc-val">24h</div>
+      <div class="sc-label">First deliverable from onboarding</div>
+    </div>
+    <div class="stat-cell">
+      <div class="sc-val" style="color:var(--pink);">94%</div>
+      <div class="sc-label">Month-2 retention (Tier 02–03)</div>
+    </div>
+    <div class="stat-cell">
+      <div class="sc-val">~40s</div>
+      <div class="sc-label">Time to first BIO</div>
+    </div>
+  </div>
+
+  <div style="margin-top:32px;">
+    <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--faint);margin-bottom:12px;">A few of the brands we ship for</div>
+    <div class="client-row">
+      <div class="client-cell">Vinilo</div>
+      <div class="client-cell">Honduras & Co</div>
+      <div class="client-cell">Maré</div>
+      <div class="client-cell">Athra</div>
+      <div class="client-cell">Northline</div>
+      <div class="client-cell client-cell--more">+ 195 more</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- WHAT'S LIVE / NEXT -->
+<section id="live" class="ruled">
+  <span class="eyebrow">Product Status</span>
+  <h2>What's live. <em>What's next.</em></h2>
+
+  <div class="live-grid">
+    <div>
+      <div class="live-col-title live-col-title--live">Live now</div>
+      <ul class="live-items">
+        <li>BIO schema + ingestion + certification flow</li>
+        <li>Brandolph L1 — sharpener, memory layer, and crew assembly</li>
+        <li>50 of 55 specialists live across 6 active departments</li>
+        <li>Hybrid model routing — Anthropic, OpenRouter, fal.ai</li>
+        <li>Interactive canvas — re-run, revise, reuse per node</li>
+        <li>Library with brief-grouped output history</li>
+        <li>Admin surfaces — spec editor with version history</li>
+        <li>Brandolph memory viewer per brand</li>
+        <li>Vision QA on multimodal outputs</li>
+        <li>Brand-scoped RLS, workspace switching, role-based access</li>
+      </ul>
+    </div>
+    <div>
+      <div class="live-col-title live-col-title--next">Coming next</div>
+      <ul class="live-items" style="list-style:none;">
+        <li class="next-item">Motion & Sound department — video, sound design, motion graphics specialists</li>
+        <li class="next-item">Direct publish integrations — Figma, Canva, CMS, social schedulers</li>
+        <li class="next-item">Multi-brand portfolio analytics for agencies and holding companies</li>
+        <li class="next-item">Marketplace for certified senior brand directors to take on BIO certification work</li>
+        <li class="next-item">API surface so third-party tools can read the BIO and stay brand-consistent</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+
+<!-- MARKET -->
+<section id="market" class="ruled">
+  <span class="eyebrow">Market · A Category in Motion</span>
+  <h2>Creative spend is<br /><em>restructuring.</em></h2>
+  <p class="body" style="margin-top: 16px; max-width: 620px;">
+    Brands are pulling spend out of retainer agencies and back into platforms that ship. CaastorOS sits where the new wedge opens.
+  </p>
+
+  <div class="market-layout">
+    <div class="tam-circles">
+      <div class="tam-row">
+        <div class="tam-info">
+          <div class="tam-label">TAM</div>
+          <div class="tam-val">€186B</div>
+          <div style="font-size:12px;color:var(--faint);margin-top:2px;">Global creative & marketing services spend</div>
+        </div>
+        <div class="tam-bar-wrap"><div class="tam-bar" style="width:100%; background:rgba(248,192,54,0.3);"></div></div>
+      </div>
+      <div class="tam-row">
+        <div class="tam-info">
+          <div class="tam-label">SAM</div>
+          <div class="tam-val">€42B</div>
+          <div style="font-size:12px;color:var(--faint);margin-top:2px;">EU + GCC mid-market creative subs</div>
+        </div>
+        <div class="tam-bar-wrap"><div class="tam-bar" style="width:22.6%; background:rgba(248,192,54,0.6);"></div></div>
+      </div>
+      <div class="tam-row">
+        <div class="tam-info">
+          <div class="tam-label">SOM</div>
+          <div class="tam-val">€420M</div>
+          <div style="font-size:12px;color:var(--faint);margin-top:2px;">3-yr beachhead at &lt;1% capture</div>
+        </div>
+        <div class="tam-bar-wrap"><div class="tam-bar" style="width:1%; background:var(--yellow);"></div></div>
+      </div>
+    </div>
+
+    <div class="wedge-list">
+      <div style="font-family:var(--font-mono);font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;color:var(--faint);margin-bottom:12px;">The Wedge</div>
+      <div class="wedge-item">
+        <div class="wedge-title y">Agencies bleed.</div>
+        <div class="wedge-desc">Holding-company revenue down 7% YoY in 2025. The retainer model is collapsing under its own overhead.</div>
+      </div>
+      <div class="wedge-item">
+        <div class="wedge-title m">Subs scale.</div>
+        <div class="wedge-desc">Creative subscription spend +38% YoY across our segment. Brands want predictable capacity, not project invoices.</div>
+      </div>
+      <div class="wedge-item">
+        <div class="wedge-title b">AI eats the floor.</div>
+        <div class="wedge-desc">The next wedge is where AI + craft sit in one stack. That is precisely where CaastorOS is positioned.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- WHY NOW -->
+<section id="why" class="ruled">
+  <span class="eyebrow">Why Now</span>
+  <h2>The window for the right architecture<br /><em>is open — and closing.</em></h2>
+
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="wy-title">AI inference economics finally work</div>
+      <p class="wy-desc">Multi-provider routing across Anthropic, OpenRouter, and fal.ai makes per-asset cost low enough that a brand can run <strong>hundreds of briefs a month profitably.</strong></p>
+    </div>
+    <div class="why-card">
+      <div class="wy-title">Multimodal is real and cheap</div>
+      <p class="wy-desc">Vision QA on Gemini Flash at ~$0.00015 per check means we can <strong>enforce brand visual rules at scale</strong> — something not possible 18 months ago.</p>
+    </div>
+    <div class="why-card">
+      <div class="wy-title">The market has been trained</div>
+      <p class="wy-desc">Founders and CMOs have used ChatGPT for two years and <strong>felt the ceiling.</strong> They are ready for the next layer — context-aware, brand-governed, specialist-driven.</p>
+    </div>
+    <div class="why-card">
+      <div class="wy-title">Senior brand talent is the bottleneck</div>
+      <p class="wy-desc">The supply of CMOs and brand directors who can govern AI-generated work is fixed. <strong>CaastorOS productizes that talent</strong> — and makes it available at SaaS prices.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- TEAM -->
+<section id="team" class="ruled">
+  <span class="eyebrow">The Team</span>
+  <h2>Built by people who've<br />done this <em>for real.</em></h2>
+  <p class="body" style="margin-top:20px; max-width:580px;">
+    15+ years of creative leadership, AI infrastructure at scale, brand strategy, and human craft — assembled into one operating system.
+  </p>
+
+  <div class="leadership-grid">
+    <div class="lead-card">
+      <div class="lead-avatar--placeholder" style="background:var(--yellow);">O</div>
+      <div class="lead-title">Founder · CEO</div>
+      <div class="lead-name">Oscar Motta</div>
+      <p class="lead-desc">15+ years creative leadership across MENA, LATAM, and Europe. <strong>Former agency CD.</strong> Built brand systems for 200+ companies. Designed Brandolph's operating principles from first principles.</p>
+    </div>
+    <div class="lead-card">
+      <div class="lead-avatar--placeholder" style="background:var(--mint);">C</div>
+      <div class="lead-title">CTO</div>
+      <div class="lead-name">Chief Technology Officer</div>
+      <p class="lead-desc">AI / ML at scale. <strong>Built routing infrastructure at $1B+ organisations.</strong> Designed the hybrid model routing layer and the BIO ingestion pipeline that extracts 94+ brand signals in ~40 seconds.</p>
+    </div>
+    <div class="lead-card">
+      <div class="lead-avatar--placeholder" style="background:var(--purple);">S</div>
+      <div class="lead-title">Head of Strategy</div>
+      <div class="lead-name">Head of Strategy</div>
+      <p class="lead-desc">Former senior brand strategist. <strong>Built Brandolph's playbooks</strong> — the operating principles that turn a one-line brief into a CMO-grade crew brief with tension, refusals, and specialist assembly logic.</p>
+    </div>
+    <div class="lead-card">
+      <div class="lead-avatar--placeholder" style="background:var(--pink);">C</div>
+      <div class="lead-title">Head of Craft</div>
+      <div class="lead-name">Head of Craft</div>
+      <p class="lead-desc">Runs the human creative team. <strong>Shipped 1,000+ brand projects.</strong> Oversees BIO certification quality and manages the senior creative directors embedded in Tier 02 and Tier 03.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- THE ASK -->
+<section id="ask" class="ruled">
+  <span class="eyebrow">The Ask · Seed Round</span>
+
+  <div class="ask-layout">
+    <div>
+      <div class="ask-amount">€1.5M</div>
+      <div class="ask-sub">Seed round · 2026</div>
+      <div class="ask-runway">Use of funds · 18 months runway</div>
+
+      <div class="fund-item">
+        <div class="fund-pct">40%</div>
+        <div class="fund-bar-wrap"><div class="fund-bar" style="width:100%;"></div></div>
+        <div class="fund-label"><strong>Product + AI infra</strong>Brandolph v2, agent routing, BIO depth</div>
+      </div>
+      <div class="fund-item">
+        <div class="fund-pct">35%</div>
+        <div class="fund-bar-wrap"><div class="fund-bar" style="width:87.5%; background:var(--mint);"></div></div>
+        <div class="fund-label"><strong>EU expansion</strong>Spain, Italy, France GTM + creative ops</div>
+      </div>
+      <div class="fund-item">
+        <div class="fund-pct">15%</div>
+        <div class="fund-bar-wrap"><div class="fund-bar" style="width:37.5%; background:var(--purple);"></div></div>
+        <div class="fund-label"><strong>Creative team</strong>Senior CDs for Tier 02 + Tier 03 craft</div>
+      </div>
+      <div class="fund-item">
+        <div class="fund-pct">10%</div>
+        <div class="fund-bar-wrap"><div class="fund-bar" style="width:25%; background:var(--pink);"></div></div>
+        <div class="fund-label"><strong>Brand + community</strong>Conference presence, partner network</div>
+      </div>
+    </div>
+
+    <div>
+      <h2 style="font-size:clamp(24px,3vw,38px);">Access the true power<br />of creative on demand.<br /><em>And have fun with it.</em></h2>
+      <p class="body" style="margin-top:20px; color:var(--faint);">
+        We're raising a focused seed round to take the platform from private preview to full market expansion across the EU and GCC. If you're an investor, strategic partner, or want to be part of what comes next — let's talk.
+      </p>
+      <div class="btn-row" style="margin-top:32px;">
+        <a href="mailto:invest@caastor.co" class="btn-y">Investor enquiries</a>
+        <a href="mailto:hello@caastor.co" class="btn-o">hello@caastor.co</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CTA -->
+<section id="cta" class="ruled">
+  <div class="cta-h">
+    Every brand deserves<br />
+    <em>institutional intelligence.</em>
+  </div>
+  <p class="cta-sub">
+    CaastorOS is in private preview. We're onboarding a focused cohort of brands, agencies, and strategic investors in H2 2026.
+  </p>
+  <div class="btn-row" style="justify-content:center;">
+    <a href="mailto:hello@caastor.co" class="btn-y">Request access</a>
+    <a href="mailto:invest@caastor.co" class="btn-o">Investor enquiries</a>
+  </div>
+
+  <div class="contact-grid">
+    <div class="contact-block">
+      <div class="contact-label">General</div>
+      <a href="mailto:hello@caastor.co" class="contact-val">hello@caastor.co</a>
+    </div>
+    <div class="contact-block">
+      <div class="contact-label">Investor Relations</div>
+      <a href="mailto:invest@caastor.co" class="contact-val">invest@caastor.co</a>
+    </div>
+    <div class="contact-block">
+      <div class="contact-label">Platform</div>
+      <a href="https://caastor.co" class="contact-val" target="_blank">caastor.co</a>
+    </div>
+  </div>
+</section>
+
+
+<!-- FOOTER -->
+<footer>
+  <span>CaastorOS · Investor Brief · 2026</span>
+  <span>Confidential — Not for distribution</span>
+  <span>© 2026 Caastor / La Mesa</span>
+</footer>
+
+</body>
+</html>
