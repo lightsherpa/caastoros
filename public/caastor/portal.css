@@ -1272,3 +1272,64 @@ a.card:active, button.card:active { transform: translateY(0); }
   .lib-grid { grid-template-columns: 1fr; }
   .lib-assets { grid-template-columns: 1fr; }
 }
+
+/* ── Split sign-in: story (left) · access (right) ─────────────────── */
+.auth-split { min-height: 100vh; display: flex; background: var(--c-bg); }
+
+.auth-story { position: relative; flex: 1 1 55%; overflow: hidden; }
+.auth-story__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.auth-story__veil { position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(18,12,6,0) 52%, rgba(18,12,6,0.30) 100%); }
+/* Localized scrim — GUARANTEES WCAG-AA white-on-photo contrast for every line
+   of copy, independent of the image behind it: the composite behind the text
+   stays ≥0.80 opaque dark, so white text clears 4.5:1 even over the lightest
+   linen/highlight areas of the photo. Text-shadows add a further safety margin. */
+.auth-story__copy { position: absolute; left: 0; right: 0; bottom: 0; padding: 76px 56px 54px; color: #fff;
+  background: linear-gradient(0deg, rgba(18,12,6,0.92) 0%, rgba(18,12,6,0.82) 74%, rgba(18,12,6,0) 100%); }
+.auth-story__eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: #fff; opacity: 0.96; margin-bottom: 14px;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.6); }
+.auth-story__head { font-family: var(--font-serif); font-style: italic; font-weight: 500;
+  font-size: 46px; line-height: 1.04; letter-spacing: -0.015em; margin: 0 0 14px; color: #fff;
+  text-shadow: 0 2px 18px rgba(0,0,0,0.6); }
+.auth-story__sub { font-size: 15px; line-height: 1.6; color: #fff; opacity: 0.97; margin: 0; max-width: 440px;
+  text-shadow: 0 1px 10px rgba(0,0,0,0.55); }
+.auth-story__dots { display: flex; gap: 8px; margin-top: 26px; }
+.auth-story__dots span { width: 7px; height: 7px; border-radius: 999px; background: rgba(255,255,255,0.42); transition: width 200ms ease; }
+.auth-story__dots span.is-active { background: #fff; width: 22px; }
+
+.auth-panel { flex: 1 1 45%; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 40px 28px; overflow-y: auto; }
+.auth-form { width: 100%; max-width: 360px; }
+.auth-form .auth-mark { display: flex; align-items: baseline; gap: 5px; justify-content: center; margin: 0 0 18px; }
+.auth-title { font-family: var(--font-serif); font-style: italic; font-weight: 500; font-size: 30px;
+  line-height: 1.1; letter-spacing: -0.01em; text-align: center; margin: 0; color: var(--c-ink); }
+.auth-form .auth-sub { text-align: center; }
+
+.auth-toggle { display: flex; gap: 4px; background: rgba(0,0,0,0.045); border: 1px solid var(--c-line);
+  border-radius: 999px; padding: 4px; margin: 22px 0 16px; }
+.auth-toggle__opt { flex: 1; border: none; background: transparent; border-radius: 999px; padding: 8px 0;
+  font-size: 13px; font-weight: 500; color: var(--c-dim); cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease; }
+.auth-toggle__opt.is-active { background: var(--c-card); color: var(--c-ink); box-shadow: 0 1px 3px rgba(0,0,0,0.10); }
+
+.auth-oauth { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+  height: 46px; border: 1px solid var(--c-line); border-radius: 12px; background: var(--c-card);
+  color: var(--c-ink); font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: background 140ms ease, box-shadow 140ms ease; }
+.auth-oauth:hover { background: var(--c-bg); box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.auth-oauth:disabled { opacity: 0.6; cursor: default; }
+
+.auth-or { display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; color: var(--c-faint);
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--c-line); }
+.auth-or span { flex: none; }
+
+.auth-form .auth-submit { width: 100%; margin-top: 16px; }
+.auth-foot { text-align: center; font-size: 12px; color: var(--c-faint); margin-top: 22px; line-height: 1.5; }
+.auth-foot a { color: var(--c-dim); text-decoration: underline; }
+.auth-foot--alt { margin-top: 10px; }
+
+@media (max-width: 860px) {
+  .auth-story { display: none; }
+  .auth-panel { flex: 1 1 100%; }
+}

@@ -19,138 +19,132 @@
     --font-mono:'IBM Plex Mono', monospace;
   }
   *{ margin:0; padding:0; box-sizing:border-box; }
-  html,body{ height:100%; background:var(--ink); color:var(--white); font-family:var(--font-body); -webkit-font-smoothing:antialiased; overflow:hidden; }
-
+  html,body{ height:100%; background:#000; color:var(--white); font-family:var(--font-body); -webkit-font-smoothing:antialiased; overflow:hidden; }
   .stage-wrap{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:#000; overflow:hidden; }
   .stage{ width:1280px; height:720px; position:relative; transform-origin:center center; background:var(--ink); box-shadow:0 40px 120px rgba(0,0,0,0.6); }
-
-  .slide{ position:absolute; inset:0; padding:64px 80px; display:none; flex-direction:column; }
+  .slide{ position:absolute; inset:0; padding:58px 76px; display:none; flex-direction:column; }
   .slide.active{ display:flex; animation:fade .35s ease; }
   @keyframes fade{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+  .sfoot{ position:absolute; left:76px; right:76px; bottom:22px; display:flex; justify-content:space-between; align-items:center; font-family:var(--font-mono); font-size:9px; letter-spacing:0.14em; color:var(--dim); text-transform:uppercase; }
 
-  /* footer */
-  .sfoot{ position:absolute; left:80px; right:80px; bottom:26px; display:flex; justify-content:space-between; align-items:center;
-          font-family:var(--font-mono); font-size:9px; letter-spacing:0.14em; color:var(--dim); text-transform:uppercase; }
-
-  /* type */
-  .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--yellow); display:block; margin-bottom:20px; }
-  .eyebrow--dim{ color:var(--faint); }
-  h1{ font-family:var(--font-sans); font-weight:700; font-size:84px; line-height:0.97; letter-spacing:-0.025em; color:var(--white); }
+  .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--yellow); display:block; margin-bottom:16px; }
+  h1{ font-family:var(--font-sans); font-weight:700; font-size:76px; line-height:0.98; letter-spacing:-0.025em; color:var(--white); }
   h1 em{ color:var(--yellow); font-style:normal; }
-  h2{ font-family:var(--font-sans); font-weight:700; font-size:46px; line-height:1.05; letter-spacing:-0.02em; color:var(--white); }
+  h2{ font-family:var(--font-sans); font-weight:700; font-size:42px; line-height:1.05; letter-spacing:-0.02em; color:var(--white); }
   h2 em{ color:var(--yellow); font-style:italic; }
-  .insight-h{ font-family:var(--font-sans); font-weight:700; font-size:60px; line-height:1.02; letter-spacing:-0.03em; color:var(--white); }
+  .insight-h{ font-family:var(--font-sans); font-weight:700; font-size:54px; line-height:1.04; letter-spacing:-0.03em; color:var(--white); }
   .insight-h em{ color:var(--mint); font-style:normal; }
-  .body{ font-family:var(--font-body); font-weight:300; font-size:18px; line-height:1.65; color:var(--faint); }
+  .body{ font-family:var(--font-body); font-weight:300; font-size:17px; line-height:1.6; color:var(--faint); }
   .body strong{ color:var(--white); font-weight:400; }
-  .lead-faint{ font-family:var(--font-body); font-weight:300; font-size:20px; line-height:1.55; color:var(--faint); max-width:760px; }
+  .lead-faint{ font-family:var(--font-body); font-weight:300; font-size:19px; line-height:1.55; color:var(--faint); max-width:780px; }
   .lead-faint strong{ color:var(--white); font-weight:400; }
 
-  /* hero deco */
-  .hero-grid{ position:absolute; inset:0; background-image:radial-gradient(rgba(248,192,54,0.05) 1px, transparent 1px); background-size:56px 56px; opacity:0.7; pointer-events:none; }
+  .hero-grid{ position:absolute; inset:0; background-image:radial-gradient(rgba(248,192,54,0.05) 1px, transparent 1px); background-size:54px 54px; opacity:0.7; pointer-events:none; }
   .hero-radial{ position:absolute; inset:0; background:radial-gradient(ellipse 70% 60% at 50% 0%, rgba(248,192,54,0.10), transparent 60%); pointer-events:none; }
-
   .topbar{ display:flex; align-items:center; gap:14px; position:relative; z-index:2; }
-  .topbar img{ height:30px; width:auto; }
+  .topbar img{ height:28px; width:auto; }
   .nav-sub{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--faint); text-transform:uppercase; }
-
-  .chip{ display:inline-flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint);
-         border:1px solid var(--line); border-radius:30px; padding:7px 15px; background:rgba(255,255,255,0.02); }
+  .chip{ display:inline-flex; align-items:center; gap:9px; font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); border:1px solid var(--line); border-radius:30px; padding:7px 15px; background:rgba(255,255,255,0.02); }
   .chip-dot{ width:6px; height:6px; border-radius:50%; background:var(--yellow); animation:blink 2.4s ease-in-out infinite; }
   @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.2;} }
-
   .mascot{ position:absolute; pointer-events:none; animation:float 6s ease-in-out infinite; }
   @keyframes float{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-12px);} }
 
-  /* layouts */
-  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:64px; align-items:center; margin-top:auto; margin-bottom:auto; }
-  .stack{ margin-top:40px; }
+  .hero-tagline{ display:flex; flex-direction:column; gap:7px; margin-bottom:22px; position:relative; z-index:2; }
+  .htag{ align-self:flex-start; font-family:var(--font-sans); font-weight:700; font-size:15px; letter-spacing:0.04em; color:var(--ink); background:var(--yellow); padding:5px 14px; border-radius:5px; text-transform:uppercase; }
+  .htag.m2{ margin-left:26px; background:var(--mint); }
+  .htag.m3{ margin-left:52px; background:var(--white); }
 
-  /* mono stat cells (gap-as-border) */
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:center; margin-top:auto; margin-bottom:auto; }
+  .stack{ margin-top:34px; }
+
   .cells{ display:grid; gap:1px; background:var(--line); border-radius:12px; overflow:hidden; }
-  .cell{ background:var(--ink-2); padding:24px 26px; }
+  .cell{ background:var(--ink-2); padding:22px 24px; }
   .cell .k{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--yellow); margin-bottom:8px; }
-  .cell .v{ font-family:var(--font-body); font-weight:300; font-size:15px; line-height:1.5; color:var(--faint); }
+  .cell .v{ font-family:var(--font-body); font-weight:300; font-size:14.5px; line-height:1.5; color:var(--faint); }
   .cell .v strong{ color:var(--white); font-weight:400; }
 
-  /* pain list */
   .pain{ list-style:none; display:flex; flex-direction:column; gap:1px; background:var(--line); border-radius:12px; overflow:hidden; }
-  .pain li{ background:var(--ink-2); padding:22px 26px; display:flex; gap:20px; align-items:flex-start; }
-  .pain .n{ font-family:var(--font-mono); font-size:13px; color:var(--yellow); padding-top:3px; }
-  .pain strong{ display:block; font-family:var(--font-sans); font-weight:600; font-size:20px; letter-spacing:-0.01em; color:var(--white); margin-bottom:4px; }
-  .pain span{ font-family:var(--font-body); font-weight:300; font-size:14.5px; line-height:1.55; color:var(--faint); }
-  .pain .pink{ color:var(--pink); }
+  .pain li{ background:var(--ink-2); padding:18px 22px; display:flex; gap:18px; align-items:flex-start; }
+  .pain .n{ font-family:var(--font-mono); font-size:12px; color:var(--yellow); padding-top:3px; }
+  .pain strong{ display:block; font-family:var(--font-sans); font-weight:600; font-size:18px; letter-spacing:-0.01em; color:var(--white); margin-bottom:3px; }
+  .pain span{ font-family:var(--font-body); font-weight:300; font-size:13.5px; line-height:1.5; color:var(--faint); }
 
-  /* flow steps */
+  .statcall{ border:1px solid rgba(248,192,54,0.2); background:rgba(248,192,54,0.04); border-radius:14px; padding:30px 28px; }
+  .statcall .big{ font-family:var(--font-sans); font-weight:700; font-size:60px; color:var(--yellow); line-height:1; letter-spacing:-0.03em; }
+  .statcall .sub{ color:var(--faint); font-size:15px; line-height:1.5; margin-top:14px; }
+  .statcall .sub strong{ color:var(--white); font-weight:400; }
+
   .flow{ display:flex; flex-direction:column; gap:1px; background:var(--line); border-radius:12px; overflow:hidden; }
-  .flow .step{ background:var(--ink-2); padding:16px 22px; display:flex; gap:16px; align-items:baseline; }
-  .flow .fn{ font-family:var(--font-sans); font-weight:700; font-size:22px; color:rgba(248,192,54,0.28); min-width:30px; }
-  .flow .ft{ font-family:var(--font-sans); font-weight:600; font-size:16px; color:var(--white); margin-bottom:2px; }
-  .flow .fd{ font-family:var(--font-body); font-weight:300; font-size:13px; line-height:1.5; color:var(--faint); }
-  .flow .ftag{ display:inline-block; margin-top:6px; font-family:var(--font-mono); font-size:9px; letter-spacing:0.06em; color:var(--yellow); background:rgba(248,192,54,0.07); padding:2px 7px; border-radius:3px; }
+  .flow .step{ background:var(--ink-2); padding:14px 20px; }
+  .flow .ft{ font-family:var(--font-sans); font-weight:600; font-size:15px; color:var(--white); }
+  .flow .fd{ font-family:var(--font-body); font-weight:300; font-size:12.5px; line-height:1.45; color:var(--faint); margin-top:2px; }
 
   .shot{ border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--ink-2); box-shadow:0 24px 60px rgba(0,0,0,0.4); }
   .shot img{ display:block; width:100%; height:auto; }
   .shot .cap{ font-family:var(--font-mono); font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); padding:9px 14px; border-top:1px solid var(--line); }
 
-  /* moat grid */
   .moat{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border-radius:12px; overflow:hidden; }
-  .moat .mc{ background:var(--ink-2); padding:22px 24px; }
-  .moat .mn{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--yellow); margin-bottom:8px; }
-  .moat .mt{ font-family:var(--font-sans); font-weight:700; font-size:19px; letter-spacing:-0.01em; color:var(--white); margin-bottom:5px; }
-  .moat .md{ font-family:var(--font-body); font-weight:300; font-size:13px; line-height:1.5; color:var(--faint); }
+  .moat .mc{ background:var(--ink-2); padding:20px 22px; }
+  .moat .mn{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--yellow); margin-bottom:7px; }
+  .moat .mt{ font-family:var(--font-sans); font-weight:700; font-size:18px; letter-spacing:-0.01em; color:var(--white); margin-bottom:5px; }
+  .moat .md{ font-family:var(--font-body); font-weight:300; font-size:12.5px; line-height:1.5; color:var(--faint); }
   .moat .md strong{ color:var(--white); font-weight:400; }
-  .band{ margin-top:18px; border:1px solid rgba(248,192,54,0.18); background:rgba(248,192,54,0.04); border-radius:10px; padding:16px 22px;
-         font-family:var(--font-body); font-weight:300; font-size:15px; line-height:1.5; color:var(--faint); }
+  .band{ margin-top:16px; border:1px solid rgba(248,192,54,0.18); background:rgba(248,192,54,0.04); border-radius:10px; padding:15px 20px; font-family:var(--font-body); font-weight:300; font-size:14.5px; line-height:1.5; color:var(--faint); }
   .band strong{ color:var(--white); font-weight:500; }
 
-  /* stats row */
+  .usp{ width:100%; border-collapse:collapse; margin-top:22px; }
+  .usp th,.usp td{ text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); font-family:var(--font-body); font-weight:300; font-size:13px; color:var(--faint); }
+  .usp thead th{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); }
+  .usp td:first-child,.usp th:first-child{ color:var(--white); font-weight:400; }
+  .usp .ca{ color:var(--yellow) !important; font-weight:600; }
+  .usp td.cacol{ background:rgba(248,192,54,0.06); color:var(--yellow); font-weight:600; text-align:center; }
+  .usp .yes{ color:var(--mint); text-align:center; }
+  .usp .no{ color:rgba(255,255,255,0.18); text-align:center; }
+  .usp .mid{ color:var(--faint); text-align:center; }
+
   .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border-radius:12px; overflow:hidden; }
-  .stats .sc{ background:var(--ink-2); padding:26px 22px; }
-  .stats .sv{ font-family:var(--font-sans); font-weight:700; font-size:36px; line-height:1; letter-spacing:-0.03em; }
-  .stats .sl{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); margin-top:10px; }
+  .stats .sc{ background:var(--ink-2); padding:24px 20px; }
+  .stats .sv{ font-family:var(--font-sans); font-weight:700; font-size:34px; line-height:1; letter-spacing:-0.03em; }
+  .stats .sl{ font-family:var(--font-mono); font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); margin-top:9px; }
 
-  .market{ margin-top:22px; display:flex; align-items:center; gap:26px; flex-wrap:wrap; }
-  .market .big{ font-family:var(--font-sans); font-weight:700; font-size:20px; color:var(--white); }
-  .market .arrow{ color:var(--yellow); }
-  .market .goal{ font-family:var(--font-body); font-weight:300; font-size:15px; color:var(--faint); }
-  .market .goal strong{ color:var(--mint); font-weight:500; }
-  .expand{ margin-top:16px; font-family:var(--font-mono); font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:var(--faint); }
-  .expand b{ color:var(--white); font-weight:600; }
-  .expand .ar{ color:var(--yellow); margin:0 8px; }
+  .client-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border-radius:10px; overflow:hidden; margin-top:14px; }
+  .client-cell{ background:var(--ink-2); padding:12px 8px; text-align:center; font-family:var(--font-mono); font-size:10px; letter-spacing:0.06em; text-transform:uppercase; color:var(--faint); }
+  .client-cell.more{ color:var(--yellow); }
 
-  /* ask */
-  .ask-cols{ display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:36px; align-items:start; }
-  .ask-list{ list-style:none; display:flex; flex-direction:column; gap:12px; }
-  .ask-list li{ display:flex; gap:12px; align-items:flex-start; font-family:var(--font-body); font-weight:300; font-size:15px; line-height:1.45; color:var(--faint); }
+  .src-tag{ margin-top:14px; font-family:var(--font-mono); font-size:9px; letter-spacing:0.08em; color:var(--dim); text-transform:uppercase; }
+  .marketline{ margin-top:18px; font-family:var(--font-body); font-weight:300; font-size:15.5px; color:var(--faint); }
+  .marketline b{ color:var(--white); font-weight:500; }
+  .marketline .sep{ color:var(--yellow); margin:0 8px; }
+
+  .ask-cols{ display:grid; grid-template-columns:1fr 1fr; gap:44px; margin-top:30px; align-items:start; }
+  .ask-list{ list-style:none; display:flex; flex-direction:column; gap:10px; }
+  .ask-list li{ display:flex; gap:11px; align-items:flex-start; font-family:var(--font-body); font-weight:300; font-size:14px; line-height:1.4; color:var(--faint); }
   .ask-list li strong{ color:var(--white); font-weight:500; }
-  .ask-list .dot{ width:6px; height:6px; border-radius:50%; background:var(--mint); margin-top:8px; flex:none; }
-  .ask-amount{ font-family:var(--font-sans); font-weight:700; font-size:72px; line-height:1; letter-spacing:-0.03em; color:var(--yellow); }
-  .ask-sub{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); margin-top:8px; margin-bottom:20px; }
-  .fund{ display:flex; flex-direction:column; gap:11px; }
-  .fund-item{ display:grid; grid-template-columns:42px 1fr; gap:12px; align-items:center; }
-  .fund-pct{ font-family:var(--font-mono); font-size:13px; color:var(--white); }
-  .fund-bar{ height:7px; border-radius:4px; }
-  .fund-label{ grid-column:2; font-family:var(--font-body); font-weight:300; font-size:12.5px; color:var(--faint); margin-top:-4px; }
-  .fund-label b{ color:var(--white); font-weight:500; }
-
-  .col-h{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--yellow); margin-bottom:18px; }
+  .ask-list .dot{ width:6px; height:6px; border-radius:50%; background:var(--mint); margin-top:7px; flex:none; }
+  .col-h{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.16em; text-transform:uppercase; color:var(--yellow); margin-bottom:16px; }
   .col-h.dim{ color:var(--faint); }
+  .ask-amount{ font-family:var(--font-sans); font-weight:700; font-size:64px; line-height:1; letter-spacing:-0.03em; color:var(--yellow); }
+  .ask-sub{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); margin-top:8px; margin-bottom:16px; }
+  .fund{ display:flex; flex-direction:column; gap:10px; }
+  .fund-item{ display:grid; grid-template-columns:40px 1fr; gap:11px; align-items:center; }
+  .fund-pct{ font-family:var(--font-mono); font-size:12.5px; color:var(--white); }
+  .fund-bar{ height:7px; border-radius:4px; }
+  .fund-label{ grid-column:2; font-family:var(--font-body); font-weight:300; font-size:12px; color:var(--faint); margin-top:-3px; }
+  .fund-label b{ color:var(--white); font-weight:500; }
+  .goalpill{ margin-top:16px; font-family:var(--font-mono); font-size:11px; letter-spacing:0.06em; color:var(--mint); border:1px solid rgba(94,196,168,0.3); background:rgba(94,196,168,0.06); border-radius:30px; padding:7px 14px; display:inline-block; }
 
   .center-slide{ align-items:center; justify-content:center; text-align:center; }
-  .center-slide .insight-h{ max-width:1000px; }
   .tint{ background:rgba(248,192,54,0.02); }
-
-  .contact{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); margin-top:28px; }
+  .contact{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); margin-top:26px; position:relative; z-index:2; }
   .contact b{ color:var(--white); }
 
-  /* chrome */
-  .counter{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:50; font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em; color:var(--faint); }
+  .counter{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%); z-index:50; font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em; color:var(--faint); }
   .counter b{ color:var(--yellow); }
-  .arrows{ position:fixed; bottom:16px; right:22px; z-index:50; display:flex; gap:8px; }
+  .arrows{ position:fixed; bottom:14px; right:20px; z-index:50; display:flex; gap:8px; }
   .arrows button{ background:var(--ink-2); border:1px solid var(--line); color:var(--faint); width:34px; height:30px; border-radius:6px; cursor:pointer; font-size:14px; transition:all .14s; }
   .arrows button:hover{ color:var(--white); border-color:rgba(248,192,54,0.4); }
-  .hint{ position:fixed; bottom:20px; left:22px; z-index:50; font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em; color:var(--dim); }
+  .hint{ position:fixed; bottom:18px; left:20px; z-index:50; font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em; color:var(--dim); }
 
   @media print{
     @page{ size:1280px 720px; margin:0; }
@@ -164,8 +158,8 @@
 </style>
 </head>
 <body>
-<!-- NOTA: marcadores a confirmar antes del lunes → [50+ marcas], [€350K ronda], [email].
-     Assets referenciados de forma relativa: mantén este HTML en la raíz del repo (Claudio/CaastorOS). -->
+<!-- NOTA: confirmar antes de presentar → email del cierre; permisos de logos (Google/Listerine = trabajo vía agencia, no presentar como cliente directo).
+     Assets relativos: mantener este HTML en la raíz del repo (Claudio/CaastorOS). -->
 <div class="stage-wrap">
   <div class="stage" id="stage">
 
@@ -178,116 +172,180 @@
         <span class="nav-sub">· Pitch iLab Madrid 2026</span>
       </div>
       <div style="position:relative; z-index:2; margin-top:auto; margin-bottom:auto;">
-        <span class="chip" style="margin-bottom:26px;"><span class="chip-dot"></span>Caastor · CaastorOS · Private Preview · 2026</span>
+        <div class="hero-tagline">
+          <span class="htag">Big Ideas.</span>
+          <span class="htag m2">Brilliant Execution.</span>
+          <span class="htag m3">Zero Drama.</span>
+        </div>
         <h1>Convertimos cada empresa<br />en <em>una marca.</em></h1>
-        <p class="lead-faint" style="margin-top:26px;">Una <strong>Identidad de Marca certificada</strong>, un director de marca con IA y un estudio creativo entero — por el precio de un software, no de una agencia.</p>
+        <p class="lead-faint" style="margin-top:22px;"><strong>Caastor</strong> es el estudio creativo as-a-service que ya factura. <strong>CaastorOS</strong> es el sistema operativo de marca que lo hará escalar.</p>
       </div>
-      <img class="mascot" src="public/caastor/assets/mascot/yellow.svg" alt="Brandolph" style="width:200px; right:70px; bottom:90px;" />
+      <img class="mascot" src="public/caastor/assets/mascot/yellow.svg" alt="Brandolph" style="width:185px; right:66px; bottom:88px;" />
       <div class="sfoot"><span>Caastor · CaastorOS</span><span>iLab Madrid 2026</span></div>
     </section>
 
-    <!-- 2 · POR QUÉ MADRID -->
-    <section class="slide">
-      <span class="eyebrow">Por qué Madrid</span>
-      <h2>Madrid es el puente. Y el hub.<br /><em>Por eso construimos aquí.</em></h2>
-      <div class="two-col">
-        <p class="body">Soy colombiano, vivo en Madrid, y llevo <strong>veinte años construyendo marcas</strong> entre Latinoamérica, Europa y el Golfo. Madrid es el único sitio donde esas tres regiones se tocan — y hoy, además, el ecosistema de startups nº1 de Europa por concentración. <strong>Queremos crear y escalar este proyecto desde aquí.</strong></p>
-        <div class="cells">
-          <div class="cell"><div class="k">Hub nº1</div><div class="v">La Comunidad de Madrid lidera Europa en concentración de startups: <strong>+2.100 empresas, +21.000 empleos.</strong></div></div>
-          <div class="cell"><div class="k">Puente</div><div class="v">Capital del mundo hispano + corazón europeo + puerta al Golfo. <strong>Las tres regiones donde operamos, en una ciudad.</strong></div></div>
-          <div class="cell"><div class="k">Momento</div><div class="v">España batió récord en 2025: <strong>128.193 empresas nuevas.</strong> Más marcas que nunca compitiendo por atención.</div></div>
-        </div>
-      </div>
-      <div class="sfoot"><span>Por qué Madrid</span><span>02 / 10</span></div>
-    </section>
-
-    <!-- 3 · VISIÓN -->
+    <!-- 2 · VISIÓN -->
     <section class="slide center-slide tint">
       <span class="eyebrow" style="text-align:center;">La visión</span>
       <h2 class="insight-h">Cada empresa merece una marca con alma.<br />Y poder producirla sin parar — <em>sin perder el alma.</em></h2>
-      <p class="lead-faint" style="margin:28px auto 0; text-align:center;">CaastorOS es el sistema operativo de la inteligencia de marca: convierte tu marca en algo <strong>vivo, certificado y consultable</strong>. Y cada pieza que produces deja de reinventarse desde cero.</p>
-      <div class="sfoot"><span>La visión</span><span>03 / 10</span></div>
+      <p class="lead-faint" style="margin:26px auto 0; text-align:center;">CaastorOS es el <strong>sistema operativo de la inteligencia de marca</strong>: convierte tu marca en algo vivo, certificado y consultable. Y cada pieza que produces deja de reinventarse desde cero.</p>
+      <div class="sfoot"><span>La visión</span><span>02 / 12</span></div>
     </section>
 
-    <!-- 4 · PROBLEMA -->
+    <!-- 3 · PROBLEMA -->
     <section class="slide">
       <span class="eyebrow">El problema</span>
-      <h2>El mercado le exige a cada empresa parecer una gran marca.<br /><em>Casi ninguna puede producirla.</em></h2>
-      <ul class="pain stack">
-        <li><span class="n">01</span><div><strong>La marca no es un sistema.</strong><span>Vive en la cabeza del fundador, en un deck y en plantillas sueltas. No se puede consultar ni proteger.</span></div></li>
-        <li><span class="n">02</span><div><strong>La IA genérica produce ruido.</strong><span>ChatGPT, Canva, Midjourney no conocen tu marca. Generan, pero se salen del personaje.</span></div></li>
-        <li><span class="n">03</span><div><strong>El criterio senior no escala.</strong><span>Un buen director de marca no puede tocar cada pieza. El fundador hace de todo y la marca se erosiona post a post. <span class="pink">Una agencia cuesta €2–8k/mes; el freelance es caro e intermitente.</span></span></div></li>
-      </ul>
-      <div class="sfoot"><span>El problema</span><span>04 / 10</span></div>
+      <h2>Todos generan con IA. <em>Casi nadie capta valor.</em></h2>
+      <div class="two-col" style="gap:48px;">
+        <ul class="pain">
+          <li><span class="n">01</span><div><strong>La marca no es un sistema.</strong><span>Vive en la cabeza del fundador, en un deck y en plantillas sueltas. No se puede consultar ni proteger.</span></div></li>
+          <li><span class="n">02</span><div><strong>La IA genérica produce ruido.</strong><span>ChatGPT, Canva, Midjourney no conocen tu marca. Generan, pero se salen del personaje.</span></div></li>
+          <li><span class="n">03</span><div><strong>La forma tradicional agota.</strong><span>Briefings infinitos, herramientas que los no-creativos no saben usar, freelances intermitentes. Burnout — y la marca se erosiona.</span></div></li>
+        </ul>
+        <div class="statcall">
+          <div class="big">88% · 6%</div>
+          <div class="sub"><strong>El 88% de las empresas ya usan IA</strong> — sobre todo en marketing. Pero <strong>solo el 6% captura valor real.</strong> Generar es fácil; diferenciar, no. Ahí estamos nosotros.</div>
+          <div class="src-tag">Fuente: McKinsey · The State of AI (2025)</div>
+        </div>
+      </div>
+      <div class="sfoot"><span>El problema</span><span>03 / 12</span></div>
     </section>
 
-    <!-- 5 · PRODUCTO -->
+    <!-- 4 · CAASTOR HOY -->
     <section class="slide">
-      <span class="eyebrow">El producto</span>
-      <h2>Un estudio creativo entero, en un software. <em>Y ya funciona.</em></h2>
-      <div class="two-col" style="gap:48px;">
+      <span class="eyebrow">Caastor · hoy</span>
+      <h2>No es una idea. <em>Es un negocio que ya factura.</em></h2>
+      <p class="body stack" style="margin-top:18px; max-width:760px;">Creative-as-a-Service: pides el diseño que quieras, en una línea, y un estudio entero lo ejecuta. <strong>Hola, soy Brandolph — tu director creativo.</strong></p>
+      <div class="cells stack" style="grid-template-columns:repeat(4,1fr); margin-top:22px;">
+        <div class="cell"><div class="k">Ilimitado</div><div class="v"><strong>Peticiones y ediciones sin límite.</strong> Hasta que dices "perfecto".</div></div>
+        <div class="cell"><div class="k">48–72h</div><div class="v"><strong>Entrega rápida.</strong> Minutos y días, no semanas.</div></div>
+        <div class="cell"><div class="k">Tarifa fija</div><div class="v"><strong>Suscripción mensual.</strong> Sin sorpresas. Sube, baja o cancela.</div></div>
+        <div class="cell"><div class="k">Todo en diseño</div><div class="v"><strong>Social, web & app, branding, packaging, presentaciones, motion.</strong></div></div>
+      </div>
+      <div class="src-tag">Caastor · Creative-as-a-Service · precio de software, capacidad de estudio</div>
+      <div class="sfoot"><span>Caastor · hoy</span><span>04 / 12</span></div>
+    </section>
+
+    <!-- 5 · POR QUÉ CAASTOR -->
+    <section class="slide">
+      <span class="eyebrow">Por qué Caastor</span>
+      <h2>Más rápido, flexible y escalable <em>que cualquier alternativa.</em></h2>
+      <table class="usp">
+        <thead>
+          <tr><th></th><th>In-house</th><th>Agencia</th><th>Freelance</th><th>Self-service</th><th class="ca">Caastor</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Velocidad</td><td class="no">✗</td><td class="no">✗</td><td class="mid">~</td><td class="yes">✓</td><td class="cacol">✓</td></tr>
+          <tr><td>Flexibilidad</td><td class="no">✗</td><td class="no">✗</td><td class="mid">~</td><td class="mid">~</td><td class="cacol">✓</td></tr>
+          <tr><td>Calidad</td><td class="yes">✓</td><td class="yes">✓</td><td class="mid">~</td><td class="no">✗</td><td class="cacol">✓</td></tr>
+          <tr><td>Escalabilidad</td><td class="no">✗</td><td class="mid">~</td><td class="no">✗</td><td class="mid">~</td><td class="cacol">✓</td></tr>
+          <tr><td>Coste</td><td class="no">✗</td><td class="no">✗</td><td class="yes">✓</td><td class="yes">✓</td><td class="cacol">✓</td></tr>
+          <tr><td>Localización</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">✗</td><td class="no">✗</td><td class="cacol">✓</td></tr>
+        </tbody>
+      </table>
+      <div class="src-tag">Posicionamiento Caastor · comparación frente a las alternativas del mercado</div>
+      <div class="sfoot"><span>Por qué Caastor</span><span>05 / 12</span></div>
+    </section>
+
+    <!-- 6 · CAASTOROS -->
+    <section class="slide">
+      <span class="eyebrow">CaastorOS · lo que construimos</span>
+      <h2>El servicio probado, <em>convertido en plataforma.</em></h2>
+      <div class="two-col" style="gap:46px;">
         <div class="flow">
-          <div class="step"><span class="fn">01</span><div><div class="ft">Subes</div><div class="fd">Tu empresa (web, redes, deck) → en minutos tienes tu <b style="color:var(--white);font-weight:500;">Identidad de Marca</b>, certificada por un director senior.</div><span class="ftag">Identidad</span></div></div>
-          <div class="step"><span class="fn">02</span><div><div class="ft">Pides</div><div class="fd">En una línea: <i>"campaña de lanzamiento", "landing de producto", "deck para la ronda"</i>. Brandolph monta el equipo.</div><span class="ftag">Brandolph · L1</span></div></div>
-          <div class="step"><span class="fn">03</span><div><div class="ft">Ejecuta</div><div class="fd">El estudio produce: estrategia, naming, identidad, posts, landings, copys, fotos de producto y mockups.</div><span class="ftag">55 especialistas</span></div></div>
-          <div class="step"><span class="fn">04</span><div><div class="ft">Apruebas</div><div class="fd">Lo ves, lo editas y lo apruebas en un lienzo visual — no en un chat. Todo sale fiel a tu marca.</div><span class="ftag">Lienzo</span></div></div>
+          <div class="step"><div class="ft">Identidad de Marca certificada</div><div class="fd">Tu marca como objeto vivo, certificado por un director senior. La fuente de la verdad.</div></div>
+          <div class="step"><div class="ft">Brandolph · director de marca con IA</div><div class="fd">Convierte un encargo de una línea en un brief afilado y monta el equipo.</div></div>
+          <div class="step"><div class="ft">Equipo de especialistas</div><div class="fd">Estrategia, naming, identidad, copy, visual — cada uno experto en lo suyo.</div></div>
+          <div class="step"><div class="ft">El lienzo</div><div class="fd">Ves, editas y apruebas cada pieza en un lienzo visual. No un chat.</div></div>
         </div>
         <div class="shot">
           <img src="intelligence/assets/canvas.png" alt="El lienzo de CaastorOS" />
-          <div class="cap">El lienzo · ves, editas y apruebas cada pieza · precio de software, capacidad de estudio</div>
+          <div class="cap">El lienzo · en desarrollo activo · lo que financia la ronda</div>
         </div>
       </div>
-      <div class="sfoot"><span>El producto</span><span>05 / 10</span></div>
+      <div class="sfoot"><span>CaastorOS · hacia dónde vamos</span><span>06 / 12</span></div>
     </section>
 
-    <!-- 6 · WHY NOW -->
+    <!-- 7 · WHY NOW -->
     <section class="slide">
       <span class="eyebrow">Why now</span>
       <h2>Tres curvas se cruzan <em>justo ahora.</em></h2>
       <div class="cells stack" style="grid-template-columns:repeat(3,1fr);">
-        <div class="cell"><div class="k">La IA ya llega</div><div class="v">Por fin produce a escala con calidad de marca, a coste viable. <strong>Lo que hace un año era demo, hoy es producción.</strong></div></div>
-        <div class="cell"><div class="k">El techo de lo genérico</div><div class="v">Todos llevan un año con ChatGPT y Canva. Generan, pero nadie es coherente. <strong>La marca es el único diferenciador que queda.</strong></div></div>
-        <div class="cell"><div class="k">Boom emprendedor</div><div class="v">Récord de empresas nuevas en España y <strong style="color:var(--mint);">+50% de las startups ya usan IA.</strong> Más marcas naciendo que nunca.</div></div>
+        <div class="cell"><div class="k">La IA ya produce</div><div class="v">El mercado de IA generativa para contenido pasa de <strong>$14,8B (2024) a $80B (2030)</strong>. Lo que era demo, hoy es producción.</div></div>
+        <div class="cell"><div class="k">Gana la coherencia</div><div class="v">La presentación consistente de marca se asocia a <strong>hasta +23% de ingresos.</strong> Todos generan; el que es coherente, gana.</div></div>
+        <div class="cell"><div class="k">Más marcas que nunca</div><div class="v">Récord de empresas nuevas y adopción masiva de IA. <strong>La competencia por atención nunca fue tan alta.</strong></div></div>
       </div>
-      <div class="sfoot"><span>Why now</span><span>06 / 10</span></div>
+      <div class="src-tag">Fuentes: Grand View Research (IA generativa en contenido) · Marq, State of Brand Consistency</div>
+      <div class="sfoot"><span>Why now</span><span>07 / 12</span></div>
     </section>
 
-    <!-- 7 · MOAT -->
+    <!-- 8 · MOAT -->
     <section class="slide">
       <span class="eyebrow">El foso</span>
       <h2>Cada pieza es defendible. <em>Juntas, imposibles de copiar.</em></h2>
-      <div class="moat stack" style="margin-top:28px;">
-        <div class="mc"><div class="mn">01 · Dato</div><div class="mt">La Identidad de Marca certificada</div><div class="md">Cada empresa genera un objeto único y certificado. <strong>Cambiarte de plataforma = rehacer la certificación.</strong></div></div>
-        <div class="mc"><div class="mn">02 · Aprendizaje</div><div class="mt">La memoria de Brandolph</div><div class="md">El sistema se afina y abarata con cada encargo, por marca. <strong>Quien arranca hoy empieza de cero cada vez.</strong></div></div>
-        <div class="mc"><div class="mn">03 · Experiencia</div><div class="mt">El lienzo</div><div class="md">Las herramientas de chat no lo replican sin rehacerse enteras. <strong>De "un prompt" a "un equipo".</strong></div></div>
-        <div class="mc"><div class="mn">04 · Confianza</div><div class="mt">La certificación humana</div><div class="md">Otros entregan output sin gobernar. <strong>Nosotros, trabajo pre-aprobado por un director senior.</strong></div></div>
+      <div class="moat stack" style="margin-top:24px;">
+        <div class="mc"><div class="mn">01 · Dato</div><div class="mt">La Identidad de Marca certificada</div><div class="md">Objeto único por marca. <strong>Cambiarte = rehacer la certificación.</strong></div></div>
+        <div class="mc"><div class="mn">02 · Aprendizaje</div><div class="mt">La memoria de Brandolph</div><div class="md">Se afina y abarata con cada encargo. <strong>Quien arranca hoy empieza de cero.</strong></div></div>
+        <div class="mc"><div class="mn">03 · Experiencia</div><div class="mt">El lienzo</div><div class="md">Un chatbot no lo replica sin rehacerse entero. <strong>De "un prompt" a "un equipo".</strong></div></div>
+        <div class="mc"><div class="mn">04 · Confianza</div><div class="mt">La certificación humana</div><div class="md">Entregamos trabajo <strong>pre-aprobado por un director senior</strong>, no output sin gobernar.</div></div>
       </div>
-      <div class="band">Y lo que nadie copia barato: <strong>el oficio.</strong> Veinte años de criterio de marca real, en muchos sectores y tres continentes. Canva o Meta pueden añadir "un brand kit con IA". No pueden añadir criterio humano ni comunidad.</div>
-      <div class="sfoot"><span>El foso</span><span>07 / 10</span></div>
+      <div class="band">Y lo que nadie copia barato: <strong>el oficio.</strong> 20 años de criterio de marca real, en muchos sectores y tres continentes (La Mesa). Canva o Meta pueden añadir "un brand kit con IA". No pueden añadir criterio humano ni comunidad.</div>
+      <div class="sfoot"><span>El foso</span><span>08 / 12</span></div>
     </section>
 
-    <!-- 8 · TRACCIÓN + MERCADO -->
+    <!-- 9 · TRACCIÓN + MERCADO GLOBAL -->
     <section class="slide">
       <span class="eyebrow">Tracción y mercado</span>
-      <h2>Producto vivo. <em>Mercado enorme.</em></h2>
+      <h2>Negocio vivo. <em>Mercado global.</em></h2>
       <div class="stats stack">
-        <div class="sc"><div class="sv" style="color:var(--yellow);">50+</div><div class="sl">Marcas servidas · EU · LATAM · Golfo</div></div>
-        <div class="sc"><div class="sv" style="color:var(--mint);">50/55</div><div class="sl">Especialistas operativos hoy</div></div>
-        <div class="sc"><div class="sv" style="color:var(--white); font-size:26px;">Multisector</div><div class="sl">Vinilo → IIT Delhi Abu Dhabi</div></div>
-        <div class="sc"><div class="sv" style="color:var(--faint); font-size:30px;">Minutos</div><div class="sl">De brief a pieza lista</div></div>
+        <div class="sc"><div class="sv" style="color:var(--yellow);">200+</div><div class="sl">Marcas servidas · La Mesa</div></div>
+        <div class="sc"><div class="sv" style="color:var(--mint);">50+</div><div class="sl">Marcas en Caastor</div></div>
+        <div class="sc"><div class="sv" style="color:var(--white); font-size:28px;">$800–5.400</div><div class="sl">Suscripción / mes</div></div>
+        <div class="sc"><div class="sv" style="color:var(--faint); font-size:30px;">48–72h</div><div class="sl">Entrega por pieza</div></div>
       </div>
-      <div class="market">
-        <span class="big">2,94M PyMEs <span class="arrow">·</span> +128.000 nuevas/año</span>
-        <span class="goal">Objetivo cercano: <strong>20.000 € MRR · Q4 2026</strong> ≈ ~100–130 clientes · fracción mínima del mercado.</span>
+      <div class="client-row">
+        <div class="client-cell">Visit Saudi</div>
+        <div class="client-cell">Dubai Chamber</div>
+        <div class="client-cell">Al Rajhi Partners</div>
+        <div class="client-cell">KSA Visa</div>
+        <div class="client-cell">Xpence</div>
+        <div class="client-cell">Magnoos</div>
+        <div class="client-cell">Vinilo</div>
+        <div class="client-cell more">+ 190 más</div>
       </div>
-      <div class="expand"><b>España</b><span class="ar">→</span><b>Sur de Europa</b><span class="ar">→</span><b>Golfo</b></div>
-      <div class="sfoot"><span>Tracción y mercado</span><span>08 / 10</span></div>
+      <div class="marketline">Mundo: las PyMEs son <b>~90% de las empresas</b> <span class="sep">·</span> IA generativa en contenido: <b>$80B en 2030</b></div>
+      <div class="src-tag">Fuentes: Banco Mundial (SME Finance) · Grand View Research · cartera Caastor / La Mesa</div>
+      <div class="sfoot"><span>Tracción y mercado global</span><span>09 / 12</span></div>
     </section>
 
-    <!-- 9 · LA NECESIDAD / ASK -->
+    <!-- 10 · ESPAÑA & MADRID -->
+    <section class="slide">
+      <span class="eyebrow">España &amp; Madrid</span>
+      <h2>Y lo construimos <em>desde Madrid.</em></h2>
+      <div class="two-col" style="gap:40px; margin-top:26px;">
+        <div>
+          <div class="col-h">El mercado · España</div>
+          <div class="cells">
+            <div class="cell"><div class="k">Tejido</div><div class="v"><strong>2,94M PyMEs</strong> — el 99,8% de las empresas. <strong>127.533 sociedades nuevas en 2025</strong> (récord desde 2007).</div></div>
+            <div class="cell"><div class="k">Adopción IA</div><div class="v">El <strong>51% de las startups españolas</strong> ya usa IA de forma habitual (vs 30% el año anterior).</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="col-h">El hub · Madrid</div>
+          <div class="cells">
+            <div class="cell"><div class="k">Ecosistema</div><div class="v"><strong>+2.100 startups · +21.000 empleos.</strong> Top-5 de Europa Occidental. iLab: espacio, mentoría y foro de inversión.</div></div>
+            <div class="cell"><div class="k">El puente</div><div class="v">Ya servimos al Golfo (Visit Saudi, Dubai Chamber) <strong>desde aquí.</strong> Madrid es nuestro puente LATAM–Europa–Golfo.</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="src-tag">Fuentes: INE (DIRCE y Sociedades Mercantiles 2025) · South Summit, Mapa del Emprendimiento 2025 · Startup Radar madri+d / Dealroom</div>
+      <div class="sfoot"><span>España &amp; Madrid</span><span>10 / 12</span></div>
+    </section>
+
+    <!-- 11 · LA NECESIDAD / ASK -->
     <section class="slide">
       <span class="eyebrow">La necesidad</span>
-      <h2>Tenemos producto y mercado.<br /><em>Nos falta combustible y comunidad.</em></h2>
+      <h2>Tenemos negocio y mercado.<br /><em>Nos falta combustible y comunidad.</em></h2>
       <div class="ask-cols">
         <div>
           <div class="col-h">Lo que pedimos al iLab</div>
@@ -301,34 +359,35 @@
         </div>
         <div>
           <div class="col-h dim">Lo que abrimos en paralelo</div>
-          <div class="ask-amount">€350K</div>
-          <div class="ask-sub">Ronda pre-seed · 18 meses de runway</div>
+          <div class="ask-amount">≥ €500K</div>
+          <div class="ask-sub">Ronda · para construir CaastorOS y escalar</div>
           <div class="fund">
-            <div class="fund-item"><span class="fund-pct">45%</span><div class="fund-bar" style="width:100%; background:var(--yellow);"></div><div class="fund-label"><b>Producto + talento de IA</b> — acelerar el motor</div></div>
-            <div class="fund-item"><span class="fund-pct">30%</span><div class="fund-bar" style="width:66%; background:var(--mint);"></div><div class="fund-label"><b>Go-to-market España</b> — canal y clientes piloto</div></div>
+            <div class="fund-item"><span class="fund-pct">45%</span><div class="fund-bar" style="width:100%; background:var(--yellow);"></div><div class="fund-label"><b>CaastorOS + talento de IA</b> — construir la plataforma</div></div>
+            <div class="fund-item"><span class="fund-pct">30%</span><div class="fund-bar" style="width:66%; background:var(--mint);"></div><div class="fund-label"><b>Go-to-market</b> — canal y crecimiento</div></div>
             <div class="fund-item"><span class="fund-pct">15%</span><div class="fund-bar" style="width:33%; background:var(--purple);"></div><div class="fund-label"><b>Equipo y operación</b></div></div>
             <div class="fund-item"><span class="fund-pct">10%</span><div class="fund-bar" style="width:22%; background:var(--pink);"></div><div class="fund-label"><b>Certificación humana + comunidad</b></div></div>
           </div>
+          <div class="goalpill">Objetivo: recuperar 20K€ MRR y ×5 en 12–18 meses</div>
         </div>
       </div>
-      <div class="sfoot"><span>La necesidad</span><span>09 / 10</span></div>
+      <div class="sfoot"><span>La necesidad</span><span>11 / 12</span></div>
     </section>
 
-    <!-- 10 · CIERRE -->
+    <!-- 12 · CIERRE -->
     <section class="slide center-slide">
       <div class="hero-radial"></div>
-      <img src="public/caastor/assets/logo-full-yellow.png" alt="CaastorOS" style="height:30px; margin-bottom:34px; position:relative; z-index:2;" />
-      <h1 style="font-size:64px; position:relative; z-index:2;">Construimos marcas con <em>alma.</em><br />Desde Madrid, para el mundo.</h1>
-      <p class="lead-faint" style="margin:26px auto 0; text-align:center; position:relative; z-index:2;">Cada empresa merece una marca de la que enamorarse. Vamos a hacer que se pueda — sin parar, y sin perder el alma.</p>
+      <img src="public/caastor/assets/logo-full-yellow.png" alt="CaastorOS" style="height:28px; margin-bottom:30px; position:relative; z-index:2;" />
+      <h1 style="font-size:60px; position:relative; z-index:2;">Big Ideas. Brilliant Execution.<br /><em>Zero Drama.</em></h1>
+      <p class="lead-faint" style="margin:24px auto 0; text-align:center; position:relative; z-index:2;">Construimos marcas con alma. Desde Madrid, para el mundo.</p>
       <div class="contact"><b>Oscar Motta</b> · Caastor / CaastorOS · oscarmottaquintana@gmail.com</div>
-      <img class="mascot" src="public/caastor/assets/mascot/yellow.svg" alt="Brandolph" style="width:120px; right:90px; bottom:70px;" />
-      <div class="sfoot"><span>Gracias</span><span>10 / 10</span></div>
+      <img class="mascot" src="public/caastor/assets/mascot/yellow.svg" alt="Brandolph" style="width:115px; right:88px; bottom:66px;" />
+      <div class="sfoot"><span>Gracias</span><span>12 / 12</span></div>
     </section>
 
   </div>
 </div>
 
-<div class="counter">Lámina <b id="cur">01</b> / 10</div>
+<div class="counter">Lámina <b id="cur">01</b> / 12</div>
 <div class="arrows"><button id="prev" aria-label="Anterior">‹</button><button id="next" aria-label="Siguiente">›</button></div>
 <div class="hint">← → para navegar · F11 pantalla completa · imprime para PDF</div>
 

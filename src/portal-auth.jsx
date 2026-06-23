@@ -87,6 +87,20 @@ async function signInWithPassword(email, password) {
   return currentProfile;
 }
 
+/* Google OAuth — redirects to Google, returns to `redirectTo`. The
+   onAuthStateChange listener below picks up the session on return, and the
+   handle_new_auth_user trigger provisions workspace+brand on first sign-in
+   (same as email signup). REQUIRES, one-time in Supabase: Auth → Providers →
+   Google enabled (Client ID + Secret from Google Cloud), and this origin
+   added to Auth → URL Configuration → Redirect URLs. No app secret needed. */
+async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: window.location.origin + window.location.pathname },
+  });
+  if (error) throw error;        // e.g. provider not enabled yet
+}
+
 async function signUpWithPassword(email, password) {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
@@ -198,6 +212,7 @@ supabase.auth.onAuthStateChange((event, session) => {
 window.CI_AUTH = {
   getSession,
   signIn: signInWithPassword,
+  signInWithGoogle,
   signUp: signUpWithPassword,
   signOut,
   requestPasswordReset,
@@ -263,6 +278,14 @@ function Login({ role = "client", go, initialMode = "signin" }) {
     }
   };
 
+  const switchMode = (m) => { setMode(m); setError(null); setInfo(null); };
+  const onGoogle = async () => {
+    setBusy(true); setError(null); setInfo(null);
+    try { await signInWithGoogle(); }            /* redirects away on success */
+    catch (err) { setError(err?.message || String(err)); setBusy(false); }
+  };
+
+  const showToggle   = mode === "signin" || mode === "signup";
   const showEmail    = mode !== "recovery";
   const showPassword = mode !== "forgot";
   const submitLabel  =
@@ -277,14 +300,50 @@ function Login({ role = "client", go, initialMode = "signin" }) {
     : (isTeam ? "La Mesa creative team" : "Sign in to your brand workspace");
 
   return (
-    <div className={"auth-root" + (isTeam ? " auth-root--team" : "")}>
-      <form className="auth-card" onSubmit={submit}>
-        <div className="auth-mark" style={{display:"flex", alignItems:"baseline", gap:5}}>
-          <img src="caastor/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height: 38, width:"auto", alignSelf:"center"}} />
-          <span style={{fontFamily:"var(--font-mono)", fontSize:18, fontWeight:600, color:"var(--text-primary)", letterSpacing:"0.01em"}}>OS</span>
+    <div className={"auth-split" + (isTeam ? " auth-split--team" : "")}>
+      {/* LEFT — the story */}
+      <aside className="auth-story" aria-hidden="true">
+        <img className="auth-story__img" src="caastor/assets/login-story.png" alt="" />
+        <div className="auth-story__veil" />
+        <div className="auth-story__copy">
+          <div className="auth-story__eyebrow">CaastorOS</div>
+          <h2 className="auth-story__head">Your brand,<br />made certifiable.</h2>
+          <p className="auth-story__sub">Brandolph reads your brand into a living BIO, assembles the crew, and lands the work on a canvas — every output certified by a senior human.</p>
+          <div className="auth-story__dots"><span className="is-active" /><span /><span /><span /></div>
         </div>
-        <h1>{isTeam ? "Team portal" : "Client portal"}</h1>
-        <p className="auth-sub">{heading}</p>
+      </aside>
+
+      {/* RIGHT — access */}
+      <div className="auth-panel">
+        <form className="auth-form" onSubmit={submit}>
+          <div className="auth-mark">
+            <img src="caastor/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height: 36, width:"auto", alignSelf:"center"}} />
+            <span style={{fontFamily:"var(--font-mono)", fontSize:17, fontWeight:600, color:"var(--c-ink)", letterSpacing:"0.01em"}}>OS</span>
+          </div>
+          <h1 className="auth-title">{showToggle ? (isTeam ? "La Mesa creative team" : "Let’s build your brand.") : heading}</h1>
+          {!showToggle && <p className="auth-sub">{mode === "forgot" ? "We’ll email you a reset link." : "Choose a new password."}</p>}
+
+          {showToggle && (
+            <div className="auth-toggle" role="tablist" aria-label="Sign in or sign up">
+              <button type="button" role="tab" aria-selected={mode === "signin"} className={"auth-toggle__opt" + (mode === "signin" ? " is-active" : "")} onClick={() => switchMode("signin")}>Sign In</button>
+              <button type="button" role="tab" aria-selected={mode === "signup"} className={"auth-toggle__opt" + (mode === "signup" ? " is-active" : "")} onClick={() => switchMode("signup")}>Sign Up</button>
+            </div>
+          )}
+
+          {showToggle && (
+            <>
+              <button type="button" className="auth-oauth" onClick={onGoogle} disabled={busy}>
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                  <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92a8.78 8.78 0 0 0 2.68-6.62z" />
+                  <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" />
+                  <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z" />
+                  <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" />
+                </svg>
+                Continue with Google
+              </button>
+              <div className="auth-or"><span>or</span></div>
+            </>
+          )}
 
         {showEmail && (
           <div className="auth-field">
@@ -362,46 +421,39 @@ function Login({ role = "client", go, initialMode = "signin" }) {
           {busy ? "…" : submitLabel} <Icon name="arrow" size={14} />
         </button>
 
-        <div className="auth-alt">
-          {mode === "signin" && (
-            <span style={{ fontSize: 13.5, color: "var(--c-dim)" }}>
-              First time?{" "}
-              <button type="button" className="btn btn--link" style={{ textDecoration: "underline" }}
-                onClick={() => { setMode("signup"); setError(null); setInfo(null); }}>
-                Create an account
+        {(mode === "forgot" || mode === "recovery") && (
+          <div className="auth-alt">
+            {mode === "forgot" && (
+              <button type="button" className="btn btn--link" onClick={() => { switchMode("signin"); setPassword(""); }}>
+                ← Back to sign in
               </button>
-            </span>
-          )}
-          {mode === "signup" && (
-            <button type="button" className="btn btn--link" onClick={() => { setMode("signin"); setError(null); setInfo(null); }}>
-              Already have an account? Sign in →
-            </button>
-          )}
-          {mode === "forgot" && (
-            <button type="button" className="btn btn--link" onClick={() => { setMode("signin"); setError(null); setInfo(null); setPassword(""); }}>
-              ← Back to sign in
-            </button>
-          )}
-          {mode === "recovery" && (
-            /* In recovery mode the user IS signed in (recovery session). The
-               only way out without setting a new password is to actually
-               sign out — otherwise on reload Supabase re-hydrates the same
-               recovery session and they're stuck on this form forever. */
-            <button type="button" className="btn btn--link" onClick={async () => {
-              try { await signOut(); } catch (e) {}
-              setMode("signin"); setError(null); setInfo(null); setPassword("");
-            }}>
-              ← Sign out and start over
-            </button>
-          )}
-        </div>
-        <div className="auth-alt" style={{ marginTop: 16, fontSize: 12, color: "var(--c-faint)" }}>
-          {isTeam ? "Not on the team?" : "Caastor team member?"}{" "}
-          <a className="btn btn--link" style={{ fontSize: 12 }} href={isTeam ? "#/login" : "#/team/login"}>
-            {isTeam ? "Client sign-in" : "Team sign-in"} →
-          </a>
-        </div>
-      </form>
+            )}
+            {mode === "recovery" && (
+              /* In recovery mode the user IS signed in (recovery session). The
+                 only way out without setting a new password is to sign out —
+                 otherwise on reload Supabase re-hydrates the recovery session
+                 and the user is stuck on this form forever. */
+              <button type="button" className="btn btn--link" onClick={async () => {
+                try { await signOut(); } catch (e) {}
+                switchMode("signin"); setPassword("");
+              }}>
+                ← Sign out and start over
+              </button>
+            )}
+          </div>
+        )}
+
+          <div className="auth-foot">
+            By continuing you agree to our <a href="#/terms">Terms</a> &amp; <a href="#/privacy">Privacy</a>.
+          </div>
+          <div className="auth-foot auth-foot--alt">
+            {isTeam ? "Not on the team?" : "Caastor team member?"}{" "}
+            <a className="btn btn--link" style={{ fontSize: 12 }} href={isTeam ? "#/login" : "#/team/login"}>
+              {isTeam ? "Client sign-in" : "Team sign-in"} →
+            </a>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

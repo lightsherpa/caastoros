@@ -1930,7 +1930,6 @@ function BriefRunCanvas({ context, onClear, go }) {
             state: passed ? "done" : "flagged",
             outputText: text,
             assetUrl,
-            cost,
             qa,
             done,
             sub: assetUrl
