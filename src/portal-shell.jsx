@@ -1,5 +1,5 @@
 import React from "react";
-import { supabase } from "./lib/supabase-browser.js";
+import { supabase, apiFetch } from "./lib/supabase-browser.js";
 const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
@@ -66,7 +66,7 @@ function useShellTweaks() {
    v2 tokens key off. Persisted to localStorage so the look survives
    reloads. */
 const DS_KEY = "ci_ds";
-const DS_DEFAULTS = { theme: "light", palette: "citrus", font: "inter", density: "cozy" };
+const DS_DEFAULTS = { theme: "light", palette: "caastor", font: "inter", density: "cozy" };
 function useDesignSettings() {
   const [ds, setDs] = useShellState(() => {
     try { return { ...DS_DEFAULTS, ...JSON.parse(localStorage.getItem(DS_KEY) || "{}") }; }
@@ -180,6 +180,30 @@ function useWorkspaceTier() {
   return tier;
 }
 
+/* Live credit balance. Hydrates the window.CI_CREDITS global (which several
+   surfaces read directly and mutate optimistically) with the real ledger
+   balance + tier pool from /api/credits, and returns a reactive copy so the
+   sidebar pill re-renders. The `split` breakdown stays as the placeholder —
+   the enforced numbers (balance/monthly) are what matter. */
+function useLiveCredits() {
+  const [credits, setCredits] = useShellState(window.CI_CREDITS);
+  useShellEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await apiFetch("/api/credits");
+        if (!r.ok) return;
+        const live = await r.json();
+        if (!alive || live == null) return;
+        Object.assign(window.CI_CREDITS, { balance: live.balance, monthly: live.monthly });
+        setCredits({ ...window.CI_CREDITS });
+      } catch (e) { /* leave placeholder on failure */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+  return credits;
+}
+
 function WorkspaceSwitcher() {
   const { brands, loading } = useBrandList();
   const tier = useWorkspaceTier();
@@ -263,7 +287,7 @@ function Brandmark() {
 function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bioScore }) {
   const routes = portal === "team" ? TEAM_ROUTES : CLIENT_ROUTES;
   const isClient = portal === "client";
-  const credits = window.CI_CREDITS;
+  const credits = useLiveCredits();
   return (
     <nav className="sidebar">
       {/* Workspace badge */}
@@ -636,7 +660,7 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "craft":        return <CraftMarketplace go={go} tier={tweaks.tier} />;
     case "credits":      return <CreditsLedger />;
     case "settings":     return <SettingsView />;
-    case "upgrade":      return <UpgradeView go={go} />;
+    case "upgrade":      return <UpgradeView go={go} param={route.param} />;
     case "team":         return <TeamQueue go={go} />;
     case "team-craft":   return <CraftQueue />;
     case "team-job":     return <TeamJob id={route.param} go={go} />;
@@ -668,13 +692,46 @@ function tierAllowance(tier) {
   return n === 1 ? "1 brand" : `${n} brands`;
 }
 
-function UpgradeView({ go }) {
-  const currentTier = useWorkspaceTier();
+function UpgradeView({ go, param }) {
+  const fetchedTier = useWorkspaceTier();
+  const [polledTier, setPolledTier] = useShellState(null);
+  const currentTier = polledTier || fetchedTier;
   const session = useSession();
   const isAdmin = session?.role === "admin";
-  const [note, setNote] = useShellState(null);   // tier id with the "opens soon" message shown
+  const [note, setNote] = useShellState(null);   // tier id showing the fallback message
+  const [busy, setBusy] = useShellState(null);    // tier id whose checkout is starting
   const tiers = window.CI_TIERS || {};
   const currentIdx = TIER_ORDER.indexOf(currentTier);
+
+  // Start a hosted Stripe Checkout for a self-serve tier (01/02). 03 = talk to us.
+  // On success the browser leaves for Stripe; any failure (e.g. 503 unconfigured)
+  // falls back to the inline note.
+  const startCheckout = async (id) => {
+    if (id === "03") { setNote(id); return; }
+    setBusy(id);
+    try {
+      const r = await apiFetch("/api/billing/checkout", { method: "POST", body: JSON.stringify({ tier: id }) });
+      const { url } = await r.json().catch(() => ({}));
+      if (r.ok && url) { window.location.href = url; return; }
+      setNote(id);
+    } catch (e) { setNote(id); }
+    setBusy(null);
+  };
+
+  // Returning from Stripe success: the webhook flips workspaces.tier server-side,
+  // which can lag the redirect by a second or two — poll a few times to catch it.
+  useShellEffect(() => {
+    if (param !== "success") return;
+    let n = 0, alive = true;
+    const tick = async () => {
+      const { data } = await supabase.from("workspaces").select("tier").limit(1).maybeSingle();
+      if (!alive) return;
+      if (data?.tier) setPolledTier(data.tier);
+      if (++n < 5) setTimeout(tick, 1500);
+    };
+    tick();
+    return () => { alive = false; };
+  }, [param]);
 
   return (
     <div style={{maxWidth: 1080, margin:"0 auto", padding:"40px 32px 64px"}}>
@@ -690,6 +747,17 @@ function UpgradeView({ go }) {
         Every plan ships the full Brandolph crew and a senior-certified BIO. Choose the
         brand allowance that fits the work in front of you.
       </p>
+
+      {param === "success" && (
+        <div className="card" style={{marginBottom: 24, padding:"14px 16px", fontSize: 13, color:"var(--c-ink)", boxShadow:"inset 0 0 0 1.5px var(--status-success)"}}>
+          Payment received — your plan is updating. This can take a few seconds.
+        </div>
+      )}
+      {param === "cancel" && (
+        <div className="card" style={{marginBottom: 24, padding:"14px 16px", fontSize: 13, color:"var(--c-dim)"}}>
+          No changes made. Pick a plan whenever you're ready.
+        </div>
+      )}
 
       <div style={{display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap: 16}}>
         {TIER_ORDER.map((id, idx) => {
@@ -742,8 +810,9 @@ function UpgradeView({ go }) {
                   <>
                     <button className="btn btn--primary"
                       style={{width:"100%", justifyContent:"center"}}
-                      onClick={() => setNote(id)}>
-                      {id === "03" ? "Talk to us" : "Upgrade"}
+                      disabled={busy === id}
+                      onClick={() => startCheckout(id)}>
+                      {id === "03" ? "Talk to us" : busy === id ? "Starting…" : "Upgrade"}
                     </button>
                     {note === id && (
                       <div style={{
@@ -753,7 +822,7 @@ function UpgradeView({ go }) {
                       }}>
                         {id === "03"
                           ? "Reach your Caastor team to set up The Colony 🐜."
-                          : "Upgrading opens soon — talk to your Caastor team."}
+                          : "Couldn't start the upgrade just now — please try again or contact your Caastor team."}
                       </div>
                     )}
                   </>

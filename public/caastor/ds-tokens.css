@@ -140,11 +140,11 @@
    LIGHT MODE — white / light-gray surfaces, vivid brand
    ================================================================= */
 :root, [data-theme="light"] {
-  --bg-app:       #F5F5F7;        /* macOS-style off-white */
+  --bg-app:       #F9F9F9;        /* Figma/Metronic body — cool off-white */
   --bg-canvas:    #FFFFFF;
   --bg-elevated:  #FFFFFF;
-  --bg-sunken:    #FAFAFB;
-  --bg-muted:     #F2F2F4;
+  --bg-sunken:    #FBFBFB;
+  --bg-muted:     #F1F1F4;        /* Metronic gray-100 */
   --bg-overlay:   rgba(20, 20, 24, 0.48);
 
   --bg-inverse:   #0B0B0F;
@@ -154,30 +154,30 @@
   --glass-stroke: rgba(255, 255, 255, 0.85);
   --glass-shadow: 0 10px 40px rgba(20, 20, 30, 0.08), 0 1px 0 rgba(255,255,255,0.6) inset;
 
-  --text-primary:   #0B0B0F;
-  --text-secondary: #3A3A42;
-  --text-tertiary:  #6A6A75;
-  --text-quaternary:#9A9AA5;
-  --text-disabled:  #C5C5CE;
+  --text-primary:   #071437;      /* Metronic gray-900 — navy ink */
+  --text-secondary: #4B5675;      /* gray-600 */
+  --text-tertiary:  #78829D;      /* gray-500 */
+  --text-quaternary:#99A1B7;      /* gray-400 */
+  --text-disabled:  #C4CADA;      /* gray-300 */
   --text-inverse:   #FFFFFF;
   --text-link:      var(--accent);
-  --text-on-brand:  #0B0B0F;
+  --text-on-brand:  #071437;
   --text-on-accent: #FFFFFF;
 
-  --border-default: rgba(15, 15, 20, 0.08);
-  --border-subtle:  rgba(15, 15, 20, 0.04);
-  --border-strong:  rgba(15, 15, 20, 0.16);
+  --border-default: #DBDFE9;      /* Metronic gray-200 — crisp card/table line */
+  --border-subtle:  #F1F1F4;      /* gray-100 */
+  --border-strong:  #C4CADA;      /* gray-300 */
   --border-focus:   var(--accent);
 
-  /* status — vivid */
-  --status-success:        #10B981;
-  --status-success-soft:   #D1FAE5;
-  --status-warning:        #F59E0B;
+  /* status — aligned to Figma (Metronic) */
+  --status-success:        #30B478;   /* Figma green */
+  --status-success-soft:   #DCF7E9;
+  --status-warning:        #F59E0B;   /* ponytail: not in sampled frames — left as-is */
   --status-warning-soft:   #FEF3C7;
-  --status-danger:         #EF4444;
+  --status-danger:         #EF4444;   /* ponytail: not in sampled frames — left as-is */
   --status-danger-soft:    #FEE2E2;
-  --status-info:           #0EA5E9;
-  --status-info-soft:      #DBEAFE;
+  --status-info:           #107EFF;   /* Figma blue */
+  --status-info-soft:      #EFF6FF;
 
   /* shadows — Apple-quiet */
   --shadow-xs:  0 1px 1px rgba(15, 15, 25, 0.04);

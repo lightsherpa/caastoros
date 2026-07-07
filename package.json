@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "start": "cd server && node --env-file-if-exists=.env src/index.js",
     "dev:server": "cd server && npm run dev",
     "dev:inngest": "npx inngest-cli@latest dev -u http://localhost:8787/api/inngest",
     "dev:all": "concurrently -k -n web,api,inngest -c yellow,cyan,magenta \"npm run dev\" \"npm run dev:server\" \"npm run dev:inngest\"",

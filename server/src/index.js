@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 
 import brandolph from "./routes/brandolph.js";
 import bios from "./routes/bios.js";
@@ -12,6 +13,8 @@ import steward from "./routes/steward.js";
 import runs from "./routes/runs.js";
 import outputs from "./routes/outputs.js";
 import craft from "./routes/craft.js";
+import credits from "./routes/credits.js";
+import billing from "./routes/billing.js";
 import admin from "./routes/admin.js";
 import { inngestHandler } from "./routes/inngest.js";
 
@@ -34,7 +37,7 @@ app.use(
   }),
 );
 
-app.get("/", (c) =>
+app.get("/healthz", (c) =>
   c.json({
     name: "caastoros-server",
     status: "ok",
@@ -53,10 +56,18 @@ app.route("/api/steward", steward);
 app.route("/api/runs", runs);
 app.route("/api/outputs", outputs);
 app.route("/api/craft", craft);
+app.route("/api/credits", credits);
+app.route("/api/billing", billing);
 app.route("/api/admin", admin);
 // Inngest serve — local dev server auto-discovers this endpoint
 // (GET introspection + POST function invocations + PUT registration).
 app.on(["GET", "POST", "PUT"], "/api/inngest", inngestHandler);
+
+// ── Serve the built SPA (production). Registered after /api routes so the API
+// always wins. In dev an absent ../dist just 404s here (the SPA runs on :5173).
+// ponytail: root is CWD-relative — start from server/ (npm start does `cd server`).
+app.use("/*", serveStatic({ root: "../dist" }));
+app.get("*", serveStatic({ path: "../dist/index.html" })); // SPA fallback (hash router)
 
 serve({ fetch: app.fetch, port: PORT }, (info) => {
   console.log(`caastoros-server listening on http://localhost:${info.port}`);

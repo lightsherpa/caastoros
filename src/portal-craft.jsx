@@ -27,7 +27,7 @@ function CraftMarketplace({ go, tier }) {
         sub="Brandolph drafts the first cut. Caastor's creative team — the same one that's served 50+ brands — finishes the work where craft is the difference. Same credit pool, same BIO, no fabricated middle."
         right={<>
           <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-dim)", letterSpacing:"0.06em"}}>
-            Available: <strong style={{color:"var(--c-ink)", fontWeight: 600}}>563 cr</strong>
+            Available: <strong style={{color:"var(--c-ink)", fontWeight: 600}}>{window.CI_CREDITS.balance} cr</strong>
           </span>
           <a href="#/credits" className="btn btn--ghost btn--sm">Top up →</a>
         </>}

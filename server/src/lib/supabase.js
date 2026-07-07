@@ -12,7 +12,13 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
   console.warn("[supabase] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing — DB reads will fail.");
 }
 
-export const supabaseAdmin = createClient(SUPABASE_URL ?? "", SERVICE_KEY ?? "", {
+// Placeholders keep createClient from throwing "supabaseUrl is required" at
+// import time when env is absent (e.g. unit tests). The warning above still
+// fires and real DB calls still fail — we just don't crash the module import.
+const PLACEHOLDER_URL = "http://localhost:54321";
+const PLACEHOLDER_KEY = "missing";
+
+export const supabaseAdmin = createClient(SUPABASE_URL || PLACEHOLDER_URL, SERVICE_KEY || PLACEHOLDER_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
@@ -22,7 +28,7 @@ export const supabaseAdmin = createClient(SUPABASE_URL ?? "", SERVICE_KEY ?? "",
  * workspace isolation enforced by Postgres, not by hand.
  */
 export function userClient(jwt) {
-  return createClient(SUPABASE_URL ?? "", ANON_KEY ?? "", {
+  return createClient(SUPABASE_URL || PLACEHOLDER_URL, ANON_KEY || PLACEHOLDER_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { headers: { Authorization: `Bearer ${jwt}` } },
   });
