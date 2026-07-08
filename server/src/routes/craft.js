@@ -15,6 +15,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { assertCreditsAvailable, creditErrorResponse } from "../lib/credits.js";
 import { craftEnabled } from "../lib/plan-limits.js";
+import { notify, notifyTeamRole } from "../lib/notify.js";
 
 const app = new Hono();
 const POLISH_CR = 40;
@@ -102,6 +103,14 @@ app.post("/", requireAuth, async (c) => {
     return c.json({ error: ledgerErr.message }, 500);
   }
 
+  await notifyTeamRole("craft", {
+    kind: "craft.queued",
+    title: "New craft job queued",
+    body: "A deliverable is ready for human polish.",
+    link: "#/team-craft",
+    brandId: output.brief?.brand?.id || null,
+  });
+
   return c.json({ ok: true, status: "queued", credits: POLISH_CR, craft: deliverables[slot].craft });
 });
 
@@ -172,6 +181,15 @@ app.patch("/deliver", requireAuth, requireCraftTeam, async (c) => {
   const { error: updErr } = await supabaseAdmin
     .from("outputs").update({ body: { ...ob, deliverables } }).eq("id", outputId);
   if (updErr) return c.json({ error: updErr.message }, 500);
+
+  await notify({
+    recipientUserId: d.craft.requested_by,
+    kind: "craft.delivered",
+    title: "Your polish is ready",
+    body: "A specialist deliverable has been refined by our team.",
+    link: "#/library",
+    brandId: output.brief?.brand?.id || null,
+  });
 
   return c.json({ ok: true, status: "delivered", deliverable: deliverables[slot] });
 });

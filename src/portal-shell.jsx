@@ -424,6 +424,122 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
 }
 
 /* Top yellow strip --------------------------------------------- */
+/* In-app notifications — initial load + Supabase Realtime push (INSERT on the
+   recipient's own rows, RLS-scoped). If Realtime isn't enabled on the project
+   the subscribe simply no-ops and the initial load still populates the bell. */
+function useNotifications() {
+  const [items, setItems] = useShellState([]);
+  const [unread, setUnread] = useShellState(0);
+  useShellEffect(() => {
+    let alive = true;
+    let channel = null;
+    const merge = (rows) => setItems((prev) => {
+      const byId = new Map(prev.map((n) => [n.id, n]));
+      for (const n of rows) byId.set(n.id, { ...byId.get(n.id), ...n });   // dedup by id
+      return [...byId.values()]
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 50);
+    });
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!alive || !user) return;
+      // Subscribe FIRST so a row created during the fetch isn't missed; merge()
+      // dedups any overlap between the live push and the fetched snapshot.
+      channel = supabase
+        .channel("notif:" + user.id)
+        .on("postgres_changes",
+          { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            if (!alive || !payload.new) return;
+            merge([payload.new]);
+            setUnread((u) => u + 1);
+          })
+        .subscribe();
+      const r = await apiFetch("/api/notifications");
+      if (r.ok && alive) { const d = await r.json(); merge(d.items || []); setUnread(d.unread || 0); }
+    })();
+    return () => { alive = false; if (channel) supabase.removeChannel(channel); };
+  }, []);
+  const markAll = async () => {
+    setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
+    setUnread(0);
+    try { await apiFetch("/api/notifications/read-all", { method: "POST" }); } catch (e) {}
+  };
+  const markRead = async (id, wasUnread = true) => {
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: n.read_at || new Date().toISOString() } : n)));
+    if (wasUnread) setUnread((u) => Math.max(0, u - 1));
+    try { await apiFetch(`/api/notifications/${id}/read`, { method: "PATCH" }); } catch (e) {}
+  };
+  return { items, unread, markAll, markRead };
+}
+
+function notifTimeAgo(iso) {
+  const s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return s + "s ago";
+  const m = Math.floor(s / 60); if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60); if (h < 24) return h + "h ago";
+  return Math.floor(h / 24) + "d ago";
+}
+
+function NotificationBell() {
+  const { items, unread, markAll, markRead } = useNotifications();
+  const [open, setOpen] = useShellState(false);
+  const openItem = (n) => {
+    markRead(n.id, !n.read_at);
+    setOpen(false);
+    if (n.link) window.location.hash = String(n.link).replace(/^#/, "");
+  };
+  return (
+    <div style={{position:"relative"}}>
+      <button onClick={() => setOpen((o) => !o)}
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-haspopup="dialog" aria-expanded={open}
+        style={{position:"relative", width:32, height:32, borderRadius:9, border:"1px solid var(--c-line)",
+          background:"var(--c-card)", cursor:"pointer", display:"inline-flex", alignItems:"center", justifyContent:"center", color:"var(--c-ink)"}}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+        {unread > 0 && (
+          <span style={{position:"absolute", top:-5, right:-5, minWidth:16, height:16, padding:"0 4px", borderRadius:999,
+            background:"var(--status-danger)", color:"#fff", fontSize:10, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center"}}>
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{position:"fixed", inset:0, zIndex:40}} />
+          <div style={{position:"absolute", right:0, top:40, width:340, maxHeight:420, overflowY:"auto", zIndex:41,
+            background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:12, boxShadow:"var(--shadow-lg)"}}>
+            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:"1px solid var(--c-line)"}}>
+              <strong style={{fontSize:13}}>Notifications</strong>
+              {unread > 0 && <button onClick={markAll} className="btn btn--link" style={{fontSize:12}}>Mark all read</button>}
+            </div>
+            {items.length === 0 ? (
+              <div style={{padding:"28px 14px", textAlign:"center", color:"var(--c-faint)", fontSize:13}}>You're all caught up.</div>
+            ) : items.map((n) => (
+              <button key={n.id} onClick={() => openItem(n)}
+                style={{display:"block", width:"100%", textAlign:"left", border:"none", cursor:"pointer",
+                  padding:"12px 14px", borderBottom:"1px solid var(--c-line)",
+                  background: n.read_at ? "transparent" : "rgba(var(--brand-glow),0.06)"}}>
+                <div style={{display:"flex", gap:8, alignItems:"baseline"}}>
+                  {!n.read_at && <span style={{width:7, height:7, borderRadius:"50%", background:"var(--brand)", flexShrink:0, marginTop:5}} />}
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontSize:13, fontWeight:500, color:"var(--c-ink)"}}>{n.title}</div>
+                    {n.body && <div style={{fontSize:12, color:"var(--c-dim)", marginTop:2, lineHeight:1.4}}>{n.body}</div>}
+                    <div style={{fontSize:11, color:"var(--c-faint)", marginTop:4}}>{notifTimeAgo(n.created_at)}</div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TopBar({ portal, route, brandName, go }) {
   const isClient = portal === "client";
   /* TopBar titles — eyebrows now match the rev-2 §2 section structure
@@ -465,6 +581,7 @@ function TopBar({ portal, route, brandName, go }) {
       <span style={{color:"rgba(48,48,48,0.4)"}}>/</span>
       <div className="topbar__title">{title}</div>
       <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap: 14}}>
+        <NotificationBell />
         {isClient && (
           <button onClick={() => go && go("home")}
             style={{

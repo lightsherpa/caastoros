@@ -14,6 +14,7 @@ import runs from "./routes/runs.js";
 import outputs from "./routes/outputs.js";
 import craft from "./routes/craft.js";
 import credits from "./routes/credits.js";
+import notifications from "./routes/notifications.js";
 import billing from "./routes/billing.js";
 import admin from "./routes/admin.js";
 import { inngestHandler } from "./routes/inngest.js";
@@ -57,6 +58,7 @@ app.route("/api/runs", runs);
 app.route("/api/outputs", outputs);
 app.route("/api/craft", craft);
 app.route("/api/credits", credits);
+app.route("/api/notifications", notifications);
 app.route("/api/billing", billing);
 app.route("/api/admin", admin);
 // Inngest serve — local dev server auto-discovers this endpoint

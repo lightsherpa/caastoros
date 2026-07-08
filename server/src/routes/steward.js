@@ -15,6 +15,7 @@ import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { computeFocus } from "../lib/bio-focus.js";
+import { notify, brandOwnerUserId } from "../lib/notify.js";
 
 const app = new Hono();
 
@@ -161,6 +162,14 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
       .eq("id", jobId);
     const { data: certified } = await supabaseAdmin
       .from("bios").select("id, version").eq("id", job.bio_id).single();
+    await notify({
+      recipientUserId: await brandOwnerUserId(job.brand_id),
+      kind: "steward.certified",
+      title: "Your brand BIO is certified",
+      body: "A senior reviewer certified your Brand Intelligence Object.",
+      link: "#/home",
+      brandId: job.brand_id,
+    });
     return c.json({
       ok: true, status: "completed", action: "approved",
       certifiedBioId: certified?.id,
@@ -244,6 +253,17 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
       assigned_to: steward.id,
     })
     .eq("id", jobId);
+
+  if (finalCertified) {
+    await notify({
+      recipientUserId: await brandOwnerUserId(job.brand_id),
+      kind: "steward.certified",
+      title: "Your brand BIO is certified",
+      body: "A senior reviewer certified your Brand Intelligence Object.",
+      link: "#/home",
+      brandId: job.brand_id,
+    });
+  }
 
   return c.json({
     ok: true,

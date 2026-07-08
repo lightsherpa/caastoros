@@ -1,8 +1,9 @@
 import React from "react";
+import { apiFetch } from "./lib/supabase-browser.js";
 const { BrandolphAvatar, BrandolphDot, Counter, Drawer, Icon, LayerTag, ModelChip, PageHeader } = window;
 /* Craft marketplace + Credits ledger + Settings. */
 
-const { useState: useCState } = React;
+const { useState: useCState, useEffect: useCEffect } = React;
 
 /* ════════════════════════════════════════════════════════════════ */
 /* CRAFT MARKETPLACE (L3)                                            */
@@ -316,6 +317,59 @@ function CreditsLedger() {
 /* ════════════════════════════════════════════════════════════════ */
 /* SETTINGS                                                          */
 
+/* Per-channel notification toggles — Profile → Notifications. Writes to
+   /api/notifications/prefs; the notify() dispatcher honours these per channel. */
+function NotifToggleRow({ label, desc, on, onChange }) {
+  return (
+    <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, padding:"14px 0", borderBottom:"1px solid var(--c-line)"}}>
+      <div>
+        <div style={{fontSize:14, fontWeight:500, color:"var(--c-ink)"}}>{label}</div>
+        <div style={{fontSize:12.5, color:"var(--c-dim)", marginTop:2}}>{desc}</div>
+      </div>
+      <button role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)}
+        style={{position:"relative", width:44, height:26, borderRadius:999, border:"none", cursor:"pointer",
+          background: on ? "var(--brand)" : "var(--neutral-300)", transition:"background 160ms ease", flexShrink:0}}>
+        <span style={{position:"absolute", top:3, left: on ? 21 : 3, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"left 160ms ease", boxShadow:"0 1px 3px rgba(0,0,0,0.25)"}} />
+      </button>
+    </div>
+  );
+}
+
+function NotificationPrefs() {
+  const [prefs, setPrefs] = useCState({ in_app: true, email: true });
+  const [loaded, setLoaded] = useCState(false);
+  useCEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await apiFetch("/api/notifications/prefs");
+        if (r.ok && alive) { const d = await r.json(); setPrefs({ in_app: d.in_app !== false, email: d.email !== false }); }
+      } catch (e) { /* keep defaults */ }
+      if (alive) setLoaded(true);
+    })();
+    return () => { alive = false; };
+  }, []);
+  const set = async (key, val) => {
+    if (!loaded) return;                                           // don't let the initial load race/clobber a toggle
+    setPrefs((p) => ({ ...p, [key]: val }));                       // optimistic
+    try {
+      const r = await apiFetch("/api/notifications/prefs", { method: "PATCH", body: JSON.stringify({ [key]: val }) });
+      if (!r.ok) throw new Error("prefs update failed");
+    } catch (e) { setPrefs((p) => ({ ...p, [key]: !val })); }      // revert on failure
+  };
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap: 4, maxWidth: 520}}>
+      <h3 style={{margin: "0 0 4px"}}>Notifications</h3>
+      <p style={{fontSize:13, color:"var(--c-dim)", margin:"0 0 12px", lineHeight:1.5}}>
+        How you hear about craft handoffs, BIO certifications, and completed work. Turn a channel off to stop receiving it there.
+      </p>
+      <NotifToggleRow label="In-app" desc="A bell notification inside CaastorOS." on={prefs.in_app} onChange={(v) => set("in_app", v)} />
+      <NotifToggleRow label="Email"  desc="A message to your account email."      on={prefs.email}  onChange={(v) => set("email", v)} />
+      {!loaded && <div style={{fontSize:12, color:"var(--c-faint)", marginTop:10}}>Loading…</div>}
+    </div>
+  );
+}
+
 function SettingsView() {
   const [tab, setTab] = useCState("workspace");
   return (
@@ -331,6 +385,7 @@ function SettingsView() {
             ["billing","Tier & billing"],
             ["bio","BIO governance"],
             ["integrations","Integrations"],
+            ["notifications","Notifications"],
             ["api","API & MCP (Tier 03)"],
             ["danger","Danger"],
           ].map(([k, l]) => (
@@ -341,6 +396,7 @@ function SettingsView() {
         </nav>
 
         <section className="card" style={{padding: 28}}>
+          {tab === "notifications" && <NotificationPrefs />}
           {tab === "workspace" && (
             <div style={{display:"flex", flexDirection:"column", gap: 18, maxWidth: 480}}>
               <h3 style={{margin: 0}}>Workspace</h3>

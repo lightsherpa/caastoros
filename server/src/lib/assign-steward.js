@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────
 
 import { supabaseAdmin } from "./supabase.js";
+import { notify } from "./notify.js";
 
 export async function assignSteward(stewardJobId) {
   const { data: job, error: jobErr } = await supabaseAdmin
@@ -31,9 +32,10 @@ export async function assignSteward(stewardJobId) {
      filter out anyone listed on a non-completed `runs` row for this brand. */
   const { data: stewards } = await supabaseAdmin
     .from("team_members")
-    .select("id, first_name")
+    .select("id, first_name, user_id")
     .contains("roles", ["steward"])
-    .eq("active", true);
+    .eq("active", true)
+    .not("user_id", "is", null); // must have a login: they need to be notified AND certify
 
   if (stewards && stewards.length > 0) {
     /* 3. Round-robin by least-recent assignment.
@@ -63,15 +65,24 @@ export async function assignSteward(stewardJobId) {
       .eq("id", stewardJobId);
     if (updErr) throw new Error(`assignSteward: update failed — ${updErr.message}`);
 
+    await notify({
+      recipientUserId: chosen.user_id,
+      kind: "steward.assigned",
+      title: "A BIO is queued for your certification",
+      body: "You've been assigned a Brand Intelligence Object to certify.",
+      link: "#/team",
+      brandId: job.brand_id,
+    });
     return { assignedTo: chosen.id, name: chosen.first_name, override: null };
   }
 
   /* 4. Capacity fallback — promote to a Lead Steward. */
   const { data: leads } = await supabaseAdmin
     .from("team_members")
-    .select("id, first_name")
+    .select("id, first_name, user_id")
     .contains("roles", ["lead_steward"])
     .eq("active", true)
+    .not("user_id", "is", null)
     .order("created_at", { ascending: true })
     .limit(1);
 
@@ -81,6 +92,14 @@ export async function assignSteward(stewardJobId) {
       .from("steward_jobs")
       .update({ assigned_to: lead.id, override_reason: "rotation_exhausted_fallback_to_lead" })
       .eq("id", stewardJobId);
+    await notify({
+      recipientUserId: lead.user_id,
+      kind: "steward.assigned",
+      title: "A BIO is queued for your certification",
+      body: "A certification was routed to you (rotation fallback).",
+      link: "#/team",
+      brandId: job.brand_id,
+    });
     return { assignedTo: lead.id, name: lead.first_name, override: "rotation_exhausted_fallback_to_lead" };
   }
 
