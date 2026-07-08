@@ -63,6 +63,10 @@ app.route("/api/admin", admin);
 // (GET introspection + POST function invocations + PUT registration).
 app.on(["GET", "POST", "PUT"], "/api/inngest", inngestHandler);
 
+// Unmatched /api/* → JSON 404 (registered after the real API routes, before the
+// static handlers) so API clients never receive the SPA's index.html.
+app.all("/api/*", (c) => c.json({ error: "not_found", path: c.req.path }, 404));
+
 // ── Serve the built SPA (production). Registered after /api routes so the API
 // always wins. In dev an absent ../dist just 404s here (the SPA runs on :5173).
 // ponytail: root is CWD-relative — start from server/ (npm start does `cd server`).

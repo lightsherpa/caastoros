@@ -25,7 +25,10 @@ export const supabase = createClient(SUPABASE_URL ?? "", SUPABASE_ANON_KEY ?? ""
   },
 });
 
-export const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8787";
+// Prod default is "" → relative /api/... on the same origin the SPA is served
+// from (Hono serves dist + API together). Dev falls back to the local API port
+// (.env.local sets VITE_API_BASE explicitly for the split 5173/8787 setup).
+export const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? "" : "http://localhost:8787");
 
 /**
  * Fetch wrapper that attaches the current session's JWT as Bearer.

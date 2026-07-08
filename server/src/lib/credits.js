@@ -45,10 +45,14 @@ export function creditCheck({ balance, monthlyDebited, requested, runCap, monthl
 }
 
 export async function loadCreditState(workspaceId, { now = new Date() } = {}) {
+  // ponytail: reads the workspace's full ledger and sums client-side. Correct
+  // and cheap to tens of thousands of rows (well beyond any real workspace);
+  // if a ledger ever gets huge, move the SUM into Postgres via an RPC/view.
   const { data: rows, error } = await supabaseAdmin
     .from("ledger")
     .select("credits, created_at")
-    .eq("workspace_id", workspaceId);
+    .eq("workspace_id", workspaceId)
+    .limit(50000);
   if (error) throw new Error(`credit ledger read failed: ${error.message}`);
 
   const balance = creditBalanceFromRows(rows);

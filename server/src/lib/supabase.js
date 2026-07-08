@@ -9,7 +9,11 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.warn("[supabase] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing — DB reads will fail.");
+  const msg = "[supabase] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing — DB reads will fail.";
+  // Fail loud in prod (misconfig should crash the boot); tolerate in dev/tests
+  // where the placeholders below keep the module importable.
+  if (process.env.NODE_ENV === "production") throw new Error(msg);
+  console.warn(msg);
 }
 
 // Placeholders keep createClient from throwing "supabaseUrl is required" at

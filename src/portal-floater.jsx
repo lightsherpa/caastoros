@@ -355,7 +355,9 @@ function FloatingBrandolph() {
       }, 1400 + Math.random() * 600);
     };
 
-    if (!API_BASE) { playMock(); return; }
+    // In prod API_BASE is "" (same-origin) which is a VALID backend — only
+    // fall back to the mock in dev when no server is configured.
+    if (import.meta.env.DEV && !API_BASE) { playMock(); return; }
 
     /* Live path — append an empty `live` brandolph message and grow it as
        tokens arrive from the server.                                      */

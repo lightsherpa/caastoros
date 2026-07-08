@@ -378,12 +378,12 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom: 6}}>
             <span className="eyebrow">Credits</span>
             <span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-dim)"}}>
-              <strong style={{color:"var(--c-ink)"}}>{credits.balance}</strong> / {credits.monthly}
+              <strong style={{color:"var(--c-ink)"}}>{credits.balance}</strong> / {credits.monthly > 0 ? credits.monthly : "∞"}
             </span>
           </div>
           <div style={{height:6, background:"var(--c-line)", borderRadius: 999, overflow:"hidden"}}>
             <div style={{
-              height:"100%", width: `${(credits.balance / credits.monthly) * 100}%`,
+              height:"100%", width: `${credits.monthly > 0 ? Math.min(100, (credits.balance / credits.monthly) * 100) : 100}%`,
               background:"var(--yellow-500)", borderRadius:999, transition:"width 600ms ease",
             }} />
           </div>

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { getStripe, TIER_TO_PRICE, PRICE_TO_TIER, SELF_SERVE_TIERS } from "../lib/stripe.js";
 
@@ -9,7 +9,7 @@ const appUrl = () => process.env.APP_URL || "http://localhost:5173";
 /* POST /api/billing/checkout — start a hosted Stripe Checkout for a tier upgrade.
    Body: { tier }. Auth required; the workspace is resolved from the JWT, never
    the body. Returns { url } to redirect the browser to Stripe's hosted page. */
-app.post("/checkout", requireAuth, async (c) => {
+app.post("/checkout", requireAuth, requireAdmin, async (c) => {
   if (!process.env.STRIPE_SECRET_KEY) return c.json({ error: "Billing not configured" }, 503);
   const { workspaceId } = c.get("auth");
   const { tier } = await c.req.json().catch(() => ({}));
@@ -74,10 +74,26 @@ app.post("/webhook", async (c) => {
           .from("workspaces")
           .update({ tier, stripe_customer_id: session.customer })
           .eq("id", workspaceId);
+      } else if (workspaceId && session.subscription) {
+        // Paid checkout whose price maps to no tier — don't silently ACK. 500 so
+        // Stripe retries and the price/env misconfiguration surfaces.
+        console.error("billing: unresolved price→tier for workspace", workspaceId);
+        return c.json({ error: "unresolved tier" }, 500);
       }
     } else if (event.type === "customer.subscription.deleted") {
       const sub = event.data.object;
-      await supabaseAdmin.from("workspaces").update({ tier: "00" }).eq("stripe_customer_id", sub.customer);
+      const workspaceId = sub.metadata?.workspace_id;
+      // Recompute from the customer's remaining ACTIVE subscriptions — a customer
+      // may hold >1 sub, and stale/incomplete subs also emit this event. Drop to
+      // '00' only when nothing active remains. (Tier strings sort lexically.)
+      let tier = "00";
+      const active = await stripe.subscriptions.list({ customer: sub.customer, status: "active", limit: 100 });
+      for (const s of active.data) {
+        const t = PRICE_TO_TIER[s.items?.data?.[0]?.price?.id];
+        if (t && t > tier) tier = t;
+      }
+      const upd = supabaseAdmin.from("workspaces").update({ tier });
+      await (workspaceId ? upd.eq("id", workspaceId) : upd.eq("stripe_customer_id", sub.customer));
     }
   } catch (err) {
     console.error("billing webhook handler error:", err);
