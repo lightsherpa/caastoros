@@ -18,6 +18,7 @@
     "test:router": "node --env-file=server/.env scripts/test-router.mjs",
     "test:discovery": "node --env-file=server/.env scripts/test-discovery.mjs",
     "grant:steward": "node --env-file=server/.env scripts/grant-steward.mjs",
+    "grant:pilot-credits": "node --env-file=server/.env scripts/grant-pilot-credits.mjs",
     "test:recovery": "node --env-file=server/.env scripts/test-recovery-link.mjs",
     "test:run": "node --env-file=server/.env scripts/test-run.mjs",
     "test:plan": "node --env-file=server/.env scripts/test-delivery-plan.mjs",

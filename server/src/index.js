@@ -75,7 +75,7 @@ app.all("/api/*", (c) => c.json({ error: "not_found", path: c.req.path }, 404));
 app.use("/*", serveStatic({ root: "../dist" }));
 app.get("*", serveStatic({ path: "../dist/index.html" })); // SPA fallback (hash router)
 
-serve({ fetch: app.fetch, port: PORT }, (info) => {
+serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, (info) => {
   console.log(`caastoros-server listening on http://localhost:${info.port}`);
   if (!process.env.ANTHROPIC_API_KEY) {
     console.log("  ⚠  ANTHROPIC_API_KEY not set — /api/brandolph/ask will 503 until you add it to .env");
