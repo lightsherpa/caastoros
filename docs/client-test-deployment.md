@@ -8,7 +8,7 @@ This is the operating runbook for the invite-only Render pilot at `app.getcaasto
 - Runtime: Node
 - Plan: Free
 - Branch: `feature/image-quality-overhaul`
-- Build command: `npm ci && npm run build && cd server && npm ci`
+- Build command: `npm ci --include=dev && npm run build && cd server && npm ci`
 - Start command: `npm start`
 - Health check path: `/healthz`
 - Custom domain: `app.getcaastor.co`

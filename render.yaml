@@ -4,7 +4,7 @@ services:
     name: caastoros-client-test
     plan: free
     branch: feature/image-quality-overhaul
-    buildCommand: npm ci && npm run build && cd server && npm ci
+    buildCommand: npm ci --include=dev && npm run build && cd server && npm ci
     startCommand: npm start
     healthCheckPath: /healthz
     domains:
