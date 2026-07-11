@@ -27,6 +27,16 @@ async function must(label, promise) {
   return { data, count };
 }
 
+async function optionalTable(label, promise) {
+  const { data, error, count } = await promise;
+  if (!error) return { data, count };
+  if (/Could not find the table|schema cache|relation .* does not exist/i.test(error.message)) {
+    console.log(`${label}: table unavailable; skipping.`);
+    return { data: [], count: 0 };
+  }
+  throw new Error(`${label}: ${error.message}`);
+}
+
 const brandQuery = sb.from("brands").select("id, name, workspace_id").order("created_at", { ascending: true });
 const { data: brands } = await must(
   "brands lookup",
@@ -66,7 +76,7 @@ const { data: stats } = await must(
   sb.from("brand_specialist_stats").select("brand_id, specialist_id").in("brand_id", brandIds)
 );
 
-const { data: notifications } = await must(
+const { data: notifications } = await optionalTable(
   "notifications lookup",
   sb.from("notifications").select("id, brand_id").in("brand_id", brandIds)
 );
