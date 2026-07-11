@@ -8,7 +8,7 @@
 
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
-import { loadBrandBio } from "../lib/load-brand-bio.js";
+import { loadBioForRun } from "../lib/load-brand-bio.js";
 import { sharpenBrief } from "../lib/sharpener.js";
 import { loadBrandMemorySummary } from "../lib/brandolph-memory.js";
 
@@ -23,8 +23,11 @@ app.post("/sharpen", requireAuth, async (c) => {
 
   let brandBio;
   try {
-    brandBio = await loadBrandBio({ workspaceId, brandId, requireCertified: false });
+    brandBio = await loadBioForRun({ workspaceId, brandId });
   } catch (err) {
+    if (err.code === "BIO_NOT_CERTIFIED") {
+      return c.json({ error: "BIO is awaiting Brand Steward certification.", code: err.code }, 409);
+    }
     return c.json({ error: err.message || String(err) }, 400);
   }
 

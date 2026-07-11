@@ -26,7 +26,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
-import { loadBrandBio } from "../lib/load-brand-bio.js";
+import { loadBioForRun } from "../lib/load-brand-bio.js";
 import { streamCompletion } from "../lib/models/router.js";
 import { composeSpecialistPrompt } from "../lib/compose-specialist-prompt.js";
 import { composeImagePrompt } from "../lib/compose-image-prompt.js";
@@ -64,13 +64,11 @@ app.post("/stream", requireAuth, async (c) => {
     .maybeSingle();
   if (specErr || !spec) return c.json({ error: `Spec ${specialistId} not active or not found` }, 400);
 
-  /* Brand + BIO. requireCertified stays false during P3 first runs so
-     dev brands without Steward sign-off can still produce output. Flip
-     to true once production brands are all certified — that's the moat
-     contract per rev-2 §17 and rev-2 §5.5. */
+  /* Brand + BIO. Client-test runs must read only the latest certified BIO.
+     Discovery creates a candidate; Steward certification turns it into canon. */
   let brandBio;
   try {
-    brandBio = await loadBrandBio({ workspaceId, brandId, requireCertified: false });
+    brandBio = await loadBioForRun({ workspaceId, brandId });
   } catch (err) {
     if (err.code === "BIO_NOT_CERTIFIED") {
       return c.json({ error: "BIO is awaiting Brand Steward certification.", code: err.code }, 409);

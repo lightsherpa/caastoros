@@ -49,6 +49,7 @@ function actionFor(field, label, status, source) {
 
 export function computeFocus(payload = {}) {
   const conf = payload.confidence || {};
+  const evidence = payload.evidence || {};
   const gaps = (Array.isArray(payload.missing) ? payload.missing : [])
     .map((g) => (typeof g === "string" ? g : g.field))
     .filter(Boolean);
@@ -64,9 +65,10 @@ export function computeFocus(payload = {}) {
       priority: imp(field),
       conf: null,
       value: null,
-      source: null,
+      source: evidence[field] || null,
+      evidence: evidence[field] || null,
       why: whyFor(field),
-      action: actionFor(field, LABELS[field] || field, "missing", null),
+      action: actionFor(field, LABELS[field] || field, "missing", evidence[field] || null),
     });
   }
 
@@ -77,6 +79,7 @@ export function computeFocus(payload = {}) {
     const c = conf[field]?.conf;
     if (typeof c !== "number" || c >= DROP_CONF) continue;
     const priority = imp(field) * (1 - c / 100);
+    const source = conf[field]?.source ?? evidence[field] ?? null;
     items.push({
       field,
       label: LABELS[field] || field,
@@ -85,9 +88,10 @@ export function computeFocus(payload = {}) {
       priority,
       conf: c,
       value: get(payload, field) ?? null,
-      source: conf[field]?.source ?? null,
+      source,
+      evidence: evidence[field] ?? null,
       why: whyFor(field),
-      action: actionFor(field, LABELS[field] || field, "low_conf", conf[field]?.source),
+      action: actionFor(field, LABELS[field] || field, "low_conf", source),
     });
   }
 

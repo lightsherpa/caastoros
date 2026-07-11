@@ -21,6 +21,7 @@ import { streamCompletion } from "../../lib/models/router.js";
 import { scoreBio } from "../../lib/score-bio.js";
 import { extractPalette, extractFonts } from "../../lib/extract-visual-deterministic.js";
 import { extractImageryAvoid } from "../../lib/extract-visual-vision.js";
+import { applyBioVerification, buildVerificationClaims, normalizeBioEvidence } from "../../lib/bio-evidence.js";
 
 // DISCOVERY_V2 master flag (default OFF). When unset the pipeline runs exactly
 // as before — single homepage scrape, empty visual{}, no upload/instagram read.
@@ -100,6 +101,37 @@ Additive keys (emit ALL THREE in the same JSON object):
 
 "refusals": an array of 3–6 brand-specific, imperative refusal sentences (each tells the brand's writers/designers what NOT to do), derived from voice.forbidden and strategic.notList. Make them concrete to THIS brand, not generic. Example: "Never use corporate jargon like 'synergy' or 'leverage'." / "Do not position the brand as a budget option."`;
 
+const VERIFIER_SPEC = {
+  payload: {
+    name: "BIO Evidence Verifier",
+    modelRouting: { primary: "openrouter/google/gemini-2.5-flash", reason: "cheap support check for high-impact BIO claims" },
+    cr_estimate: 5,
+  },
+};
+
+const VERIFIER_SYSTEM = `You are a BIO evidence verifier. Your job is to check whether high-impact BIO claims are supported by the supplied source material.
+
+Return STRICT JSON ONLY, no markdown. Shape:
+{"verdicts":[{"field":"identity.positioning","status":"supported|inferred|unsupported|missing","confidence":0-100,"evidence":"short quote or source cue","reason":"short reason"}]}
+
+Rules:
+- supported = directly stated or strongly backed by multiple source cues.
+- inferred = plausible but not directly stated.
+- unsupported = the claim goes beyond the sources or contradicts them.
+- missing = the field cannot be evaluated from the sources.
+- Evidence must be short. Do not invent quotes.`;
+
+function buildSynthesisInput(scrapedMarkdown, extraSources = [], budget = 48000) {
+  const extraReserve = extraSources.length ? Math.min(16000, Math.floor(budget * 0.35)) : 0;
+  let input = String(scrapedMarkdown || "").slice(0, budget - extraReserve);
+  for (const block of extraSources) {
+    if (input.length >= budget) break;
+    const remaining = budget - input.length;
+    input += `\n\n${String(block || "").slice(0, remaining)}`;
+  }
+  return input;
+}
+
 export const compileBio = inngest.createFunction(
   {
     id: "compile-bio",
@@ -171,11 +203,8 @@ export const compileBio = inngest.createFunction(
     // (the visual bucket is handled by the visual step). Built as labeled
     // blocks so the model can cite which source a fact came from.
     //
-    // ponytail: this relies on uploads having committed to bio_sources during
-    // the ~10–30s crawl window above (uploads currently fire just before
-    // discovery/start). If logs ever show a race (uploads arriving after this
-    // read), the upgrade path is a POST /api/discovery/resolve-brand endpoint
-    // that returns brandId so the UI can attach files before firing discovery.
+    // The SPA now uploads files + client intake before discovery/start, so this
+    // step can reliably fold those source rows into the same BIO compile.
     const TEXT_EXTS = new Set(["pdf", "docx", "pptx", "txt", "md"]);
     const extraSources = V2
       ? await step.run("gather-upload-sources", async () => {
@@ -183,11 +212,19 @@ export const compileBio = inngest.createFunction(
 
           const { data: rows } = await supabaseAdmin
             .from("bio_sources")
-            .select("src, signals, raw_ref")
-            .eq("brand_id", brandId)
-            .eq("kind", "file_upload");
+            .select("kind, bucket, src, signals, raw_ref")
+            .eq("brand_id", brandId);
 
           for (const row of rows || []) {
+            if (row.kind !== "file_upload") {
+              if (row.kind === "url_scrape") continue;
+              const signals = row.signals && typeof row.signals === "object"
+                ? `\nSignals: ${JSON.stringify(row.signals)}`
+                : "";
+              blocks.push(`## ${String(row.kind || "SOURCE").toUpperCase()}: ${row.src || "(source)"}${row.bucket ? ` [${row.bucket}]` : ""}${signals}`);
+              continue;
+            }
+
             const ext = String(row.signals?.ext || "").toLowerCase().replace(/^\./, "");
             if (!TEXT_EXTS.has(ext)) continue;          // skip images / non-text
             if (!row.raw_ref) continue;
@@ -211,18 +248,10 @@ export const compileBio = inngest.createFunction(
         })
       : [];
 
+    const synthInput = buildSynthesisInput(scraped.markdown, extraSources);
+
     // ── Step 2 · Synthesize ──────────────────────────────────────
     const bioPayload = await step.run("synthesize-bio", async () => {
-      // Build the synthesis input under a ~48k char budget. Crawled pages come
-      // first; labeled upload texts + instagram fill the remainder.
-      const INPUT_BUDGET = 48000;
-      let synthInput = scraped.markdown.slice(0, INPUT_BUDGET);
-      for (const block of extraSources) {
-        if (synthInput.length >= INPUT_BUDGET) break;
-        const remaining = INPUT_BUDGET - synthInput.length;
-        synthInput += `\n\n${block.slice(0, remaining)}`;
-      }
-
       let text = "";
       let usage = null;
       for await (const ev of streamCompletion({
@@ -254,9 +283,40 @@ export const compileBio = inngest.createFunction(
         .replace(/\s*```\s*$/i, "")
         .trim();
       try {
-        return JSON.parse(stripped);
+        return normalizeBioEvidence(JSON.parse(stripped));
       } catch (err) {
         throw new Error(`Compiler returned non-JSON: ${stripped.slice(0, 300)}`);
+      }
+    });
+
+    // ── Step 2a · Verify high-impact fields cheaply ───────────────
+    const verifiedBioPayload = await step.run("verify-high-impact-fields", async () => {
+      const claims = buildVerificationClaims(bioPayload);
+      if (!claims.length) return normalizeBioEvidence(bioPayload);
+
+      let text = "";
+      try {
+        for await (const ev of streamCompletion({
+          spec: VERIFIER_SPEC,
+          system: VERIFIER_SYSTEM,
+          messages: [{
+            role: "user",
+            content: `Source URL: ${url}\n\n--- SOURCE MATERIAL ---\n${synthInput.slice(0, 36000)}\n\n--- BIO CLAIMS TO VERIFY ---\n${JSON.stringify(claims, null, 2)}`,
+          }],
+          maxTokens: 1200,
+        })) {
+          if (ev.type === "token") text += ev.text;
+          else if (ev.type === "error") throw new Error(`Verifier error: ${ev.message}`);
+        }
+      } catch {
+        return normalizeBioEvidence(bioPayload);
+      }
+
+      const stripped = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+      try {
+        return applyBioVerification(bioPayload, JSON.parse(stripped));
+      } catch {
+        return normalizeBioEvidence(bioPayload);
       }
     });
 
@@ -277,8 +337,8 @@ export const compileBio = inngest.createFunction(
 
           const { imagery, avoid } = await extractImageryAvoid({
             screenshotUrl,
-            voice: bioPayload.voice,
-            notList: bioPayload.strategic?.notList,
+            voice: verifiedBioPayload.voice,
+            notList: verifiedBioPayload.strategic?.notList,
           });
 
           return {
@@ -292,7 +352,7 @@ export const compileBio = inngest.createFunction(
           return { palette: [], type: [], imagery: [], avoid: [] };
         }
       });
-      bioPayload.visual = visual;
+      verifiedBioPayload.visual = visual;
     }
     // When NOT V2, visual stays as the model emitted it (empty arrays) — as today.
 
@@ -313,8 +373,8 @@ export const compileBio = inngest.createFunction(
         .insert({
           brand_id: brandId,
           version: nextVersion,
-          payload: bioPayload,
-          score: scoreBio(bioPayload), // deterministic score from coverage/conf/diversity
+          payload: verifiedBioPayload,
+          score: scoreBio(verifiedBioPayload), // deterministic score from coverage/conf/diversity
           certified: false,                // Steward cert (P1.5) flips this later
         })
         .select("id, version")
@@ -329,8 +389,8 @@ export const compileBio = inngest.createFunction(
     // serves them instead of the Vinilo fallback. Guard: only when the brand's
     // current refusals are empty/null — never clobber Steward edits.
     await step.run("write-brand-refusals", async () => {
-      const refusals = Array.isArray(bioPayload.refusals)
-        ? bioPayload.refusals.filter((r) => typeof r === "string" && r.trim())
+      const refusals = Array.isArray(verifiedBioPayload.refusals)
+        ? verifiedBioPayload.refusals.filter((r) => typeof r === "string" && r.trim())
         : [];
       if (refusals.length === 0) return { written: false, reason: "no refusals" };
 

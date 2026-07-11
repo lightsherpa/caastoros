@@ -8,6 +8,20 @@ import { canAddBrand, brandLimit } from "../lib/plan-limits.js";
 
 const app = new Hono();
 
+/* GET /api/brands
+   Returns the caller's brands in creation order. Used by Discovery to resolve
+   the current/default brand before uploading source material. */
+app.get("/", requireAuth, async (c) => {
+  const { workspaceId } = c.get("auth");
+  const { data, error } = await supabaseAdmin
+    .from("brands")
+    .select("id, name, url, created_at")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: true });
+  if (error) return c.json({ error: error.message }, 500);
+  return c.json({ brands: data || [] });
+});
+
 /* POST /api/brands
    Body: { name }
    Returns: { brand: { id, name, created_at } }

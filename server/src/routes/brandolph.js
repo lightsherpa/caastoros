@@ -3,7 +3,7 @@ import { streamSSE } from "hono/streaming";
 
 import { buildBrandolphSystem } from "../prompt.js";
 import { streamCompletion, BRANDOLPH_SYNTHETIC_SPEC, isRouteAvailable } from "../lib/models/router.js";
-import { loadBrandBio } from "../lib/load-brand-bio.js";
+import { loadBioForRun } from "../lib/load-brand-bio.js";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
@@ -14,10 +14,9 @@ const app = new Hono();
    Auth: required (Bearer JWT from Supabase magic-link or password sign-in)
    SSE events: token | done (normalized usage) | error
 
-   The brand + BIO now come from Supabase (loadBrandBio). If the
-   user's brand has no BIO yet, the loader falls back to the Vinilo
-   seed so the endpoint still works pre-P1 Discovery. Once P1.5
-   Steward lands, set requireCertified=true here.                       */
+   Brandolph now reads only certified BIOs in client-test mode. Discovery
+   drafts are visible in the BIO viewer, but they are not canon until a
+   Steward signs them.                                                    */
 app.post("/ask", requireAuth, async (c) => {
   const route = BRANDOLPH_SYNTHETIC_SPEC.payload.modelRouting.primary;
   if (!isRouteAvailable(route)) {
@@ -36,7 +35,7 @@ app.post("/ask", requireAuth, async (c) => {
 
   let brandBio;
   try {
-    brandBio = await loadBrandBio({ workspaceId, brandId, requireCertified: false });
+    brandBio = await loadBioForRun({ workspaceId, brandId });
   } catch (err) {
     if (err.code === "BIO_NOT_CERTIFIED") {
       return c.json({ error: "Your BIO is awaiting Brand Steward certification.", code: err.code }, 409);

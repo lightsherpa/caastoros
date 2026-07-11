@@ -181,6 +181,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
   const [brandName, setBrandName] = useDState("");
   const [url, setUrl] = useDState("vinilo.coffee");
   const [instagram, setInstagram] = useDState("");
+  const [intake, setIntake] = useDState({ offer: "", audience: "", never: "", priority: "", competitors: "" });
   const [busy, setBusy] = useDState(false);
   const [error, setError] = useDState(null);
   const [uploading, setUploading] = useDState(false);
@@ -188,6 +189,27 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
     setUploadsByBucket(prev => ({ ...prev, [key]: [...prev[key], ...newFiles] }));
   const removeFromBucket = (key) => (idx) =>
     setUploadsByBucket(prev => ({ ...prev, [key]: prev[key].filter((_, i) => i !== idx) }));
+  const patchIntake = (key) => (e) => setIntake(prev => ({ ...prev, [key]: e.target.value }));
+  const intakeAnswers = () => Object.entries({
+    offer: intake.offer.trim(),
+    audience: intake.audience.trim(),
+    never: intake.never.trim(),
+    priority: intake.priority.trim(),
+    competitors: intake.competitors.trim(),
+  }).filter(([, value]) => value);
+
+  const resolveExistingBrandId = async () => {
+    const current = window.getCurrentBrandId?.();
+    if (current) return current;
+    const res = await apiFetch("/api/brands");
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    const brand = json.brands?.[0];
+    if (!brand?.id) throw new Error("No brand in workspace yet.");
+    window.setCurrentBrandId?.(brand.id);
+    return brand.id;
+  };
+
   const handleStart = async () => {
     if (newBrand && !brandName.trim()) { setError("Brand name is required."); return; }
     setBusy(true); setError(null);
@@ -216,15 +238,27 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
         newBrandId = brand.id;
         window.setCurrentBrandId?.(brand.id);
       }
-      const res = await apiFetch("/api/discovery/start", {
-        method: "POST",
-        body: JSON.stringify({ url: targetUrl, instagram, ...(newBrandId ? { brandId: newBrandId } : {}) }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(err.error || `HTTP ${res.status}`);
+      const brandId = newBrandId || await resolveExistingBrandId();
+
+      const answers = intakeAnswers();
+      if (answers.length) {
+        const sourceRes = await apiFetch(`/api/bios/${brandId}/sources`, {
+          method: "POST",
+          body: JSON.stringify({
+            sources: [{
+              kind: "client_intake",
+              bucket: "foundations",
+              src: "Discovery intake",
+              signals: Object.fromEntries(answers),
+            }],
+          }),
+        });
+        if (!sourceRes.ok) {
+          const err = await sourceRes.json().catch(() => ({ error: `HTTP ${sourceRes.status}` }));
+          throw new Error(err.error || `HTTP ${sourceRes.status}`);
+        }
       }
-      const { eventId, brandId } = await res.json();
+
       const filesToUpload = BUCKETS.flatMap((bucket) =>
         uploadsByBucket[bucket.key].map((file) => ({ bucket: bucket.key, file }))
       );
@@ -244,6 +278,15 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
           }
         }
       }
+      const res = await apiFetch("/api/discovery/start", {
+        method: "POST",
+        body: JSON.stringify({ url: targetUrl, instagram, brandId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const { eventId } = await res.json();
       console.log("[Discovery] fired", { eventId, brandId, url: targetUrl });
       onNext();
     } catch (err) {
@@ -295,6 +338,19 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
                 Instagram handle <span style={{color:"var(--c-faint)", fontWeight:400}}>· optional</span>
               </label>
               <input className="input" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@handle" />
+            </div>
+
+            <div>
+              <label style={{display:"block", fontSize:12, fontWeight:500, color:"var(--c-ink)", marginBottom: 8}}>
+                Quick intake <span style={{color:"var(--c-faint)", fontWeight:400}}>· optional, improves accuracy</span>
+              </label>
+              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))", gap: 10}}>
+                <textarea className="input" rows={2} value={intake.offer} onChange={patchIntake("offer")} placeholder="What do you sell?" style={{resize:"vertical"}} />
+                <textarea className="input" rows={2} value={intake.audience} onChange={patchIntake("audience")} placeholder="Primary customer" style={{resize:"vertical"}} />
+                <textarea className="input" rows={2} value={intake.never} onChange={patchIntake("never")} placeholder="What should we never say?" style={{resize:"vertical"}} />
+                <textarea className="input" rows={2} value={intake.priority} onChange={patchIntake("priority")} placeholder="Next 90-day priority" style={{resize:"vertical"}} />
+                <textarea className="input" rows={2} value={intake.competitors} onChange={patchIntake("competitors")} placeholder="Competitors or references" style={{resize:"vertical", gridColumn:"1 / -1"}} />
+              </div>
             </div>
 
             <div>
