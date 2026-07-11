@@ -1,6 +1,6 @@
-# CaastorOS client-test deployment
+# CaastorOS MVP deployment
 
-This is the operating runbook for the invite-only Render pilot at `app.getcaastor.co`.
+This is the operating runbook for the invite-only MVP deployment at `app.getcaastor.co`.
 
 ## Render
 
@@ -8,6 +8,7 @@ This is the operating runbook for the invite-only Render pilot at `app.getcaasto
 - Runtime: Node
 - Plan: Free
 - Branch: `feature/image-quality-overhaul`
+- Service name: `caastoros-app`
 - Build command: `npm ci --include=dev && npm run build && cd server && npm ci`
 - Start command: `npm start`
 - Health check path: `/healthz`

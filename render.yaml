@@ -1,7 +1,7 @@
 services:
   - type: web
     runtime: node
-    name: caastoros-client-test
+    name: caastoros-app
     plan: free
     branch: feature/image-quality-overhaul
     buildCommand: npm ci --include=dev && npm run build && cd server && npm ci
