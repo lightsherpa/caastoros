@@ -179,7 +179,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
      /api/discovery/start; the SPA can then poll bios for the result. */
   const [uploadsByBucket, setUploadsByBucket] = useDState({ foundations: [], visual: [], voice: [] });
   const [brandName, setBrandName] = useDState("");
-  const [url, setUrl] = useDState("vinilo.coffee");
+  const [url, setUrl] = useDState("");
   const [instagram, setInstagram] = useDState("");
   const [intake, setIntake] = useDState({ offer: "", audience: "", never: "", priority: "", competitors: "" });
   const [busy, setBusy] = useDState(false);
@@ -212,6 +212,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
 
   const handleStart = async () => {
     if (newBrand && !brandName.trim()) { setError("Brand name is required."); return; }
+    if (!url.trim()) { setError("Primary website URL is required."); return; }
     setBusy(true); setError(null);
     try {
       const cleaned = url.trim().replace(/^https?:\/\//i, "");
@@ -324,7 +325,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
                 <label style={{display:"block", fontSize:12, fontWeight:500, color:"var(--c-ink)", marginBottom: 8}}>
                   Brand name <span style={{color:"var(--pink-500)"}}>·</span>
                 </label>
-                <input className="input" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. Vinilo Coffee" />
+                <input className="input" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. Hermes" />
               </div>
             )}
             <div>
@@ -1141,7 +1142,7 @@ function BioViewer({ go, bioScore = 91 }) {
       {/* Hero */}
       <div style={{display:"grid", gridTemplateColumns:"1fr 320px", gap: 28, marginBottom: 28, alignItems:"end"}}>
         <div>
-          <div className="eyebrow" style={{marginBottom: 6}}>Brand Intelligence Object · {live.brandName || "Vinilo Coffee"}</div>
+          <div className="eyebrow" style={{marginBottom: 6}}>Brand Intelligence Object · {live.brandName || "Brand"}</div>
           <div style={{display:"flex", alignItems:"baseline", gap: 14}}>
             <span style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 88, lineHeight: 1, color: tone.color, fontWeight: 500}}>
               <Counter to={conf} />
@@ -1573,8 +1574,8 @@ function BioSources({ sources, setSources, feed, setFeed, reading, addReference,
         </div>
         <div style={{display:"flex", gap:8, marginTop:12, flexWrap:"wrap"}}>
           <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Document upload · brand-deck.pdf", "doc")}><Icon name="files" size={13} /> Upload document</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Instagram · @vinilo.coffee · latest 30 posts")}><Icon name="refresh" size={13} /> Re-pull social</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Competitor · blue-bottle.com")}><Icon name="plus" size={13} /> Add competitor</button>
+          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Instagram · latest posts")}><Icon name="refresh" size={13} /> Re-pull social</button>
+          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Competitor · category reference")}><Icon name="plus" size={13} /> Add competitor</button>
         </div>
       </div>
 
