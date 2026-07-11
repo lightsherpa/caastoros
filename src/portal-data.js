@@ -710,46 +710,6 @@ window.CI_BRANDOLPH_OPENERS = {
   fresh:    "*Welcome back.* The BIO is current. Nothing is in flight. The fastest way to start is to tell me what you're trying to ship this month — not the deliverable, the change you want made.",
 };
 
-/* Discovery — extraction signals (used in /discovery results) ----- */
-window.CI_DISCOVERY = {
-  brand: "Vinilo Coffee",
-  url:   "vinilo.coffee",
-  confidence: 91,
-  duration: "38.4s",
-  signals: 94,
-  flags: 1,
-  identity: [
-    { key:"Brand name",    val:"Vinilo Coffee",                       conf:99 },
-    { key:"One-liner",     val:"Specialty coffee for slow Tuesdays.", conf:88 },
-    { key:"Origin year",   val:"2021",                                conf:94 },
-    { key:"Headquarters",  val:"Barcelona, Spain",                    conf:96 },
-  ],
-  palette: [
-    { hex:"#1F1A14", name:"Espresso", conf:96, wcag:"AA+" },
-    { hex:"#C97B3F", name:"Ember",    conf:94, wcag:"AA" },
-    { hex:"#F4ECDD", name:"Cream",    conf:91, wcag:"—" },
-    { hex:"#7FA37A", name:"Sage",     conf:78, wcag:"AA" },
-    { hex:"#E8A020", name:"Honey",    conf:62, wcag:"AA" },
-  ],
-  type: [
-    { kind:"Display", family:"Söhne Breit", size:"variable 32–80", license:"paid", suggest:"Söhne Breit (kept)" },
-    { kind:"Body",    family:"GT Sectra Display", size:"16/26", license:"paid", suggest:"Söhne (kept)" },
-  ],
-  voice: [
-    { dim:"Formality", val:0.4, sample:"Annual is now an option." },
-    { dim:"Warmth",    val:0.75, sample:"We'll be here on a Tuesday." },
-    { dim:"Play",      val:0.45, sample:"You can stop reading. The coffee is ready." },
-    { dim:"Urgency",   val:0.15, sample:"Take the week to decide." },
-  ],
-  imagery: ["Hands + craft tools","Café interiors low light","Producer portraits","Coffee bag detail (no model)"],
-  avoid: ["B&W documentary","Latte art top-down","Group lifestyle shots"],
-  audience: {
-    segments: ["Café-warm regulars","Online subscribers","Wholesale buyers"],
-    channels: ["Klaviyo email","Instagram","In-café"],
-    languages: ["Catalan","Spanish","English"],
-  },
-};
-
 /* Team queue (jobs) ----------------------------------------------- */
 window.CI_JOBS = [
   { id:"j-9f2a1c", client:"Vinilo Coffee",   type:"Hero KV finish",      cr:220, submitted:"2h ago",  sla:"48h",     status:"unassigned", assignee:null },

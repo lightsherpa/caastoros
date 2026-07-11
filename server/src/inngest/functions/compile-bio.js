@@ -132,6 +132,13 @@ function buildSynthesisInput(scrapedMarkdown, extraSources = [], budget = 48000)
   return input;
 }
 
+function addMissing(payload, field, why) {
+  if (!payload.missing || !Array.isArray(payload.missing)) payload.missing = [];
+  if (!payload.missing.some((item) => (typeof item === "string" ? item : item?.field) === field)) {
+    payload.missing.push({ field, why });
+  }
+}
+
 export const compileBio = inngest.createFunction(
   {
     id: "compile-bio",
@@ -353,6 +360,9 @@ export const compileBio = inngest.createFunction(
         }
       });
       verifiedBioPayload.visual = visual;
+      if (!visual.palette?.length) addMissing(verifiedBioPayload, "visual.palette", "No palette could be extracted from the available source material.");
+      if (!visual.type?.length) addMissing(verifiedBioPayload, "visual.type", "No typography could be extracted from the available source material.");
+      if (!visual.imagery?.length) addMissing(verifiedBioPayload, "visual.imagery", "No usable screenshot or visual source was available for imagery analysis.");
     }
     // When NOT V2, visual stays as the model emitted it (empty arrays) — as today.
 

@@ -502,11 +502,106 @@ function DiscoveryStep2Running({ onDone }) {
 }
 
 function DiscoveryStep2Results({ onConfirm }) {
-  const d = window.CI_DISCOVERY;
   const [tab, setTab] = useDState("identity");
   /* Pull live BIO + cert state so the Steward chip flips in real time
      if a certification lands while the user is on this screen. */
   const live = useLiveBio({ pollMs: 5000 });
+  const payload = live.bio?.payload || null;
+  const bio = payload ? payloadToFields(payload) : null;
+  const score = live.bio?.score ?? 0;
+  const evidence = payload?.evidence || {};
+  const statusMap = payload?.fieldStatus || {};
+  const confidence = payload?.confidence || {};
+
+  const confFor = (item) => typeof item?.conf === "number" ? item.conf : null;
+  const pathFor = (section, item) => {
+    const key = {
+      Positioning: "positioning",
+      Category: "category",
+      Founded: "founded",
+      Pillars: "pillars",
+      Primary: "primary",
+      Secondary: "secondary",
+      Tertiary: "tertiary",
+      "Jobs to be done": "jtbd",
+      Register: "register",
+      Forbidden: "forbidden",
+      Rhythm: "rhythm",
+      Signatures: "signatures",
+      "North star": "northStar",
+      "This quarter": "q2",
+      "Next quarter": "q3",
+    }[item.label];
+    return key ? `${section}.${key}` : null;
+  };
+  const valueText = (value) => Array.isArray(value) ? value.join(", ") : value || "Missing";
+  const evidenceText = (section, item) => {
+    const path = pathFor(section, item);
+    return path ? evidence[path] || confidence[path]?.source || item.source || "" : item.source || "";
+  };
+  const statusText = (section, item) => {
+    const path = pathFor(section, item);
+    return path ? statusMap[path] || "" : "";
+  };
+  const renderRows = (section, rows = []) => (
+    <table style={{width:"100%", borderCollapse:"collapse", fontSize: 14}}>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={row.label} style={{borderBottom: i < rows.length - 1 ? "1px solid var(--c-line)" : "none"}}>
+            <td style={{padding:"11px 0", color:"var(--c-faint)", width: 150, fontSize: 12}}>{row.label}</td>
+            <td style={{padding:"11px 12px 11px 0", color: valueText(row.value) === "Missing" ? "var(--orange-600)" : "var(--c-ink)", lineHeight: 1.45}}>
+              {valueText(row.value)}
+              {(evidenceText(section, row) || statusText(section, row)) && (
+                <div style={{fontSize: 11, color:"var(--c-faint)", marginTop: 4}}>
+                  {[statusText(section, row), evidenceText(section, row)].filter(Boolean).join(" · ")}
+                </div>
+              )}
+            </td>
+            <td style={{padding:"11px 0", textAlign:"right", width: 72}}>
+              {confFor(row) != null ? <Confidence value={confFor(row)} /> : <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>—</span>}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+  const empty = (label) => (
+    <div style={{padding: 18, border:"1px dashed var(--c-line-2)", borderRadius: 8, color:"var(--c-faint)", fontSize: 13}}>
+      {label}
+    </div>
+  );
+  const missingCount = Array.isArray(payload?.missing) ? payload.missing.length : 0;
+  const tabs = [
+    ["identity", "Identity", bio?.identity?.length || 0],
+    ["audience", "Audience", bio?.audience?.length || 0],
+    ["voice", "Voice", bio?.voice?.length || 0],
+    ["visual", "Visual", (bio?.palette?.length || 0) + (bio?.type?.length || 0) + (bio?.imagery?.length || 0)],
+    ["goals", "Goals", bio?.goals?.length || 0],
+    ["strategic", "Strategic", (bio?.strategic?.watchouts?.length || 0) + (bio?.strategic?.notList?.length || 0) + missingCount],
+  ];
+
+  if (live.loading && !bio) {
+    return (
+      <div style={{maxWidth: 760, margin:"40px auto 0"}}>
+        <div className="card" style={{padding: 24, display:"flex", alignItems:"center", gap: 12}}>
+          <BrandolphDot state="thinking" size={12} />
+          <span style={{fontSize: 14, color:"var(--c-ink)"}}>Loading the compiled BIO…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!bio) {
+    return (
+      <div style={{maxWidth: 760, margin:"40px auto 0"}}>
+        <div className="card" style={{padding: 24}}>
+          <h2 style={{margin:"0 0 8px", fontSize: 20}}>No compiled BIO found yet.</h2>
+          <p style={{margin: 0, color:"var(--c-dim)", fontSize: 14}}>{live.error || "Discovery is still running or needs to be started again."}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{maxWidth: 1080, margin:"24px auto 0"}}>
       {/* Brand Steward notice — the moat-defining trust signal per rev-2 §17 */}
@@ -547,29 +642,31 @@ function DiscoveryStep2Results({ onConfirm }) {
         }}>
           <div>
             <div style={{display:"flex", alignItems:"center", gap:12, marginBottom: 6}}>
-              <span style={{width:36, height: 36, borderRadius: 8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize: 18}}>V</span>
-              <h2 style={{margin:0, fontSize: 22, letterSpacing:"-0.01em"}}>{d.brand}</h2>
+              <span style={{width:36, height: 36, borderRadius: 8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize: 18}}>{(live.brandName || "B").slice(0, 1).toUpperCase()}</span>
+              <h2 style={{margin:0, fontSize: 22, letterSpacing:"-0.01em"}}>{live.brandName || "Brand"}</h2>
             </div>
-            <p style={{margin: 0, color:"var(--c-dim)", fontSize: 14}}>Specialty coffee for slow Tuesdays. · <a href={"https://" + d.url} style={{color:"var(--purple-500)"}}>{d.url}</a></p>
+            <p style={{margin: 0, color:"var(--c-dim)", fontSize: 14}}>
+              {payload.identity?.positioning || "Candidate BIO compiled."}
+              {live.brandUrl && <> · <a href={live.brandUrl} style={{color:"var(--purple-500)"}}>{live.brandUrl.replace(/^https?:\/\//, "")}</a></>}
+            </p>
             <div style={{marginTop: 12, display:"flex", gap: 14, alignItems:"center", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)", letterSpacing:"0.06em"}}>
               <span><span className="dot-state dot-state--ok" /> EXTRACTION COMPLETE</span>
-              <span>· {d.duration}</span>
-              <span>· {d.signals} signals</span>
-              <span style={{color:"var(--orange-600)"}}>· {d.flags} flag</span>
+              <span>· BIO v{live.bio?.version}</span>
+              <span>· {live.reviewPending ? "Steward review queued" : live.cert ? "certified" : "review pending"}</span>
+              {missingCount > 0 && <span style={{color:"var(--orange-600)"}}>· {missingCount} gap{missingCount === 1 ? "" : "s"}</span>}
             </div>
           </div>
           <div style={{textAlign:"right"}}>
             <div className="eyebrow eyebrow--yellow" style={{marginBottom: 4}}>Overall confidence</div>
             <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 56, lineHeight: 1, color:"var(--green-600)", fontWeight: 500}}>
-              <Counter to={d.confidence} format={n => Math.round(n)} />
+              <Counter to={score} format={n => Math.round(n)} />
             </div>
             <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginTop: 2}}>OF 100</div>
           </div>
         </div>
       </Reveal>
 
-      {/* Flag banner */}
-      <Reveal>
+      {missingCount > 0 && <Reveal>
         <div style={{
           marginBottom: 14,
           background:"var(--yellow-50)", border:"1px solid var(--yellow-200)", borderRadius: 10,
@@ -579,26 +676,17 @@ function DiscoveryStep2Results({ onConfirm }) {
           <div style={{display:"flex", alignItems:"center", gap: 10}}>
             <Icon name="flag" size={14} />
             <span style={{fontSize: 13, color:"var(--c-ink)"}}>
-              <strong style={{fontWeight: 600}}>1 flag to resolve.</strong> Display typeface (Söhne Breit) requires a paid license. Suggested substitute: Söhne.
+              <strong style={{fontWeight: 600}}>{missingCount} gap{missingCount === 1 ? "" : "s"} to resolve.</strong> The Steward will review unsupported or missing fields before certification.
             </span>
           </div>
-          <div style={{display:"flex", gap: 8}}>
-            <button className="btn btn--ghost btn--sm">Upload license</button>
-            <button className="btn btn--primary btn--sm">Accept substitute</button>
-          </div>
         </div>
-      </Reveal>
+      </Reveal>}
 
       <Reveal>
         <div className="card" style={{padding: 0, overflow:"hidden"}}>
           <div className="tabs">
             {[
-              ["identity","Identity", 4],
-              ["palette","Palette", 5],
-              ["type","Typography", 2],
-              ["voice","Voice", 4],
-              ["imagery","Imagery", 4],
-              ["audience","Audience", 3],
+              ...tabs,
             ].map(([k, l, count]) => (
               <button key={k} className={"tab" + (tab === k ? " tab--active" : "")} onClick={() => setTab(k)}>
                 {l} <span className="tab__count">{count}</span>
@@ -607,181 +695,101 @@ function DiscoveryStep2Results({ onConfirm }) {
           </div>
           <div style={{padding: 24}}>
             {tab === "identity" && (
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 28}}>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Facts captured</div>
-                  <table style={{width:"100%", borderCollapse:"collapse", fontSize: 14}}>
-                    <tbody>
-                      {d.identity.map((r, i) => (
-                        <tr key={i} style={{borderBottom: i < d.identity.length - 1 ? "1px solid var(--c-line)" : "none"}}>
-                          <td style={{padding:"10px 0", color:"var(--c-faint)", width: 140, fontSize: 12}}>{r.key}</td>
-                          <td style={{padding:"10px 0", color:"var(--c-ink)"}}>{r.val}</td>
-                          <td style={{padding:"10px 0", textAlign:"right"}}><Confidence value={r.conf} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Logo lockups captured · 3</div>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 10}}>
-                    {["#1F1A14", "#F4ECDD", "#C97B3F"].map((bg, i) => (
-                      <div key={i} style={{
-                        aspectRatio: "1.3 / 1", background: bg,
-                        borderRadius: 10, display:"flex", alignItems:"center", justifyContent:"center",
-                        color: bg === "#F4ECDD" ? "#1F1A14" : "#F4ECDD",
-                        fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 24, letterSpacing:"-0.02em",
-                        border:"1px solid var(--c-line)",
-                      }}>vinilo</div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-            {tab === "palette" && (
               <div>
-                <div style={{display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap: 14}}>
-                  {d.palette.map((c, i) => (
-                    <div key={i} className="card" style={{padding: 0, overflow:"hidden"}}>
-                      <div style={{aspectRatio:"1.4/1", background: c.hex}}></div>
-                      <div style={{padding:"10px 12px"}}>
-                        <div style={{fontSize: 13, fontWeight: 500, color:"var(--c-ink)"}}>{c.name}</div>
-                        <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginTop: 2}}>{c.hex}</div>
-                        <div style={{marginTop: 10, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                          <Confidence value={c.conf} />
-                          <span style={{fontFamily:"var(--font-mono)", fontSize:10, color: c.wcag === "—" ? "var(--c-faint)" : "var(--green-600)", letterSpacing:"0.06em"}}>WCAG {c.wcag}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{marginTop: 18}}>
-                  <div className="eyebrow" style={{marginBottom: 8}}>Distribution across 47 scraped pages</div>
-                  <div style={{display:"flex", height: 18, borderRadius: 4, overflow:"hidden", border:"1px solid var(--c-line)"}}>
-                    {d.palette.map((c, i) => (
-                      <div key={i} style={{flex: [38, 22, 28, 8, 4][i], background: c.hex}} title={`${c.name} ${[38,22,28,8,4][i]}%`} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-            {tab === "type" && (
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 16}}>
-                {d.type.map((t, i) => (
-                  <div key={i} className="card" style={{padding: 20}}>
-                    <div style={{display:"flex", justifyContent:"space-between", marginBottom: 10}}>
-                      <span className="eyebrow">{t.kind}</span>
-                      {t.license === "paid" && <span className="pill" style={{background:"var(--orange-100)", color:"var(--orange-600)", border:"1px solid #FFE0B0"}}>Paid license</span>}
-                    </div>
-                    <div style={{
-                      fontFamily: t.kind === "Display" ? "Georgia, serif" : "var(--font-sans)",
-                      fontWeight: 700, fontSize: t.kind === "Display" ? 38 : 22,
-                      letterSpacing: "-0.01em", marginBottom: 6, color:"var(--c-ink)",
-                    }}>
-                      {t.kind === "Display" ? "Slow Tuesdays." : "Cup-by-cup, named after the person who grew it."}
-                    </div>
-                    <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginBottom: 14}}>
-                      {t.family} · {t.size}
-                    </div>
-                    <div style={{paddingTop: 14, borderTop:"1px dashed var(--c-line-2)", fontSize:12, color:"var(--c-dim)"}}>
-                      Substitute: <strong style={{color:"var(--c-ink)", fontWeight: 500}}>{t.suggest}</strong>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {tab === "voice" && (
-              <div style={{display:"grid", gridTemplateColumns:"260px 1fr", gap: 28}}>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 14}}>Voice dimensions</div>
-                  <div style={{display:"flex", flexDirection:"column", gap: 16}}>
-                    {d.voice.map((v, i) => (
-                      <div key={i}>
-                        <div style={{display:"flex", justifyContent:"space-between", marginBottom: 4}}>
-                          <span style={{fontSize: 13, color:"var(--c-ink)"}}>{v.dim}</span>
-                          <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{Math.round(v.val * 100)}</span>
-                        </div>
-                        <div style={{height: 6, background:"var(--neutral-50)", borderRadius: 999, position:"relative"}}>
-                          <div style={{position:"absolute", left: 0, top: 0, height:"100%", width: `${v.val * 100}%`, background: "var(--yellow-500)", borderRadius:999}} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 14}}>Sampled from the site</div>
-                  <div style={{display:"flex", flexDirection:"column", gap: 12}}>
-                    {d.voice.map((v, i) => (
-                      <div key={i} style={{
-                        padding: 14, borderLeft:"3px solid var(--yellow-500)",
-                        background:"var(--yellow-50)", borderRadius:"0 8px 8px 0",
-                      }}>
-                        <div className="eyebrow eyebrow--yellow" style={{marginBottom: 4}}>{v.dim}</div>
-                        <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 15, color:"var(--c-ink)", margin: 0, lineHeight: 1.5}}>"{v.sample}"</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-            {tab === "imagery" && (
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 28}}>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Style categories</div>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 10}}>
-                    {[1,2,4,5].map((n, i) => (
-                      <div key={n} style={{
-                        aspectRatio:"1/1", borderRadius: 10, overflow:"hidden",
-                        position:"relative", border:"1px solid var(--c-line)",
-                      }}>
-                        <img src={`caastor/assets/profile-${n}.jpg`} alt="" style={{width:"100%", height:"100%", objectFit:"cover", filter:"sepia(0.05) saturate(0.9)"}} />
-                        <div style={{position:"absolute", bottom:8, left:8, right:8, background:"rgba(0,0,0,0.66)", color:"#fff", padding:"4px 8px", borderRadius: 4, fontSize: 10, fontFamily:"var(--font-mono)", letterSpacing:"0.06em", textTransform:"uppercase"}}>
-                          {d.imagery[i]}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Style qualities</div>
-                  <ul style={{margin:0, padding: 0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8, marginBottom: 22}}>
-                    {["Warm, slightly sunny color cast","Editorial framing — never staged","Hands + craft tools","Low light café interiors","Producer portraits with name"].map((q, i) => (
-                      <li key={i} style={{display:"flex", gap: 8, fontSize: 13, color:"var(--c-ink)"}}>
-                        <span style={{color:"var(--green-600)"}}>✓</span> {q}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>Avoid</div>
-                  <ul style={{margin:0, padding: 0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-                    {d.avoid.map((q, i) => (
-                      <li key={i} style={{display:"flex", gap: 8, fontSize: 13, color:"var(--c-faint)", textDecoration:"line-through"}}>
-                        <span style={{color:"var(--pink-500)", textDecoration:"none"}}>✕</span> {q}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <div className="eyebrow" style={{marginBottom: 12}}>Facts captured</div>
+                {renderRows("identity", bio.identity)}
               </div>
             )}
             {tab === "audience" && (
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 22}}>
-                {[
-                  ["Segments", d.audience.segments],
-                  ["Channels", d.audience.channels],
-                  ["Languages", d.audience.languages],
-                ].map(([title, items], i) => (
-                  <div key={i}>
-                    <div className="eyebrow" style={{marginBottom: 12}}>{title}</div>
-                    <div style={{display:"flex", flexDirection:"column", gap: 8}}>
-                      {items.map((it, j) => (
-                        <div key={j} style={{
-                          padding:"10px 14px", border:"1px solid var(--c-line)",
-                          borderRadius: 8, fontSize: 13, color:"var(--c-ink)",
-                          display:"flex", justifyContent:"space-between", alignItems:"center",
-                        }}>
-                          {it} <Confidence value={[88, 75, 92][j] || 80} />
+              <div>
+                <div className="eyebrow" style={{marginBottom: 12}}>Audience read</div>
+                {renderRows("audience", bio.audience)}
+              </div>
+            )}
+            {tab === "voice" && (
+              <div>
+                <div className="eyebrow" style={{marginBottom: 12}}>Voice read</div>
+                {renderRows("voice", bio.voice)}
+              </div>
+            )}
+            {tab === "visual" && (
+              <div style={{display:"flex", flexDirection:"column", gap: 24}}>
+                <div>
+                  <div className="eyebrow" style={{marginBottom: 12}}>Palette</div>
+                  {bio.palette.length ? (
+                    <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(130px, 1fr))", gap: 14}}>
+                      {bio.palette.map((c, i) => (
+                        <div key={`${c.hex || c.name}-${i}`} className="card" style={{padding: 0, overflow:"hidden"}}>
+                          <div style={{aspectRatio:"1.4/1", background: c.hex || "#ddd"}} />
+                          <div style={{padding:"10px 12px"}}>
+                            <div style={{fontSize: 13, fontWeight: 500, color:"var(--c-ink)"}}>{c.name || "Colour"}</div>
+                            <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginTop: 2}}>{c.hex || "—"}</div>
+                            <div style={{marginTop: 10, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                              {typeof c.conf === "number" ? <Confidence value={c.conf} /> : <span />}
+                              <span style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.06em"}}>WCAG {c.wcag || "—"}</span>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
+                  ) : empty("No palette extracted from the source yet.")}
+                </div>
+                <div>
+                  <div className="eyebrow" style={{marginBottom: 12}}>Typography</div>
+                  {bio.type.length ? (
+                    <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))", gap: 16}}>
+                      {bio.type.map((t, i) => (
+                        <div key={`${t.family || t.kind}-${i}`} className="card" style={{padding: 18}}>
+                          <div className="eyebrow" style={{marginBottom: 8}}>{t.kind || "Type"}</div>
+                          <div style={{fontSize: 22, fontWeight: 700, color:"var(--c-ink)", marginBottom: 4}}>{t.family || "Unknown family"}</div>
+                          <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>{[t.size, t.license, t.suggest && `substitute ${t.suggest}`].filter(Boolean).join(" · ") || "No metadata"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : empty("No typography extracted from the source yet.")}
+                </div>
+                <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(240px, 1fr))", gap: 18}}>
+                  <div>
+                    <div className="eyebrow" style={{marginBottom: 10}}>Imagery</div>
+                    {bio.imagery.length ? (
+                      <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8}}>
+                        {bio.imagery.map((item, i) => <li key={i} style={{fontSize:13, color:"var(--c-ink)", lineHeight:1.45}}>✓ {item}</li>)}
+                      </ul>
+                    ) : empty("No imagery direction extracted yet.")}
+                  </div>
+                  <div>
+                    <div className="eyebrow eyebrow--pink" style={{marginBottom: 10}}>Avoid</div>
+                    {bio.avoid.length ? (
+                      <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8}}>
+                        {bio.avoid.map((item, i) => <li key={i} style={{fontSize:13, color:"var(--c-faint)", lineHeight:1.45}}>✕ {item}</li>)}
+                      </ul>
+                    ) : empty("No visual avoid-list extracted yet.")}
+                  </div>
+                </div>
+              </div>
+            )}
+            {tab === "goals" && (
+              <div>
+                <div className="eyebrow" style={{marginBottom: 12}}>Goals</div>
+                {renderRows("goals", bio.goals)}
+              </div>
+            )}
+            {tab === "strategic" && (
+              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))", gap: 22}}>
+                {[
+                  ["Watchouts", bio.strategic.watchouts],
+                  ["Not-list", bio.strategic.notList],
+                  ["Gaps", bio.strategic.gaps],
+                ].map(([title, items]) => (
+                  <div key={title}>
+                    <div className="eyebrow" style={{marginBottom: 12}}>{title}</div>
+                    {items.length ? (
+                      <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
+                        {items.map((item, i) => (
+                          <li key={i} style={{fontSize: 13, color:"var(--c-ink)", lineHeight: 1.45, padding:"10px 12px", border:"1px solid var(--c-line)", borderRadius: 8}}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : empty(`No ${title.toLowerCase()} yet.`)}
                   </div>
                 ))}
               </div>
@@ -799,12 +807,12 @@ function DiscoveryStep2Results({ onConfirm }) {
       }}>
         <div style={{display:"flex", alignItems:"center", gap: 12}}>
           <Icon name="check" size={18} />
-          <span style={{fontSize: 14, color:"var(--c-ink)"}}>Looks right? Confirm to activate your Brand Space.</span>
+          <span style={{fontSize: 14, color:"var(--c-ink)"}}>Candidate BIO compiled. It needs Steward certification before client outputs run.</span>
         </div>
         <div style={{display:"flex", gap: 10}}>
-          <button className="btn btn--ghost">Save & review later</button>
+          <button className="btn btn--ghost" onClick={onConfirm}>Review later</button>
           <button className="btn btn--primary btn--lg" onClick={onConfirm}>
-            Activate brand space <Icon name="arrow" size={14} />
+            Continue <Icon name="arrow" size={14} />
           </button>
         </div>
       </div>
@@ -813,16 +821,19 @@ function DiscoveryStep2Results({ onConfirm }) {
 }
 
 function DiscoveryStep3({ go }) {
+  const live = useLiveBio({ pollMs: 8000 });
+  const brand = live.brandName || "this brand";
+  const gapCount = Array.isArray(live.bio?.payload?.missing) ? live.bio.payload.missing.length : 0;
   return (
     <div style={{maxWidth: 580, margin:"80px auto 0", textAlign:"center"}}>
       <div style={{display:"flex", justifyContent:"center", marginBottom: 22}}>
         <BrandolphAvatar size={64} />
       </div>
-      <h1 style={{fontSize: 28, letterSpacing:"-0.01em", marginBottom: 14}}>Brand Space is live.</h1>
+      <h1 style={{fontSize: 28, letterSpacing:"-0.01em", marginBottom: 14}}>{brand} is ready for review.</h1>
       <div className="stream" style={{display:"flex", flexDirection:"column", gap: 12, marginBottom: 28, textAlign:"left"}}>
-        <BrandolphLine html="*I've read the site, the IG, and three competitors.* You sell coffee. You also sell a decision to slow down on purpose. Most people in the category sell the first; almost none sell the second. That's your unfair advantage." />
-        <BrandolphLine html="*Two things to know before we go further.* One — the BIO is editable. If I got something wrong, fix it. Two — I don't pretend to know what I don't know. I left three fields flagged amber. I'd rather ask you than guess." />
-        <BrandolphLine html="*The first brief is on you.* When you have something to ship, brief me on the change you want — not the deliverable. I'll do the deliverable part." />
+        <BrandolphLine html={`*I've compiled the candidate BIO for ${brand}.* The next step is certification, not blind activation. A Steward needs to check the fields with weak evidence before this becomes canon.`} />
+        <BrandolphLine html={`*I don't pretend to know what I don't know.* ${gapCount ? `I left ${gapCount} gap${gapCount === 1 ? "" : "s"} for review.` : "I did not find any declared gaps, but the Steward still needs to confirm the read."} Unsupported claims stay out of the BIO instead of becoming brand truth.`} />
+        <BrandolphLine html="*Once certified, every brief and specialist run will read this BIO.* Until then, the workspace is in review mode." />
       </div>
       <button className="btn btn--primary btn--lg" onClick={() => go("home")}>
         Open Brandolph <Icon name="arrow" size={14} />
@@ -847,67 +858,6 @@ function Discovery({ go, newBrand = false }) {
 
 /* ════════════════════════════════════════════════════════════════ */
 /* BIO VIEWER                                                        */
-
-const BIO_SEED_SOURCES = [
-  { src: "vinilo.coffee · homepage", date: "scraped 14 May 09:31", n: 18 },
-  { src: "vinilo.coffee · about", date: "scraped 14 May 09:31", n: 12 },
-  { src: "vinilo.coffee · pricing", date: "scraped 14 May 09:31", n: 7 },
-  { src: "Instagram · @vinilo.coffee · 90 posts", date: "scraped 14 May 09:34", n: 22 },
-  { src: "Founder intake answers", date: "14 May 09:42", n: 14 },
-  { src: "Brand book v1.pdf · uploaded", date: "14 May 09:42", n: 9 },
-  { src: "Competitor map · 9 in-category", date: "Brandolph 14 May 09:50", n: 12 },
-];
-
-const BIO_IDENTITY = [
-  { label:"Name",        value:"Vinilo Coffee",                       conf:99, source:"intake answer" },
-  { label:"Positioning", value:"Specialty coffee for slow Tuesdays.", conf:88, source:"extracted from homepage hero + about page", italic:true },
-  { label:"Category",    value:"Specialty coffee · subscription + café", conf:94, source:"scrape + competitor map" },
-  { label:"Founded",     value:"2021 · Barcelona",                    conf:96, source:"about page" },
-  { label:"Ownership",   value:"Founder-led · 2 co-founders · 8 FTEs", conf:72, source:"intake answer + LinkedIn" },
-  { label:"Pillars",     multi:true, value:["Provenance","Routine","Patience","Café-as-rest"], conf:84, source:"Brandolph synthesis from 47 scraped pages" },
-];
-const BIO_AUDIENCE = [
-  { label:"Primary",   value:"Subscribers, 28–48, urban, recurring purchase behaviour. Value routine over discovery.", conf:86, source:"IG + Klaviyo intake" },
-  { label:"Secondary", value:"Café-warm locals. Walks-in within 2.5km. Tuesday afternoon over Saturday morning.", conf:78, source:"café footfall + observation" },
-  { label:"Tertiary",  value:"Wholesale buyers. Specialty hotels + co-working spaces.", conf:62, source:"intake answer" },
-  { label:"JTBD",      multi:true, value:["The decision to slow down","The ritual that holds the week together","A weekly bag arriving on time"], conf:80, source:"Brandolph synthesis" },
-];
-const BIO_COMPETITIVE = [
-  { label:"Direct",   multi:true, value:["Café Granell","Nomad Coffee","Three Marks","Caravelle"], conf:92, source:"competitor map · 9 in-category" },
-  { label:"Adjacent", multi:true, value:["The Slow Café (UK)","Onyx (US)","La Marzocco Home"], conf:78, source:"competitor map" },
-  { label:"The table you sit at", value:"Specialty roasters who lead with provenance + ritual. NOT the 'limited drop' microlot table.", conf:84, source:"Brandolph diagnosis" },
-  { label:"Where you don't fit",  value:"High-energy 'third wave' branding. Aesthetic-led without infrastructure.", conf:80, source:"Brandolph diagnosis" },
-];
-const BIO_VOICE = [
-  { label:"Register",        value:"Editorial, low-urgency, second person. Funny only when it's earned.", conf:88, source:"50 paragraphs sampled from site + IG" },
-  { label:"Forbidden",       multi:true, value:["unlock","limited time","FOMO","drop","exclusive","kit","journey"], conf:94, source:"rules + Brandolph QA" },
-  { label:"Sentence rhythm", value:"Short. Then longer, with a slight ramp. Periods over commas. No dashes-for-pace.", conf:82, source:"rhythm analysis (Opus)" },
-  { label:"Signature moves", multi:true, value:["The phrase 'on purpose'","'It isn't X — it's Y'","First-person plural only in brand voice"], conf:86, source:"Brandolph synthesis" },
-];
-const BIO_GOALS = [
-  { label:"2026 north star", value:"Be the coffee that earns the Tuesday back, for 10,000 households.", conf:70, source:"intake" },
-  { label:"Q2 priority",     value:"Pricing relaunch + summer Tuesdays campaign.", conf:90, source:"founder calendar" },
-  { label:"Q3 priority",     value:"Honduras + Aug microlot. Brand book v2.", conf:62, source:"intake" },
-];
-const BIO_STRATEGIC = {
-  watchouts: [
-    "The \"slow Tuesday\" line is doing a lot of work. If you outgrow it without retiring it cleanly, the brand reads contradictory.",
-    "The café revenue is half the business. The site reads like it's only the subscription. There's a tension to resolve, not hide.",
-    "Wholesale audience is on the BIO but invisible everywhere else. Decide if it stays.",
-  ],
-  gaps: [
-    "No documented behaviour around producer relationships. Critical for the microlot cadence.",
-    "No declared price ceiling. The annual conversation needs one.",
-  ],
-  notList: [
-    "A discount-led subscription.",
-    "A \"drop\" culture roaster.",
-    "An aesthetic-led brand. The taste is the brand.",
-    "A coffee-cult evangelism brand. Quiet conviction over loud taste.",
-  ],
-  diagnosis: "Vinilo's writing is consistently better than its visual system. The site reads with conviction; the system around it doesn't earn that conviction yet. The Q3 priority should be the book — not new campaigns. The summer campaign is fine, but a brand book is the unlock you've been compounding the cost of for two years.",
-};
-const BIO_GRADE = "Warm, slightly sunny. Editorial framing. Hands + craft + low-light interiors.";
 
 /* ─── API payload ↔ BioFieldList shape mappers ─────────────────────
    The BIO viewer's tabs render flat arrays of `{ label, value, multi? }`.
