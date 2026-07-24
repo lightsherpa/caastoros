@@ -1,6 +1,6 @@
 import React from "react";
 import { apiFetch } from "./lib/supabase-browser.js";
-const { BrandolphDot, Confidence, Counter, Icon, ModelChip, PageHeader, SlaHeat, StatusPill } = window;
+const { Confidence, Counter, Icon, PageHeader, SlaHeat, StatusPill } = window;
 /* Team portal — queue, job workspace, capacity, clients, earnings. */
 
 const { useState: useTState, useEffect: useTEffect } = React;

@@ -22,7 +22,7 @@ const QA_SPEC = {
   payload: {
     name: "a18 Voice QA",
     modelRouting: {
-      primary: "openrouter/google/gemini-2.5-flash",
+      primary: "openrouter/google/gemini-3.5-flash-lite",
       reason: "high-volume reliability check; local regex handles hard violations",
     },
     cr_estimate: 1,

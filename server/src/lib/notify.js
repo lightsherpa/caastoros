@@ -62,12 +62,3 @@ export async function notifyTeamRole(role, payload) {
   }
   await Promise.all(targets.map((id) => notify({ ...payload, recipientUserId: id })));
 }
-
-/* Resolve a team_member's auth user id (null if the member has no login — a
-   seed/bench member — in which case they get no in-app notification). */
-export async function teamMemberUserId(teamMemberId) {
-  if (!teamMemberId) return null;
-  const { data: tm } = await supabaseAdmin
-    .from("team_members").select("user_id").eq("id", teamMemberId).maybeSingle();
-  return tm?.user_id || null;
-}

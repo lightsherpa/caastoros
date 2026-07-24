@@ -2,7 +2,6 @@ import { monthlyPool } from "./plan-limits.js";
 import { supabaseAdmin } from "./supabase.js";
 
 export const DEFAULT_RUN_CREDIT_CAP = 250;
-export const DEFAULT_MONTHLY_DEBIT_CAP = 1200;
 
 function envInt(name, fallback) {
   const raw = process.env[name];

@@ -15,6 +15,7 @@ import "./portal-team.jsx";
 import "./portal-floater.jsx";
 import "./portal-admin.jsx";       // admin-only screens (spec editor, future memory)
 import "./portal-auth.jsx";        // mock auth + login screens
+import "./portal-onboarding.jsx";  // first-run profile + brand setup
 
 import { App } from "./portal-shell.jsx"; // router + sidebar + topbar
 

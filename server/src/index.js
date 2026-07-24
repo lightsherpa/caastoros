@@ -24,13 +24,15 @@ const ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://lo
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+const isLocalDevOrigin = (origin) => process.env.NODE_ENV !== "production"
+  && /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/.test(origin || "");
 
 const app = new Hono();
 app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: (origin) => (ORIGINS.includes(origin) ? origin : ORIGINS[0]),
+    origin: (origin) => (ORIGINS.includes(origin) || isLocalDevOrigin(origin) ? origin : ORIGINS[0]),
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: false,

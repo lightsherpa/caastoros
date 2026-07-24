@@ -212,21 +212,6 @@ async function streamSpecialistRun({ specialistId, briefText, brandId, briefId, 
 /* ════════════════════════════════════════════════════════════════ */
 /* BRIEFS LIBRARY                                                    */
 
-function relativeBucket(iso) {
-  if (!iso) return "Older";
-  const now = new Date();
-  const then = new Date(iso);
-  const diff = now - then;
-  const day = 86_400_000;
-  /* Bucket boundaries: today, yesterday, this week, this month, older */
-  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  if (then.getTime() >= startToday) return "Today";
-  if (then.getTime() >= startToday - day) return "Yesterday";
-  if (diff < 7 * day)  return "This week";
-  if (diff < 30 * day) return "This month";
-  return "Older";
-}
-
 /* Per-day group key + eyebrow label for sticky date dividers.
    key is a stable calendar-day sort key (YYYY-MM-DD, local), label is the
    short eyebrow form ("JUN 3"). "Today" / "Yesterday" stay legible. */
@@ -272,11 +257,10 @@ function BriefsLibrary({ go }) {
   const [statusF, setStatusF] = useBrState("all");        /* all | approved | flagged */
   const [specF, setSpecF]     = useBrState("all");
 
-  /* Click a brief → save the briefId to sessionStorage and open the
-     Canvas. Canvas is the moat surface; the dropdown was redundant. */
+  /* Click a brief → open its live workspace. Canvas remains one tab,
+     while work, review, delivery, and provenance stay in context. */
   const openBrief = (briefId) => {
-    try { sessionStorage.setItem("ci_run_context", JSON.stringify({ mode: "view", briefId, ts: Date.now() })); } catch (e) {}
-    go("canvas");
+    go(`brief-detail/${briefId}/overview`);
   };
 
   const totalRuns = briefs.reduce((acc, b) => acc + (b.runs?.length || 0), 0);
@@ -497,127 +481,165 @@ function BriefsLibrary({ go }) {
 /* ════════════════════════════════════════════════════════════════ */
 /* BRIEF DETAIL                                                      */
 
-function BriefDetail({ id, go }) {
-  const brief = window.CI_BRIEFS.find(b => b.id === id) || window.CI_BRIEFS[0];
-  const outputs = window.CI_OUTPUTS.filter(o => o.briefId === brief.id);
-  const [win, setWin] = useBrState(null);   // "overview" | "recommendation" | null — open as floating windows
-  const depts = [...new Set(brief.agents.map(aid => window.CI_AGENTS.find(a => a.id === aid)?.dept))].filter(Boolean).length;
+const LIVE_BRIEF_TABS = [
+  ["overview", "Overview"],
+  ["canvas", "Canvas"],
+  ["work", "Work"],
+  ["review", "Review"],
+  ["delivery", "Delivery"],
+  ["activity", "Activity"],
+];
 
-  const TABS = [["overview","Overview"],["recommendation","Recommendation"],["delivery","Delivery"]];
-  React.useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") setWin(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+function liveOutputText(output) {
+  const body = output?.body;
+  if (typeof body === "string") return humanize(body);
+  if (!body || typeof body !== "object") return "";
+  return humanize(body.edited_text || body.text || body.summary || "");
+}
+
+function LiveBriefDetail({ id, initialTab, go }) {
+  const { briefs, cert, brand, loading, error } = useLiveBriefs();
+  const validTab = LIVE_BRIEF_TABS.some(([key]) => key === initialTab) ? initialTab : "overview";
+  const brief = briefs.find((item) => String(item.id) === String(id));
+
+  const openCanvas = () => {
+    try { sessionStorage.setItem("ci_run_context", JSON.stringify({ mode:"view", briefId:id, ts:Date.now() })); } catch (e) {}
+    go("canvas");
+  };
+
+  if (loading) return <div className="brief-workspace-state"><BrandolphDot state="thinking" /><span>Loading the brief workspace…</span></div>;
+  if (error || !brief) {
+    return (
+      <div className="brief-workspace-state brief-workspace-state--error">
+        <strong>{error || "Brief not found"}</strong>
+        <button className="btn btn--ghost" onClick={() => go("briefs")}>Back to briefs</button>
+      </div>
+    );
+  }
+
+  const runs = [...(brief.runs || [])].sort((a, b) => new Date(a.ended_at || 0) - new Date(b.ended_at || 0));
+  const items = runs.flatMap((run) => (run.outputs || []).map((output) => ({
+    run,
+    output,
+    agent: window.CI_AGENTS.find((agent) => agent.id === run.specialist_id),
+    text: liveOutputText(output),
+    assetUrl: typeof output.body === "object" ? output.body?.asset_url : null,
+  })));
+  const crew = [...new Map(runs.map((run) => [run.specialist_id, window.CI_AGENTS.find((agent) => agent.id === run.specialist_id)])).values()].filter(Boolean);
+  const approved = items.filter((item) => item.output.status === "approved");
+  const needsReview = items.filter((item) => item.output.status !== "approved");
+  const credits = runs.reduce((sum, run) => sum + (window.CI_AGENTS.find((agent) => agent.id === run.specialist_id)?.cr || 0), 0);
+  const payload = brief.payload || {};
+  const rawRequest = humanize(extractOriginalRequest(payload.request) || payload.rawBrief || payload.request || "");
+  const objective = humanize(payload.sharpenedBrief || rawRequest || brief.title || "");
+  const status = needsReview.length ? "flagged" : items.length ? "approved" : (brief.status || "draft");
+
+  const outputRow = (item, showStatus = true) => (
+    <article className="brief-workspace-output" key={item.output.id}>
+      {item.assetUrl && <img src={item.assetUrl} alt="" />}
+      <div className="brief-workspace-output__body">
+        <div className="brief-workspace-output__meta">
+          <span>{item.agent?.name || item.run.specialist_id}</span>
+          <span>{item.output.kind || "output"}</span>
+          {showStatus && <StatusPill status={item.output.status || "pending"} />}
+        </div>
+        {item.text
+          ? <p>{item.text}</p>
+          : <p className="brief-workspace-output__empty">Structured or visual output. Open Canvas to inspect the full record.</p>}
+      </div>
+      <button className="btn btn--ghost btn--icon" onClick={openCanvas} title="Inspect on Canvas" aria-label="Inspect on Canvas"><Icon name="canvas" size={15} /></button>
+    </article>
+  );
 
   return (
-    <div style={{padding:"22px 36px 60px", maxWidth: 1100, margin: "0 auto"}}>
-      <button onClick={() => go("briefs")} className="btn btn--link" style={{fontSize: 12, marginBottom: 14}}>
-        <Icon name="arrowLeft" size={13} /> All briefs
-      </button>
-
-      {/* Persistent header */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr auto", gap: 24, alignItems:"start", marginBottom: 18}}>
+    <div className="brief-workspace">
+      <button onClick={() => go("briefs")} className="btn btn--link brief-workspace__back"><Icon name="arrowLeft" size={13} /> All briefs</button>
+      <header className="brief-workspace__header">
         <div>
-          <div className="eyebrow" style={{marginBottom: 8}}>{brief.type} · {brief.createdAt} · {brief.credits} cr · {brief.agents.length} specialists</div>
-          <h1 style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 36, letterSpacing:"-0.015em", lineHeight: 1.1, margin: 0, color:"var(--c-ink)", fontWeight: 500}}>{brief.title}</h1>
+          <div className="eyebrow">{brand?.name || "Workspace"} · {shortDate(brief.created_at)}</div>
+          <h1>{briefTitle(brief)}</h1>
+          <p>{objective || "No decision brief was saved for this run."}</p>
         </div>
-        <div style={{display:"flex", flexDirection:"column", gap: 10, alignItems:"flex-end"}}>
-          <StatusPill status={brief.status} />
-          <div style={{display:"flex", gap: 8}}>
-            {brief.status === "draft" && <button className="btn btn--primary btn--sm">Approve <Icon name="check" size={13} /></button>}
-            <button className="btn btn--ghost btn--sm">Revise with Brandolph</button>
-            <button className="btn btn--ghost btn--icon" aria-label="Export PDF"><Icon name="download" size={14} /></button>
-          </div>
+        <div className="brief-workspace__summary">
+          <StatusPill status={status} />
+          <span>{runs.length} run{runs.length === 1 ? "" : "s"}</span>
+          <span>{items.length} output{items.length === 1 ? "" : "s"}</span>
+          <span>{credits} cr</span>
         </div>
-      </div>
+      </header>
 
-      {/* Deck tabs — Overview/Recommendation open as floating windows; Delivery opens the board */}
-      <div style={{display:"flex", gap: 2, borderBottom:"1px solid var(--c-line)", marginBottom: 26}}>
-        {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => k === "delivery" ? go("board/" + brief.id) : setWin(w => w === k ? null : k)} style={{
-            border:"none", background:"transparent", cursor:"pointer", padding:"10px 16px",
-            fontFamily:"var(--font-sans)", fontSize: 14, fontWeight: win === k ? 600 : 500,
-            color: win === k ? "var(--c-ink)" : "var(--c-faint)",
-            borderBottom: win === k ? "2px solid var(--yellow-500)" : "2px solid transparent", marginBottom: -1,
-            display:"inline-flex", alignItems:"center", gap:6,
-          }}>{l}{k === "delivery" && <Icon name="canvas" size={13} />}</button>
+      <nav className="brief-workspace__tabs" aria-label="Brief workspace views">
+        {LIVE_BRIEF_TABS.map(([key, label]) => (
+          <button key={key} className={validTab === key ? "is-active" : ""}
+            onClick={() => go(`brief-detail/${brief.id}/${key}`)} aria-current={validTab === key ? "page" : undefined}>
+            {label}
+            {key === "review" && needsReview.length > 0 && <span>{needsReview.length}</span>}
+          </button>
         ))}
-      </div>
+      </nav>
 
-      {/* Base — calm proposition summary; the detail lives in the windows / board */}
-      <div style={{maxWidth: 900}}>
-        <div style={{background:"var(--yellow-500)", borderRadius: 14, padding:"30px 36px", marginBottom: 22, position:"relative", overflow:"hidden"}}>
-          <div style={{position:"absolute", top: 16, right: 20, fontFamily:"var(--font-mono)", fontSize: 10, letterSpacing:"0.18em", color:"rgba(48,48,48,0.6)", textTransform:"uppercase", fontWeight:500}}>Single-minded proposition</div>
-          <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 28, letterSpacing:"-0.005em", lineHeight: 1.25, margin: 0, color:"#1a1f36", fontWeight: 500, maxWidth: 820}}>"{brief.smp}"</p>
-        </div>
-        <div style={{display:"flex", gap:12, flexWrap:"wrap", alignItems:"center"}}>
-          <button className="btn btn--primary" onClick={() => go("board/" + brief.id)}><Icon name="canvas" size={14} /> Open the board</button>
-          <button className="btn btn--ghost btn--sm" onClick={() => setWin("overview")}>Overview</button>
-          <button className="btn btn--ghost btn--sm" onClick={() => setWin("recommendation")}>Recommendation</button>
-          <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.06em"}}>{outputs.length} outputs · {depts} departments · {brief.credits} cr</span>
-        </div>
-      </div>
-
-      {/* Small floating window — opens on the same page, no full-screen modal */}
-      {win && (
-        <>
-          <div onClick={() => setWin(null)} style={{position:"fixed", inset:0, zIndex:60}} />
-          <div className="card" style={{position:"fixed", top:170, left:284, width:440, maxHeight:"calc(100vh - 200px)", overflowY:"auto", zIndex:61, boxShadow:"var(--shadow-xl)", animation:"cvPopIn 180ms cubic-bezier(.2,.8,.2,1)"}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:"1px solid var(--c-line)", position:"sticky", top:0, background:"var(--c-card)"}}>
-              <h3 style={{margin:0, fontSize:17}}>{win === "overview" ? "Overview" : "Recommendation"}</h3>
-              <button onClick={() => setWin(null)} className="btn btn--icon btn--ghost" aria-label="Close"><Icon name="close" size={15} /></button>
-            </div>
-            <div style={{padding:"20px 22px"}}>
-              {win === "overview" ? (
-                <>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14, marginBottom: 18}}>
-                    <BriefSection title="Background"          body={brief.background} />
-                    <BriefSection title="Objective"           body={brief.objective} />
-                    <BriefSection title="Audience"            body={brief.audience} />
-                    <BriefSection title="Metrics that matter" body={brief.metrics} />
-                  </div>
-                  <div className="card card--inset" style={{padding: 18}}>
-                    <div className="eyebrow" style={{marginBottom: 12}}>Deliverables · {brief.deliverables.length}</div>
-                    <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
-                      {brief.deliverables.map((d, i) => <span key={i} className="pill" style={{height: 28, padding:"0 14px", fontSize:11.5}}>{d}</span>)}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14, marginBottom: 18}}>
-                    <BriefSection title="Creative strategy" body={brief.strategy} />
-                    <BriefSection title="Tone"              body={brief.tone} />
-                    <BriefSection title="Direction"         body={brief.direction} />
-                    <BriefSection title="Mandatories"       body={brief.mandatories} />
-                  </div>
-                  <div style={{background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius: 12, padding: 18, marginBottom: 18}}>
-                    <div className="eyebrow eyebrow--pink" style={{marginBottom: 12}}>What this brief is NOT doing</div>
-                    <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 16, lineHeight: 1.55, color:"var(--c-ink)", margin: 0}}>"{brief.notDoing}"</p>
-                  </div>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14}}>
-                    <div className="card card--inset" style={{padding: 18, borderLeft: "3px solid var(--yellow-500)"}}>
-                      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Strategic assumptions</div>
-                      <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-                        {brief.assumptions.map((a, i) => <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}</li>)}
-                      </ul>
-                    </div>
-                    <div className="card card--inset" style={{padding: 18, borderLeft: "3px solid var(--orange-500)"}}>
-                      <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom: 12}}>Production watchouts</div>
-                      <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-                        {brief.watchouts.map((w, i) => <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}</li>)}
-                      </ul>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+      <main className="brief-workspace__content">
+        {validTab === "overview" && (
+          <div className="brief-overview-grid">
+            <section className="brief-workspace-section brief-overview-grid__decision">
+              <div className="eyebrow">Approved decision brief</div>
+              <h2>Objective</h2>
+              <p>{objective || "No objective was recorded."}</p>
+              {payload.tension && <><h3>Tension</h3><p>{payload.tension}</p></>}
+              {rawRequest && rawRequest !== objective && <><h3>Original request</h3><p>{rawRequest}</p></>}
+              {payload.orchestrationRationale && <><h3>Execution direction</h3><p>{payload.orchestrationRationale}</p></>}
+            </section>
+            <aside className="brief-workspace-section brief-overview-grid__crew">
+              <div className="eyebrow">Crew and provenance</div>
+              <div className="brief-crew-list">
+                {crew.map((agent) => <div key={agent.id}><span style={{background:window.CI_DEPT_COLORS?.[agent.dept]}} /><strong>{agent.name}</strong><small>{agent.dept} · {agent.cr} cr</small></div>)}
+                {!crew.length && <p>No specialist has run on this brief yet.</p>}
+              </div>
+              <div className="brief-cert-line">
+                <Icon name={cert ? "check" : "bio"} size={15} />
+                <span>{cert ? `BIO v${cert.version} certified by ${cert.byName}` : "No certified BIO was attached to this workspace."}</span>
+              </div>
+            </aside>
           </div>
-        </>
-      )}
+        )}
+
+        {validTab === "canvas" && (
+          <section className="brief-workspace-section brief-canvas-preview">
+            <div className="brief-canvas-preview__head"><div><div className="eyebrow">Live dependency graph</div><h2>BIO → brief → crew → work</h2></div><button className="btn btn--primary" onClick={openCanvas}>Open interactive Canvas <Icon name="arrow" size={14} /></button></div>
+            <div className="brief-canvas-flow">
+              <div><Icon name="bio" size={18} /><strong>BIO v{cert?.version || "—"}</strong><span>{cert ? "Certified canon" : "Uncertified"}</span></div>
+              <i>→</i>
+              <div><Icon name="brief" size={18} /><strong>{briefTitle(brief)}</strong><span>Approved decision brief</span></div>
+              <i>→</i>
+              <div><Icon name="team" size={18} /><strong>{crew.length} specialist{crew.length === 1 ? "" : "s"}</strong><span>{crew.map((agent) => agent.name).join(" · ") || "No runs"}</span></div>
+              <i>→</i>
+              <div><Icon name="files" size={18} /><strong>{items.length} output{items.length === 1 ? "" : "s"}</strong><span>{approved.length} ready · {needsReview.length} flagged</span></div>
+            </div>
+          </section>
+        )}
+
+        {validTab === "work" && (
+          <section className="brief-workspace-section"><div className="brief-workspace-section__head"><div><div className="eyebrow">All generated work</div><h2>{items.length} output{items.length === 1 ? "" : "s"}</h2></div><button className="btn btn--ghost" onClick={openCanvas}>Inspect on Canvas</button></div>{items.length ? <div className="brief-workspace-outputs">{items.map((item) => outputRow(item))}</div> : <BriefWorkspaceEmpty text="No work has been generated for this brief yet." action="Start a new brief" onAction={() => go("home")} />}</section>
+        )}
+
+        {validTab === "review" && (
+          <section className="brief-workspace-section"><div className="brief-workspace-section__head"><div><div className="eyebrow">QA review</div><h2>{needsReview.length ? `${needsReview.length} item${needsReview.length === 1 ? "" : "s"} need attention` : "Everything cleared QA"}</h2></div><button className="btn btn--ghost" onClick={openCanvas}>Open review tools</button></div>{needsReview.length ? <div className="brief-workspace-outputs">{needsReview.map((item) => outputRow(item))}</div> : <BriefWorkspaceEmpty icon="check" text={items.length ? "All persisted outputs are approved." : "Review begins after the first output is generated."} />}</section>
+        )}
+
+        {validTab === "delivery" && (
+          <section className="brief-workspace-section"><div className="brief-workspace-section__head"><div><div className="eyebrow">Client-ready delivery</div><h2>{approved.length} approved output{approved.length === 1 ? "" : "s"}</h2></div><button className="btn btn--primary" onClick={() => go("library")}>Open Library <Icon name="arrow" size={14} /></button></div>{approved.length ? <div className="brief-workspace-outputs">{approved.map((item) => outputRow(item, false))}</div> : <BriefWorkspaceEmpty text="Nothing is ready for delivery yet. Flagged work stays out of this view." />}</section>
+        )}
+
+        {validTab === "activity" && (
+          <section className="brief-workspace-section"><div className="eyebrow">Audit trail</div><div className="brief-activity-list"><div><span><Icon name="brief" size={14} /></span><strong>Brief created</strong><small>{new Date(brief.created_at).toLocaleString()}</small></div>{runs.slice().reverse().map((run) => <div key={run.id}><span><Icon name={run.status === "completed" ? "check" : "timer"} size={14} /></span><strong>{specialistName(run.specialist_id)} · {run.status || "run"}</strong><small>{run.model_used || "routed model"} · {run.ended_at ? new Date(run.ended_at).toLocaleString() : "In progress"} · {(run.outputs || []).length} output{(run.outputs || []).length === 1 ? "" : "s"}</small></div>)}</div></section>
+        )}
+      </main>
     </div>
   );
+}
+
+function BriefWorkspaceEmpty({ icon = "files", text, action, onAction }) {
+  return <div className="brief-workspace-empty"><Icon name={icon} size={20} /><p>{text}</p>{action && <button className="btn btn--ghost" onClick={onAction}>{action}</button>}</div>;
 }
 
 function BriefSection({ title, body }) {
@@ -1603,6 +1625,16 @@ function MoodBoardCard({ tiles = [], bioVisual = null }) {
 }
 
 function BriefRunCanvas({ context, onClear, go }) {
+  const allSpecialistIds = React.useMemo(() => [...new Set(context.specialistIds || [])], [context.specialistIds]);
+  const requiredIds = React.useMemo(() => {
+    const routed = new Set();
+    for (const group of context.deliveryPlan?.deliverableGroups || []) {
+      for (const id of Object.values(group.crew || {})) if (allSpecialistIds.includes(id)) routed.add(id);
+    }
+    if (routed.size === 0 && allSpecialistIds[0]) routed.add(allSpecialistIds[0]);
+    return routed;
+  }, [context.deliveryPlan, allSpecialistIds]);
+  const [selectedIds, setSelectedIds] = useBrState(() => allSpecialistIds);
   const [nodes, setNodes]         = useBrState(() => buildInitialRunNodes(context));
   const [edges, setEdges]         = useBrState(() => buildInitialRunEdges(context));
   const [running, setRunning]     = useBrState(false);
@@ -1613,8 +1645,53 @@ function BriefRunCanvas({ context, onClear, go }) {
   const [openBrief, setOpenBrief] = useBrState(false);   /* clicked Brief node → brief drawer */
   const [editedText, setEditedText] = useBrState({});            /* per-spec text overrides from the notepad */
   const [briefId, setBriefId]       = useBrState(null);          /* surfaced so the notepad can fire re-runs */
+  const [creditState, setCreditState] = useBrState(() => {
+    const cached = Number(window.CI_CREDITS?.balance);
+    return { balance: Number.isFinite(cached) ? cached : null, loading: true, error: null };
+  });
 
-  const specs = (context.specialistIds || []).map((id) => window.CI_AGENTS.find((a) => a.id === id)).filter(Boolean);
+  const selectedSet = React.useMemo(() => new Set(selectedIds), [selectedIds]);
+  const specs = selectedIds.map((id) => window.CI_AGENTS.find((a) => a.id === id)).filter(Boolean);
+  const totalCr = specs.reduce((sum, agent) => sum + (agent.cr || 0), 0);
+  const canAfford = creditState.balance == null || creditState.balance >= totalCr;
+
+  React.useEffect(() => {
+    if (running || completed) return;
+    const nextContext = { ...context, specialistIds: selectedIds };
+    setNodes(buildInitialRunNodes(nextContext));
+    setEdges(buildInitialRunEdges(nextContext));
+  }, [selectedIds.join("|"), running, completed]);
+
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const response = await apiFetch("/api/credits");
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || "Credit balance unavailable");
+        if (!alive) return;
+        const balance = Number(data.balance);
+        setCreditState({ balance: Number.isFinite(balance) ? balance : null, loading: false, error: null });
+      } catch (error) {
+        if (alive) setCreditState((state) => ({ ...state, loading: false, error: error?.message || String(error) }));
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const crewRole = (id) => {
+    for (const group of context.deliveryPlan?.deliverableGroups || []) {
+      for (const [part, specialistId] of Object.entries(group.crew || {})) {
+        if (specialistId === id) return `${humanize(part)} for ${humanize(group.type || "delivery")}`;
+      }
+    }
+    return "Supporting specialist";
+  };
+
+  const toggleOptional = (id) => {
+    if (requiredIds.has(id) || running || completed) return;
+    setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
 
   /* Live cert state for the moat footer */
   const [cert, setCert] = useBrState(null);
@@ -1805,6 +1882,17 @@ function BriefRunCanvas({ context, onClear, go }) {
 
   const runAssembly = async () => {
     if (running || completed) return;
+    if (!specs.length) { setErr("Choose at least one specialist before running."); return; }
+    if (!canAfford) { setErr(`This assembly needs ${totalCr} credits; ${creditState.balance} are available.`); return; }
+    try {
+      sessionStorage.setItem("ci_run_context", JSON.stringify({
+        ...context,
+        specialistIds: selectedIds,
+        totalCr,
+        crewApprovedAt: new Date().toISOString(),
+        approvalState: "crew-approved",
+      }));
+    } catch (e) {}
     setRunning(true); setErr(null);
     let sharedBriefId = null;
 
@@ -1818,12 +1906,12 @@ function BriefRunCanvas({ context, onClear, go }) {
     for (const g of context.deliveryPlan?.deliverableGroups || []) {
       const entries = Object.entries(g.crew || {});
       const hasText = entries.some(([part]) => !/image|frames|hero/i.test(part));
-      const visual = entries.find(([part]) => /image|frames|hero/i.test(part));
+      const visual = entries.find(([part, id]) => /image|frames|hero/i.test(part) && selectedSet.has(id));
       if (hasText && visual) {
         pairedVisualIds.add(visual[1]);
         /* Record every non-visual crew member as having a paired visual. */
         for (const [part, id] of entries) {
-          if (!/image|frames|hero/i.test(part)) copyHasVisual.set(id, true);
+          if (!/image|frames|hero/i.test(part) && selectedSet.has(id)) copyHasVisual.set(id, true);
         }
       }
     }
@@ -1969,7 +2057,7 @@ function BriefRunCanvas({ context, onClear, go }) {
       if (done?.output?.kind === "deliverables" && Array.isArray(done.output.deliverables)) {
         const group = (context.deliveryPlan?.deliverableGroups || [])
           .find((g) => Object.values(g.crew || {}).includes(agent.id));
-        const visualEntry = group && Object.entries(group.crew || {}).find(([part]) => /image|frames|hero/i.test(part));
+        const visualEntry = group && Object.entries(group.crew || {}).find(([part, id]) => /image|frames|hero/i.test(part) && selectedSet.has(id));
         const visualId = visualEntry?.[1];
         if (visualId) {
           const platform = group.platforms?.[0] || "generic";
@@ -2035,13 +2123,62 @@ function BriefRunCanvas({ context, onClear, go }) {
         sharpenedBrief={context.sharpenedBrief}
         refusals={context.refusals || []}
         deptBreakdown={deptBreakdown}
-        totalCr={context.totalCr}
+        totalCr={totalCr}
         completed={completed}
         running={running}
       />
+      {!running && !completed && (
+        <section className="canvas-crew-gate" aria-label="Review crew before running">
+          <div className="canvas-crew-gate__intro">
+            <div>
+              <div className="eyebrow eyebrow--yellow">Approval 2 of 2 · Crew</div>
+              <h2>Review who will work on this brief</h2>
+              <p>Required roles protect the delivery plan. Optional roles can be removed before any credits are spent.</p>
+            </div>
+            <div className="canvas-crew-gate__balance">
+              <span>Available</span>
+              <strong>{creditState.balance == null ? "—" : creditState.balance} cr</strong>
+            </div>
+          </div>
+          <div className="canvas-crew-gate__roles">
+            {allSpecialistIds.map((id) => {
+              const agent = window.CI_AGENTS.find((item) => item.id === id);
+              if (!agent) return null;
+              const required = requiredIds.has(id);
+              const selected = selectedSet.has(id);
+              return (
+                <div className={"canvas-crew-role" + (selected ? " is-selected" : "")} key={id}>
+                  <span className="canvas-crew-role__mark" style={{background: window.CI_DEPT_COLORS?.[agent.dept] || "var(--neutral-400)"}} />
+                  <div className="canvas-crew-role__copy">
+                    <strong>{agent.name}</strong>
+                    <span>{crewRole(id)}</span>
+                  </div>
+                  <span className="canvas-crew-role__type">{required ? "Required" : "Optional"}</span>
+                  <span className="canvas-crew-role__cost">{agent.cr || 0} cr</span>
+                  {!required && (
+                    <button className="btn btn--ghost btn--sm" onClick={() => toggleOptional(id)}>
+                      {selected ? "Remove" : "Add"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="canvas-crew-gate__action">
+            <div>
+              <strong>{specs.length} specialist{specs.length === 1 ? "" : "s"} · {totalCr} credits</strong>
+              <span>{creditState.error ? "Balance could not be refreshed; the API will verify it before charging." : "Credits are charged only as each specialist completes."}</span>
+            </div>
+            <button className="btn btn--primary" onClick={runAssembly} disabled={!specs.length || !canAfford}>
+              {canAfford ? <>Approve crew &amp; run · {totalCr} cr <Icon name="arrow" size={14} /></> : <>Need {totalCr - creditState.balance} more credits</>}
+            </button>
+          </div>
+        </section>
+      )}
       <InteractiveCanvas
         nodeData={nodes}
         edges={edges}
+        height={!running && !completed ? "max(500px, calc(100vh - 360px))" : "calc(100vh - 150px)"}
         renderNode={renderNode}
         exportName="run-canvas"
         onNodeClick={(node) => {
@@ -2055,8 +2192,8 @@ function BriefRunCanvas({ context, onClear, go }) {
         }}
         helper={
           running     ? "Running the crew… each card streams its progress. Click any to open the full output."
-          : completed ? `Run complete · ${context.totalCr} cr spent. Click any specialist to verify, edit, or copy its output.`
-          : "Crew assembled. Hit Run when you're ready."
+          : completed ? `Run complete · ${totalCr} cr spent. Click any specialist to verify, edit, or copy its output.`
+          : "Review the crew above. The canvas updates as optional roles change."
         }
         toolbarExtra={
           <>
@@ -2085,34 +2222,26 @@ function BriefRunCanvas({ context, onClear, go }) {
         }
       />
 
-      {/* Prominent floating RUN button — the moment of action. Sits
-          center-bottom above the canvas helper, impossible to miss. */}
-      {!completed && (
+      {/* The approval lives in the crew gate. This is progress only. */}
+      {running && !completed && (
         <button
-          onClick={runAssembly}
-          disabled={running}
+          disabled
           style={{
             position:"fixed",
             bottom: 120, left:"50%", transform:"translateX(-50%)",
             zIndex: 50,
             height: 60, padding:"0 36px",
             borderRadius: 999,
-            border:"none", cursor: running ? "default" : "pointer",
-            background: running ? "var(--neutral-900)" : "var(--yellow-500)",
-            color: running ? "#fff" : "var(--c-ink)",
+            border:"none", cursor:"default",
+            background:"var(--neutral-900)",
+            color:"#fff",
             fontFamily:"var(--font-sans)", fontWeight: 600, fontSize: 16, letterSpacing:"-0.005em",
             boxShadow:"0 16px 36px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.08)",
             display:"inline-flex", alignItems:"center", gap: 12,
-            transition: running ? "none" : "transform 140ms ease, box-shadow 140ms ease",
+            transition:"none",
           }}
-          onMouseEnter={(e) => { if (!running) { e.currentTarget.style.transform = "translateX(-50%) translateY(-2px)"; e.currentTarget.style.boxShadow = "0 22px 44px rgba(0,0,0,0.22), 0 6px 14px rgba(0,0,0,0.1)"; } }}
-          onMouseLeave={(e) => { if (!running) { e.currentTarget.style.transform = "translateX(-50%)"; e.currentTarget.style.boxShadow = "0 16px 36px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.08)"; } }}
         >
-          {running ? (
-            <><BrandolphDot state="thinking" size={11} /> &nbsp;Running the crew…</>
-          ) : (
-            <><span style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17}}>Run</span> the assembly · {context.totalCr} cr <Icon name="arrow" size={16} /></>
-          )}
+          <><BrandolphDot state="thinking" size={11} /> &nbsp;Running the approved crew…</>
         </button>
       )}
 
@@ -2149,7 +2278,7 @@ function BriefRunCanvas({ context, onClear, go }) {
       )}
       {openBrief && (
         <BriefDrawer
-          brief={{ title: context.title, tension: context.tension, sharpenedBrief: context.sharpenedBrief, rawBrief: context.rawBrief, refusals: context.refusals, deliveryPlan: context.deliveryPlan }}
+          brief={{ title: context.title, tension: context.tension, sharpenedBrief: context.sharpenedBrief, rawBrief: context.rawBrief, refusals: context.refusals, orchestrationRationale: context.orchestrationRationale, deliveryPlan: context.deliveryPlan }}
           onClose={() => setOpenBrief(false)}
         />
       )}
@@ -2164,8 +2293,8 @@ const TEXT_RERUN_OPTIONS = [
   { route: "anthropic/claude-opus-4-7",            label: "Opus 4.7",            note: "Premium — deepest reasoning" },
   { route: "anthropic/claude-sonnet-4-6",          label: "Sonnet 4.6",          note: "Balanced workhorse" },
   { route: "anthropic/claude-haiku-4-5-20251001",  label: "Haiku 4.5",           note: "Fast + cheap" },
-  { route: "openrouter/google/gemini-2.5-pro",     label: "Gemini Pro",          note: "Long-context synthesis" },
-  { route: "openrouter/google/gemini-2.5-flash",   label: "Gemini Flash",        note: "Cheapest" },
+  { route: "openrouter/google/gemini-3.6-flash",       label: "Gemini 3.6 Flash",      note: "Current high-quality synthesis" },
+  { route: "openrouter/google/gemini-3.5-flash-lite",  label: "Gemini 3.5 Flash-Lite", note: "Low-cost QA and variants" },
 ];
 const IMAGE_RERUN_OPTIONS = [
   { route: "vendor/fal/flux-1.1-pro",  label: "Flux 1.1 Pro",   note: "Premium hero quality" },
@@ -2208,9 +2337,18 @@ function BriefDrawer({ brief, onClose }) {
       {groups.length > 0 && (
         <div>
           <div className="eyebrow" style={{ marginBottom: 6 }}>What Brandolph is producing</div>
+          {(brief.orchestrationRationale || brief.deliveryPlan?.orchestrationRationale) && (
+            <p style={{ margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.55, color: "var(--c-dim)" }}>
+              {brief.orchestrationRationale || brief.deliveryPlan.orchestrationRationale}
+            </p>
+          )}
           {groups.map((g, i) => (
-            <div key={i} style={{ fontSize: 13.5, color: "var(--c-ink)", marginBottom: 4 }}>
-              {g.count}× {String(g.type || "").replace(/_/g, " ")}{g.platforms?.length ? ` · ${g.platforms.join(", ")}` : ""}
+            <div key={i} style={{ fontSize: 13.5, color: "var(--c-ink)", marginBottom: 10 }}>
+              <div>
+                {g.count}× {String(g.type || "").replace(/_/g, " ")}{g.platforms?.length ? ` · ${g.platforms.join(", ")}` : ""}
+              </div>
+              {g.why && <div style={{ color: "var(--c-dim)", lineHeight: 1.45, marginTop: 2 }}>{g.why}</div>}
+              {g.successSignal && <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--c-faint)", marginTop: 4 }}>Signal: {g.successSignal}</div>}
             </div>
           ))}
         </div>
@@ -3089,76 +3227,10 @@ function outputRationale(o, specialist) {
   return `${who} read the BIO first, then ${spec.objective ? spec.objective.toLowerCase() : "produced the deliverable to the brief"}`;
 }
 
-/* Per-brief Delivery view: the canvas + a node-detail drawer. */
-function BriefDelivery({ brief, outputs }) {
-  const [sel, setSel] = useBrState(null);
-  const graph = React.useMemo(() => buildBriefGraph(brief, outputs), [brief.id]);
-
-  const open = (node) => { if (node && node.ref) setSel(node.ref); };
-  const ref = sel || {};
-  const output = ref.type === "output" ? outputs.find(o => o.id === ref.id) : null;
-  const specialist =
-    ref.type === "specialist" ? window.CI_AGENTS.find(a => a.id === ref.id)
-    : output ? window.CI_AGENTS.find(a => a.id === output.agentId) : null;
-
-  let title = "", eyebrow = "", body = null;
-  if (ref.type === "bio") {
-    eyebrow = "Source · the canon"; title = "Brand Intelligence Object";
-    body = <p style={{fontSize:14.5, color:"var(--c-ink)", lineHeight:1.55}}>Everything downstream is judged against the BIO. <em className="b-voice">{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p>;
-  } else if (ref.type === "brief") {
-    eyebrow = "L1 · Brandolph"; title = brief.title;
-    body = <><p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:17, lineHeight:1.5, color:"var(--c-ink)", marginBottom:12}}>"{brief.smp}"</p><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{brief.objective}</p></>;
-  } else if (ref.type === "specialist" && specialist) {
-    const spec = specialistSpec(specialist);
-    eyebrow = `${specialist.code} · ${specialist.dept}`; title = specialist.name;
-    body = <>
-      <p style={{fontSize:14, color:"var(--c-ink)", lineHeight:1.5, marginBottom:14}}>{specialist.job}</p>
-      <div className="eyebrow" style={{marginBottom:6}}>Why Brandolph routed this here</div>
-      <p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{spec.objective || "Best fit for this part of the brief."}</p>
-    </>;
-  } else if (output) {
-    eyebrow = `${output.type}${specialist ? " · " + specialist.name : ""}`; title = "Output";
-    body = <>
-      {output.status && <div style={{marginBottom:12}}><StatusPill status={output.status} /></div>}
-      <p style={{fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic", fontSize:16, lineHeight:1.55, color:"var(--c-ink)", marginBottom:14}}>"{output.body}"</p>
-      <div style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)", marginBottom:18}}>{output.meta}</div>
-      <div className="card card--inset" style={{padding:"14px 16px", borderLeft:"3px solid var(--yellow-500)"}}>
-        <div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>Why this creative choice</div>
-        <p style={{fontSize:13.5, color:"var(--c-ink)", lineHeight:1.5, margin:0}}>{outputRationale(output, specialist)}</p>
-      </div>
-    </>;
-  }
-
-  return (
-    <div>
-      <InteractiveCanvas
-        key={brief.id}
-        nodeData={graph.nodes}
-        edges={graph.edges}
-        onNodeClick={open}
-        height="calc(100vh - 250px)"
-        exportName={brief.id}
-      />
-      <Drawer open={!!sel} onClose={() => setSel(null)} title={title} eyebrow={eyebrow} width={440}>
-        {body}
-      </Drawer>
-    </div>
-  );
-}
-
 /* ════════════════════════════════════════════════════════════════ */
 /* BRIEF BOARD — the whole brief as a Miro-style canvas workspace.    */
 /* Floating launcher + toolbar; Ask-Brandolph, specialists, results   */
 /* as draggable nodes; +Add to drop another ask or specialist.        */
-
-const BOARD_LAUNCH = [
-  { id:"home",        icon:"sparkles", label:"Create" },
-  { id:"briefs",      icon:"brief",    label:"Briefs" },
-  { id:"library",     icon:"files",    label:"Library" },
-  { id:"specialists", icon:"team",     label:"Specialists" },
-  { id:"credits",     icon:"credit",   label:"Credits" },
-  { id:"settings",    icon:"settings", label:"Settings" },
-];
 
 function boardReply(text) {
   const m = text.toLowerCase();
@@ -4334,4 +4406,4 @@ function SpecialistAuthor({ go }) {
   );
 }
 
-Object.assign(window, { BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, Library, SpecialistAuthor, BriefBoard });
+Object.assign(window, { BriefsLibrary, LiveBriefDetail, SpecialistsDirectory, CanvasView, Library, SpecialistAuthor, BriefBoard });

@@ -10,7 +10,7 @@
 
 import { streamCompletion } from "../server/src/lib/models/router.js";
 
-async function run(spec, label) {
+async function run(spec, label, maxTokens = 32) {
   console.log(`\n=== ${label} ===`);
   console.log(`  route:  ${spec.payload.modelRouting.primary}`);
   process.stdout.write("  tokens: ");
@@ -21,7 +21,7 @@ async function run(spec, label) {
     spec,
     system: "You are a one-word answer machine. Reply in lowercase. One word only.",
     messages: [{ role: "user", content: "Name a color." }],
-    maxTokens: 12,
+    maxTokens,
   })) {
     if (ev.type === "token") process.stdout.write(ev.text);
     else if (ev.type === "done") usage = ev.usage;
@@ -42,16 +42,23 @@ await run({
 
 await run({
   payload: {
-    modelRouting: { primary: "openrouter/google/gemini-2.5-flash", fallback: null, reason: "test" },
+    modelRouting: { primary: "openrouter/google/gemini-3.5-flash-lite", fallback: null, reason: "test" },
     cr_estimate: 1,
   }
-}, "OpenRouter path (Gemini 2.5 Flash)");
+}, "OpenRouter path (Gemini 3.5 Flash-Lite)");
+
+await run({
+  payload: {
+    modelRouting: { primary: "openrouter/google/gemini-3.6-flash", fallback: null, reason: "test" },
+    cr_estimate: 1,
+  }
+}, "OpenRouter path (Gemini 3.6 Flash)", 256);
 
 await run({
   payload: {
     modelRouting: { primary: "openrouter/openai/gpt-5", fallback: null, reason: "test" },
     cr_estimate: 1,
   }
-}, "OpenRouter path (GPT-5)");
+}, "OpenRouter path (GPT-5)", 256);
 
 console.log("\nDone.");

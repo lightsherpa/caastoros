@@ -1,5 +1,5 @@
 import React from "react";
-import { apiFetch } from "./lib/supabase-browser.js";
+import { apiFetch, supabase } from "./lib/supabase-browser.js";
 const { BrandolphAvatar, BrandolphDot, Icon, LayerTag, Reveal, StatusPill, StreamedText, useIsTeam } = window;
 
 /* Same SSE helper as portal-briefs's TryPanel — duplicated here to keep
@@ -52,715 +52,359 @@ function getAssembly(density) {
   return { agents, totalCr, models };
 }
 
-/* Brandolph message rendered with italic + yellow voice highlight */
-function BrandolphLine({ html, who = "brandolph" }) {
-  return (
-    <div style={{display:"flex", gap: 12, alignItems:"flex-start"}}>
-      {who === "brandolph" ? <BrandolphAvatar /> : (
-        <img src={window.CI_USER.avatar} alt="" style={{width: 36, height: 36, borderRadius: "50%", objectFit:"cover"}} />
-      )}
-      <div style={{flex: 1, minWidth: 0}}>
-        <div style={{display:"flex", alignItems:"center", gap:8, marginBottom: 4}}>
-          <span style={{fontWeight:500, fontSize:13, color:"var(--c-ink)"}}>
-            {who === "brandolph" ? "Brandolph" : window.CI_USER.name}
-          </span>
-          {who === "brandolph" && <LayerTag layer="L1" />}
-          <span className="eyebrow" style={{marginLeft:"auto"}}>now</span>
-        </div>
-        <div className="b-voice" style={{fontSize: 14.5, lineHeight: 1.6, color:"var(--c-ink)"}}>
-          <StreamedText html={html} stream={who === "brandolph"} />
-        </div>
-      </div>
-    </div>
-  );
+function isPlaceholderBrand(brand) {
+  const name = String(brand?.name || "").trim().toLowerCase();
+  return !name || name === "my brand" || name === "untitled brand" || name === "new brand";
 }
 
-/* Brandolph's diagnosis card (the "sharpens before assembling" pattern) */
-function BrandolphDiagnosis({ onAnswer, onProceed }) {
-  return (
-    <div style={{
-      borderLeft: "3px solid var(--yellow-500)",
-      background: "var(--yellow-50)",
-      borderRadius: "0 12px 12px 0",
-      padding: "18px 22px",
-      marginTop: 14,
-    }}>
-      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 8}}>Brandolph · sharpening</div>
-      <div style={{
-        fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 16,
-        color:"var(--c-ink)", lineHeight: 1.5, marginBottom: 14,
-      }}>
-        Before we run this, two things I'd want a CMO to answer first. They're not gatekeepers — they're the difference between a pricing page that converts and one that hedges.
-      </div>
-      <ol style={{margin: 0, padding: 0, listStyle:"none", display:"flex", flexDirection:"column", gap: 12}}>
-        <li>
-          <div style={{display:"flex", gap: 10}}>
-            <span style={{
-              fontFamily:"var(--font-mono)", fontSize:11, color:"var(--yellow-800)",
-              minWidth: 22,
-            }}>01</span>
-            <div>
-              <div style={{fontWeight: 500, fontSize: 14, color:"var(--c-ink)"}}>Annual at 11.4× monthly, or 10×?</div>
-              <div style={{fontSize: 12.5, color:"var(--c-dim)", marginTop: 4}}>
-                Because — at 10× you're competing with your own monthly. At 11.4× you're offering 1-in-12 free, which reads as a decision, not a discount.
-              </div>
-            </div>
-          </div>
-        </li>
-        <li>
-          <div style={{display:"flex", gap: 10}}>
-            <span style={{
-              fontFamily:"var(--font-mono)", fontSize:11, color:"var(--yellow-800)",
-              minWidth: 22,
-            }}>02</span>
-            <div>
-              <div style={{fontWeight: 500, fontSize: 14, color:"var(--c-ink)"}}>Is the wholesale audience in or out of this push?</div>
-              <div style={{fontSize: 12.5, color:"var(--c-dim)", marginTop: 4}}>
-                Because — they convert on email differently. If they're in, I'll route a sequence variant B. If they're out, we don't waste a Sonnet pass on copy that won't land.
-              </div>
-            </div>
-          </div>
-        </li>
-      </ol>
-      <div style={{display:"flex", gap: 8, marginTop: 16}}>
-        <button className="btn btn--primary btn--sm" onClick={onAnswer}>Answer inline</button>
-        <button className="btn btn--ghost btn--sm" onClick={onProceed}>Proceed with what Brandolph proposes</button>
-      </div>
-    </div>
-  );
+function flattenBriefOutputs(briefs = []) {
+  const outputs = [];
+  for (const brief of briefs || []) {
+    for (const run of brief.runs || []) {
+      for (const output of run.outputs || []) {
+        outputs.push({ ...output, run, brief });
+      }
+    }
+  }
+  return outputs.sort((a, b) => new Date(b.created_at || b.run?.ended_at || b.brief?.created_at || 0) - new Date(a.created_at || a.run?.ended_at || a.brief?.created_at || 0));
 }
 
-/* "Not doing" red card */
-function NotDoing({ items }) {
-  return (
-    <div style={{
-      borderLeft: "3px solid var(--pink-500)",
-      background: "var(--pink-50)",
-      borderRadius: "0 12px 12px 0",
-      padding: "16px 20px",
-    }}>
-      <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>What this brief is NOT doing</div>
-      <ul style={{margin:0, paddingLeft: 0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-        {items.map((it, i) => (
-          <li key={i} style={{display:"flex", gap: 10, fontSize:13.5, lineHeight: 1.45}}>
-            <span style={{color:"var(--pink-500)", fontFamily:"var(--font-mono)"}}>✕</span>
-            <span style={{color:"var(--c-ink)"}}>{it}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+function readableOutputTitle(output) {
+  const body = output?.body || {};
+  return body.title || body.name || body.headline || output?.brief?.title || output?.brief?.payload?.title || output?.kind || "Output";
 }
 
-/* Assembly panel — used in Console + Desk variants */
-function AssemblyPanel({ assembly, runState = "proposing", onRun }) {
-  const isTeam = useIsTeam();
-  return (
-    <div style={{display:"flex", flexDirection:"column", height:"100%"}}>
-      <div style={{
-        padding:"18px 20px", borderBottom: "1px solid var(--c-line)",
-      }}>
-        <div className="eyebrow" style={{marginBottom: 6}}>Assembly</div>
-        <div style={{fontSize: 15, fontWeight: 500, color:"var(--c-ink)", letterSpacing:"-0.005em"}}>Pricing relaunch</div>
-        <div style={{fontSize: 12, color:"var(--c-faint)", marginTop: 2}}>
-          {assembly.agents.length} specialists assembled{isTeam ? ` · ${assembly.models.length} models routed` : ""}
-        </div>
-      </div>
-      <div className="scroll" style={{flex:1, overflowY:"auto", padding:"12px 12px", display:"flex", flexDirection:"column", gap: 6}}>
-        {assembly.agents.map((a, i) => {
-          const m = window.CI_MODELS[a.model];
-          const accent = isTeam ? m.color : (window.CI_DEPT_COLORS[a.dept] || "var(--neutral-300)");
-          const state = runState === "running" ? (i < 2 ? "ok" : i === 2 ? "running" : "queued")
-                       : runState === "done" ? "ok"
-                       : "queued";
-          return (
-            <div key={a.id} style={{
-              display:"flex", alignItems:"center", gap: 10,
-              padding: "10px 12px",
-              borderRadius: 8,
-              border:"1px solid var(--c-line)",
-              borderLeft: `3px solid ${accent}`,
-              background: state === "running" ? "var(--yellow-50)" : "var(--c-card)",
-              transition: "background 200ms ease",
-            }}>
-              <span style={{
-                fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)",
-                letterSpacing:"0.06em", minWidth: 28,
-              }}>{a.code.replace("L2-","")}</span>
-              <div style={{flex:1, minWidth: 0}}>
-                <div style={{fontSize: 13, fontWeight: 500, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</div>
-                <div style={{display:"flex", alignItems:"center", gap:6, marginTop:2}}>
-                  {isTeam ? (
-                    <>
-                      <span className="modelchip__dot" style={{width:6, height:6, background: m.color}} />
-                      <span style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>{m.label}</span>
-                    </>
-                  ) : (
-                    <span style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.06em", textTransform:"uppercase"}}>{a.dept}</span>
-                  )}
-                </div>
-              </div>
-              <div style={{display:"flex", alignItems:"center", gap: 8}}>
-                <span className="credit" style={{fontSize:11}}>{a.cr} cr</span>
-                <span className={"dot-state dot-state--" + state} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{
-        padding:"14px 18px", borderTop:"1px solid var(--c-line)",
-        background:"var(--c-bg)",
-      }}>
-        <div style={{display:"flex", justifyContent:"space-between", marginBottom: 12, fontSize:13}}>
-          <span style={{color:"var(--c-dim)"}}>Total</span>
-          <strong style={{fontFamily:"var(--font-mono)"}}>{assembly.totalCr} cr</strong>
-        </div>
-        {runState === "running" ? (
-          <button className="btn btn--ghost" style={{width:"100%", justifyContent:"center"}} disabled>
-            <BrandolphDot state="thinking" /> Running…
-          </button>
-        ) : runState === "done" ? (
-          <button className="btn btn--primary" style={{width:"100%", justifyContent:"center"}}>
-            <Icon name="check" size={14} /> Open the work
-          </button>
-        ) : (
-          <button className="btn btn--primary" style={{width:"100%", justifyContent:"center"}} onClick={onRun}>
-            Run — {assembly.totalCr} credits <Icon name="arrow" size={14} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
+function useHomeWorkspaceSnapshot() {
+  const [state, setState] = React.useState({
+    loading: true,
+    error: null,
+    brands: [],
+    brand: null,
+    bio: null,
+    reviewPending: false,
+    focusCount: 0,
+    briefs: [],
+    outputs: [],
+    sourceCount: 0,
+    credits: null,
+    stage: "loading",
+  });
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+      try {
+        const { data: brands, error: brandErr } = await supabase
+          .from("brands")
+          .select("id, name, url, created_at")
+          .order("created_at", { ascending: true });
+        if (brandErr) throw brandErr;
+
+        const ownedBrands = brands || [];
+        const stored = window.getCurrentBrandId?.();
+        let brand = ownedBrands.find((b) => b.id === stored) || ownedBrands[0] || null;
+        if (brand && brand.id !== stored) window.setCurrentBrandId?.(brand.id);
+
+        if (!brand) {
+          if (!cancelled) {
+            setState({
+              loading: false,
+              error: null,
+              brands: [],
+              brand: null,
+              bio: null,
+              reviewPending: false,
+              focusCount: 0,
+              briefs: [],
+              outputs: [],
+              sourceCount: 0,
+              credits: null,
+              stage: "no-brand",
+            });
+          }
+          return;
+        }
+
+        const [bioRes, briefsRes, sourceRes, creditsRes] = await Promise.all([
+          apiFetch(`/api/bios/${brand.id}`).then(async (r) => r.ok ? r.json() : { bio: null, reviewPending: false, focusCount: 0 }).catch(() => ({ bio: null, reviewPending: false, focusCount: 0 })),
+          supabase
+            .from("briefs")
+            .select(`
+              id, title, type, payload, mode, status, created_at,
+              runs ( id, specialist_id, spec_version, bio_version, model_used, status, prompt_tokens, completion_tokens, ended_at,
+                     outputs ( id, kind, body, status, rationale, created_at ) )
+            `)
+            .eq("brand_id", brand.id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("bio_sources")
+            .select("id", { count: "exact", head: true })
+            .eq("brand_id", brand.id),
+          apiFetch("/api/credits").then(async (r) => r.ok ? r.json() : null).catch(() => null),
+        ]);
+
+        if (briefsRes.error) throw briefsRes.error;
+        const bio = bioRes?.bio || null;
+        const briefs = briefsRes.data || [];
+        const outputs = flattenBriefOutputs(briefs);
+        const stage = !bio
+          ? "no-bio"
+          : bio.certified
+            ? "ready"
+            : "review";
+
+        if (!cancelled) {
+          setState({
+            loading: false,
+            error: null,
+            brands: ownedBrands,
+            brand,
+            bio,
+            reviewPending: !!bioRes?.reviewPending,
+            focusCount: bioRes?.focusCount || 0,
+            briefs,
+            outputs,
+            sourceCount: sourceRes.count || 0,
+            credits: creditsRes,
+            stage,
+            placeholderBrand: isPlaceholderBrand(brand),
+          });
+        }
+      } catch (e) {
+        if (!cancelled) setState((prev) => ({ ...prev, loading: false, error: e?.message || String(e), stage: "error" }));
+      }
+    };
+
+    load();
+    window.addEventListener("brand:changed", load);
+    window.addEventListener("ci_auth_change", load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("brand:changed", load);
+      window.removeEventListener("ci_auth_change", load);
+    };
+  }, []);
+
+  return state;
 }
 
-/* BIO chip — a left rail summary entry */
-function BioChip({ bioScore }) {
-  return (
-    <div className="card" style={{padding: "14px 16px", marginBottom: 14}}>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom: 6}}>
-        <span className="eyebrow">BIO · Vinilo</span>
-        <span style={{fontFamily:"var(--font-mono)", fontWeight: 600, fontSize:14, color:"var(--c-ink)"}}>{bioScore}%</span>
-      </div>
-      <div style={{height:6, background:"var(--neutral-50)", borderRadius: 999, overflow:"hidden", marginBottom: 10}}>
-        <div style={{height:"100%", width: bioScore + "%", background:"var(--yellow-500)", borderRadius:999}} />
-      </div>
-      <div style={{fontSize: 12, color:"var(--c-dim)", lineHeight: 1.45}}>
-        <strong style={{color:"var(--c-ink)", fontWeight:500}}>Slow Tuesdays.</strong> Editorial + warm. No "limited", no "unlock", no urgency manipulation.
-      </div>
-      <a href="#/bio" className="btn btn--link" style={{marginTop: 8, fontSize:12}}>View full BIO →</a>
-    </div>
-  );
-}
 
-/* Quick prompts (suggested actions Brandolph offers) */
-function QuickPrompts({ onPrompt }) {
-  const items = [
-    { eyebrow:"Strategy",   label:"What's blocked on the pricing relaunch?" },
-    { eyebrow:"Ship",       label:"Three subject line variants for Tuesday's send" },
-    { eyebrow:"Read me",    label:"Read my BIO out loud — diagnostic mode" },
-    { eyebrow:"Sharpen",    label:"I want to brief a summer campaign" },
+function FirstRunOnboarding({ snapshot, go }) {
+  const brand = snapshot.brand;
+  const hasBio = !!snapshot.bio;
+  const reviewCopy = snapshot.reviewPending
+    ? "A Steward review is already queued. You can inspect the draft BIO while the review is in motion."
+    : "The BIO exists, but it is not certified yet. Client outputs stay locked until a Steward approves the canon.";
+  const title = snapshot.stage === "review"
+    ? `${brand?.name || "Your brand"} is waiting for certification.`
+    : "Build the brand canon before you brief.";
+  const intro = snapshot.stage === "review"
+    ? reviewCopy
+    : "Caastor needs a Brand Intelligence Object: one source of truth for audience, voice, strategy, visual rules, and refusals. Briefs unlock when that foundation is reviewed.";
+  const steps = [
+    { label: "Brand", text: brand ? (snapshot.placeholderBrand ? "Name still needs cleanup" : brand.name) : "Create the first brand", done: !!brand && !snapshot.placeholderBrand },
+    { label: "Discovery", text: hasBio ? `BIO v${snapshot.bio.version} compiled` : "Read the site and source files", done: hasBio },
+    { label: "Steward", text: snapshot.bio?.certified ? "Certified" : snapshot.reviewPending ? "Review queued" : "Needs review", done: !!snapshot.bio?.certified },
+    { label: "Create", text: snapshot.bio?.certified ? "Briefs unlocked" : "Locked until certification", done: !!snapshot.bio?.certified },
   ];
-  return (
-    <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 10}}>
-      {items.map((it, i) => (
-        <button key={i} className="card" onClick={() => onPrompt(it.label)} style={{
-          textAlign:"left", padding:"12px 14px", cursor:"pointer", border:"1px solid var(--c-line)",
-          background:"var(--c-card)", transition:"border-color 140ms ease",
-        }}
-          onMouseEnter={e => e.currentTarget.style.borderColor = "var(--purple-300)"}
-          onMouseLeave={e => e.currentTarget.style.borderColor = "var(--c-line)"}
-        >
-          <div className="eyebrow eyebrow--purple" style={{marginBottom: 4}}>{it.eyebrow}</div>
-          <div style={{fontSize: 13.5, color:"var(--c-ink)", lineHeight: 1.4}}>{it.label}</div>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/* Composer (chat input) */
-function Composer({ value, onChange, onSend, placeholder }) {
-  return (
-    <div style={{
-      background:"var(--c-card)", border:"1.5px solid var(--c-line-2)",
-      borderRadius: 14, padding: 12,
-      transition:"border-color 160ms ease, box-shadow 160ms ease",
-    }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = "var(--purple-500)"; e.currentTarget.style.boxShadow = "var(--shadow-focus-ring)"; }}
-      onBlur={(e) => { e.currentTarget.style.borderColor = "var(--c-line-2)"; e.currentTarget.style.boxShadow = "none"; }}
-      tabIndex={-1}
-    >
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={2}
-        placeholder={placeholder || "Tell me what you're working on…"}
-        style={{
-          width:"100%", border:"none", outline:"none", resize:"none",
-          fontFamily:"var(--font-sans)", fontSize: 15, color:"var(--c-ink)",
-          background:"transparent", padding: 0, lineHeight: 1.5,
-        }}
-      />
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop: 6}}>
-        <div style={{display:"flex", gap: 10, alignItems:"center"}}>
-          <button className="btn btn--ghost btn--sm" style={{height:28, padding:"0 10px"}}>
-            <Icon name="files" size={13} /> Attach
-          </button>
-          <button className="btn btn--ghost btn--sm" style={{height:28, padding:"0 10px"}}>
-            <Icon name="brief" size={13} /> From brief
-          </button>
-          <span style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
-            Brandolph turn ≈ 3 cr · Assembly previewed before spend
-          </span>
-        </div>
-        <button className="btn btn--primary btn--sm" onClick={onSend}>
-          Send <Icon name="arrow" size={13} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* Outputs ready strip (shows when assembly is done) */
-function OutputsReady({ outputs }) {
-  return (
-    <div style={{borderLeft:"3px solid var(--green-500)", background:"var(--green-50)", borderRadius:"0 12px 12px 0", padding:"16px 20px"}}>
-      <div className="eyebrow eyebrow--green" style={{marginBottom: 8}}>Brandolph · ready</div>
-      <p style={{fontSize: 14, color:"var(--c-ink)", margin: 0, marginBottom: 12}}>
-        The pricing relaunch is back from the team. <em className="b-voice" style={{background:"none"}}>I read it.</em>{" "}
-        The conversion copy + subject lines hold. Email 2 reads dutiful — I'd send it for a second pass. Want me to, or want to read it first?
-      </p>
-      <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
-        <a href="#/briefs/b-pricing-relaunch" className="btn btn--primary btn--sm">Open the brief →</a>
-        <button className="btn btn--ghost btn--sm">Send Email 2 back for a pass — 5 cr</button>
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════ */
-/* Variant A — CONSOLE (chat + assembly always visible)            */
-function HomeConsole({ tweaks }) {
-  const [input, setInput] = useBState("");
-  const [runState, setRunState] = useBState("proposing");
-  const assembly = useBMemo(() => getAssembly(tweaks.assemblyDensity || 7), [tweaks.assemblyDensity]);
-  const openers = window.CI_BRANDOLPH_OPENERS;
-  const opener = openers[tweaks.brandolphMood || "midway"];
 
   return (
-    <div className="bcon">
-      {/* Left rail */}
-      <aside className="bcon-left scroll" style={{padding: 24, borderRight:"1px solid var(--c-line)", overflowY:"auto"}}>
-        <BioChip bioScore={tweaks.bioScore || 91} />
-        <div className="eyebrow" style={{margin:"4px 4px 10px"}}>This week</div>
-        <div className="card" style={{padding: 14, marginBottom: 12}}>
-          <div style={{display:"flex", justifyContent:"space-between", marginBottom: 6}}>
-            <span style={{fontSize:13, color:"var(--c-dim)"}}>Active briefs</span>
-            <strong style={{fontFamily:"var(--font-mono)"}}>3</strong>
-          </div>
-          <div style={{display:"flex", justifyContent:"space-between", marginBottom: 6}}>
-            <span style={{fontSize:13, color:"var(--c-dim)"}}>Outputs shipped</span>
-            <strong style={{fontFamily:"var(--font-mono)"}}>9</strong>
-          </div>
-          <div style={{display:"flex", justifyContent:"space-between"}}>
-            <span style={{fontSize:13, color:"var(--c-dim)"}}>Credits spent</span>
-            <strong style={{fontFamily:"var(--font-mono)"}}>337</strong>
-          </div>
-        </div>
-        <div className="eyebrow" style={{margin:"14px 4px 10px"}}>Recent briefs</div>
-        <div style={{display:"flex", flexDirection:"column", gap: 6}}>
-          {window.CI_BRIEFS.slice(0,3).map(b => (
-            <a key={b.id} href={"#/board/" + b.id} className="card" style={{
-              padding:"10px 12px", textDecoration:"none", cursor:"pointer",
-              display:"flex", flexDirection:"column", gap: 4,
-            }}>
-              <span style={{fontSize: 13, fontWeight: 500, color:"var(--c-ink)"}}>{b.title}</span>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                <StatusPill status={b.status} />
-                <span style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)"}}>{b.createdAt}</span>
-              </div>
-            </a>
-          ))}
-        </div>
-      </aside>
-
-      {/* Main chat surface */}
-      <section className="scroll" style={{padding:"24px 32px", overflowY:"auto", display:"flex", flexDirection:"column"}}>
-        <div className="stream" style={{display:"flex", flexDirection:"column", gap: 22, flex:1}}>
-          <BrandolphLine html={opener} />
-          {tweaks.brandolphMood === "midway" && (
-            <>
-              <OutputsReady outputs={window.CI_OUTPUTS.filter(o => o.briefId === "b-pricing-relaunch")} />
-              <BrandolphLine html="One more thing while I have you. The summer campaign you sketched on Friday — I drafted three creative territories for it. *Two are obvious. One is a refusal disguised as a territory.* Want to see them?" />
-            </>
-          )}
-          {tweaks.brandolphMood === "cold" && (
-            <BrandolphDiagnosis onAnswer={() => {}} onProceed={() => {}} />
-          )}
-          {tweaks.brandolphMood === "welcome" && (
-            <QuickPrompts onPrompt={(p) => setInput(p)} />
-          )}
-          {tweaks.brandolphMood === "fresh" && (
-            <>
-              <NotDoing items={[
-                "Don't ask me to make a logo before we agree what 'Vinilo' is for in 2026.",
-                "Don't ask me to write you content for a content calendar that doesn't exist yet.",
-              ]} />
-              <QuickPrompts onPrompt={(p) => setInput(p)} />
-            </>
-          )}
-        </div>
-        <div style={{position:"sticky", bottom: 0, paddingTop: 22, background:"linear-gradient(180deg, transparent, var(--c-bg) 30%)"}}>
-          <Composer value={input} onChange={setInput} onSend={() => { setInput(""); setRunState("running"); setTimeout(() => setRunState("done"), 3500); }} />
-        </div>
-      </section>
-
-      {/* Right rail — assembly */}
-      <aside className="bcon-right scroll" style={{borderLeft:"1px solid var(--c-line)", background:"var(--c-card)", overflowY:"auto"}}>
-        <AssemblyPanel assembly={assembly} runState={runState} onRun={() => { setRunState("running"); setTimeout(() => setRunState("done"), 3500); }} />
-      </aside>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════ */
-/* Variant B — CARDS (Brandolph offers options, less prompt-first)  */
-function HomeCards({ tweaks }) {
-  const assembly = useBMemo(() => getAssembly(tweaks.assemblyDensity || 7), [tweaks.assemblyDensity]);
-  return (
-    <div style={{padding:"32px 40px", maxWidth: 1180, margin:"0 auto"}}>
-      <Reveal>
-        <div style={{display:"flex", gap: 18, alignItems:"flex-start", marginBottom: 28}}>
-          <BrandolphAvatar size={56} />
-          <div style={{flex:1, paddingTop: 8}}>
-            <div className="eyebrow eyebrow--yellow" style={{marginBottom: 4}}>Brandolph · L1</div>
-            <h1 style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 30, lineHeight: 1.25, letterSpacing:"-0.01em", margin: 0, color:"var(--c-ink)"}}>
-              Good morning, Marina. The pricing relaunch is two cards short of ready, and the summer campaign is sitting in your head — not on a brief. <em style={{fontStyle:"normal", background:"var(--yellow-200)", padding:"0 4px"}}>Where do you want to spend the next 20 minutes?</em>
-            </h1>
-          </div>
-        </div>
-      </Reveal>
-
-      <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap: 18, marginBottom: 32}}>
-        <Reveal delay={50}>
-          <a href="#/board/b-pricing-relaunch" className="card" style={{padding: 22, display:"flex", flexDirection:"column", height:"100%", cursor:"pointer", textDecoration:"none"}}>
-            <div className="eyebrow eyebrow--yellow" style={{marginBottom: 8}}>Finish what's running</div>
-            <h3 style={{fontSize: 18, letterSpacing:"-0.01em", margin: 0, marginBottom: 8}}>Pricing relaunch</h3>
-            <p style={{fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5, margin: 0, flex: 1}}>
-              Conversion copy + subjects look strong. Email 2 reads dutiful. <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>I'd send it back for one pass.</em>
-            </p>
-            <div style={{marginTop: 14, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-              <StatusPill status="in-production" />
-              <span className="credit credit--pending">37 cr spent</span>
-            </div>
-          </a>
-        </Reveal>
-        <Reveal delay={150}>
-          <div className="card" style={{padding: 22, display:"flex", flexDirection:"column", height:"100%"}}>
-            <div className="eyebrow eyebrow--purple" style={{marginBottom: 8}}>Sharpen a new brief</div>
-            <h3 style={{fontSize: 18, letterSpacing:"-0.01em", margin: 0, marginBottom: 8}}>Summer campaign</h3>
-            <p style={{fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5, margin: 0, flex: 1}}>
-              You said "make Tuesday matter in June". <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>That's not a brief yet — it's a feeling.</em> I have two questions that turn it into one.
-            </p>
-            <div style={{marginTop: 14, display:"flex", gap: 8}}>
-              <button className="btn btn--primary btn--sm">Sharpen with me</button>
-              <button className="btn btn--ghost btn--sm">Skip — just brief it</button>
-            </div>
-          </div>
-        </Reveal>
-        <Reveal delay={250}>
-          <div className="card" style={{padding: 22, display:"flex", flexDirection:"column", height:"100%", borderLeft: "3px solid var(--mint-500)"}}>
-            <div className="eyebrow" style={{color:"#1d6b4b", marginBottom: 8}}>Hand to the human team</div>
-            <h3 style={{fontSize: 18, letterSpacing:"-0.01em", margin: 0, marginBottom: 8}}>Honduras essay needs finishing</h3>
-            <p style={{fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5, margin: 0, flex: 1}}>
-              Opus wrote 1,840 words. <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>The opening is exactly right. The middle drifts.</em> Lia could finish this in 2h. 120 cr.
-            </p>
-            <a href="#/craft" className="btn btn--dark btn--sm" style={{marginTop: 14, alignSelf:"flex-start"}}>Hand off →</a>
-          </div>
-        </Reveal>
-      </div>
-
-      <Reveal>
-        <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 18, marginBottom: 28}}>
-          <div className="card" style={{padding: 22}}>
-            <div className="eyebrow" style={{marginBottom: 12}}>Currently assembled · Pricing relaunch</div>
-            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 8}}>
-              {assembly.agents.slice(0,6).map(a => {
-                const accent = window.CI_DEPT_COLORS[a.dept] || "var(--neutral-300)";
-                return (
-                  <div key={a.id} style={{display:"flex", alignItems:"center", gap:8, padding:"6px 8px", border:"1px solid var(--c-line)", borderRadius: 8, borderLeft:`3px solid ${accent}`}}>
-                    <span style={{fontFamily:"var(--font-mono)", fontSize:9, color:"var(--c-faint)"}}>{a.code}</span>
-                    <span style={{fontSize: 12, fontWeight: 500, flex:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{marginTop: 12, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-              <span style={{fontSize:12, color:"var(--c-dim)"}}>{assembly.agents.length} specialists · from {[...new Set(assembly.agents.map(a => a.dept))].length} departments</span>
-              <span className="credit">{assembly.totalCr} cr</span>
-            </div>
-          </div>
-          <NotDoing items={[
-            "Not running a 'limited-time' urgency play. We've committed to the slow Tuesday register.",
-            "Not bundling annual with the brewing kit. That's a different conversation, with a different SMP.",
-            "Not opening a paid social push. Klaviyo + IG organic only.",
-          ]} />
-        </div>
-      </Reveal>
-
-      <Reveal>
-        <Composer value="" onChange={() => {}} onSend={() => {}} placeholder="Or — tell Brandolph what you're working on." />
-      </Reveal>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════ */
-/* Variant C — DESK (operator dashboard, Brandolph speaks atop)     */
-function HomeDesk({ tweaks }) {
-  const assembly = useBMemo(() => getAssembly(tweaks.assemblyDensity || 7), [tweaks.assemblyDensity]);
-  return (
-    <div style={{padding:"28px 36px", display:"flex", flexDirection:"column", gap: 22}}>
-      <Reveal>
-        <div style={{
-          background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius: 14, padding: "22px 26px",
-          display:"grid", gridTemplateColumns: "auto 1fr auto", gap: 20, alignItems:"flex-start",
-        }}>
-          <BrandolphAvatar size={48} />
+    <div style={{padding:"34px 36px 72px"}}>
+      <div style={{maxWidth: 1120, margin:"0 auto"}}>
+        <section className="first-run-grid">
           <div>
-            <div className="eyebrow eyebrow--yellow" style={{marginBottom: 6}}>Brandolph · this morning</div>
-            <p style={{fontSize:17, lineHeight:1.5, margin: 0, color:"var(--c-ink)"}}>
-              <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>You shipped two things last week.</em> The annual page is converting at 6.2% — better than baseline, not yet what we agreed. The Honduras essay is in human craft. <strong>Today the work is the summer campaign brief.</strong> I have two questions before we assemble.
+            <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>First setup</div>
+            <h1 style={{
+              margin:"0 0 14px",
+              fontFamily:"Georgia, serif",
+              fontStyle:"italic",
+              fontWeight: 500,
+              fontSize:"clamp(32px, 4vw, 46px)",
+              lineHeight:1.04,
+              letterSpacing:"-0.018em",
+              color:"var(--c-ink)",
+            }}>
+              {title}
+            </h1>
+            <p style={{margin:"0 0 24px", maxWidth: 660, color:"var(--c-dim)", fontSize: 16, lineHeight: 1.58}}>
+              {intro}
             </p>
+            <div style={{display:"flex", gap: 10, flexWrap:"wrap"}}>
+              {snapshot.stage === "review" ? (
+                <>
+                  <button className="btn btn--primary btn--lg" onClick={() => go("bio")}>
+                    Open BIO <Icon name="arrow" size={14} />
+                  </button>
+                  <button className="btn btn--ghost" onClick={() => go("discovery")}>
+                    Re-run Discovery
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="btn btn--primary btn--lg" onClick={() => go(snapshot.placeholderBrand ? "onboarding" : "discovery")}>
+                    Continue brand setup <Icon name="arrow" size={14} />
+                  </button>
+                  <button className="btn btn--ghost" onClick={() => go("bio")}>
+                    View BIO area
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-          <div style={{display:"flex", flexDirection:"column", gap: 8}}>
-            <button className="btn btn--primary btn--sm">Continue · 2 questions</button>
-            <button className="btn btn--ghost btn--sm">Read me the BIO</button>
-          </div>
-        </div>
-      </Reveal>
 
-      {/* Operator strips */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 18}}>
-        <Reveal delay={60}>
-          <div className="card" style={{padding: 18}}>
-            <div className="eyebrow" style={{marginBottom: 10}}>What's running</div>
-            <div style={{display:"flex", flexDirection:"column", gap: 8}}>
-              {window.CI_BRIEFS.filter(b => b.status === "in-production").map(b => (
-                <a href={"#/board/" + b.id} key={b.id} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius: 8, border:"1px solid var(--c-line)", textDecoration:"none", color:"inherit"}}>
-                  <span style={{fontSize:13, fontWeight: 500}}>{b.title}</span>
-                  <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--yellow-700)"}}>● live</span>
-                </a>
-              ))}
-              <a href="#/board/b-honduras-microlot" style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius: 8, border:"1px solid var(--c-line)", textDecoration:"none", color:"inherit"}}>
-                <span style={{fontSize:13, fontWeight: 500}}>Honduras single-origin</span>
-                <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"#1d6b4b"}}>● in craft</span>
-              </a>
-            </div>
-          </div>
-        </Reveal>
-        <Reveal delay={120}>
-          <div className="card" style={{padding: 18}}>
-            <div className="eyebrow" style={{marginBottom: 10}}>Needs you</div>
-            <div style={{display:"flex", flexDirection:"column", gap: 10}}>
-              <div style={{padding: 10, borderRadius: 8, borderLeft:"3px solid var(--yellow-500)", background:"var(--yellow-50)"}}>
-                <div style={{fontSize:13, color:"var(--c-ink)", marginBottom: 4}}>Approve summer territories</div>
-                <div style={{fontSize:12, color:"var(--c-dim)"}}>3 directions ready. Brandolph recommends "Slow June".</div>
-              </div>
-              <div style={{padding: 10, borderRadius: 8, borderLeft:"3px solid var(--purple-500)", background:"var(--purple-50)"}}>
-                <div style={{fontSize:13, color:"var(--c-ink)", marginBottom: 4}}>Decide: annual 10× or 11.4×</div>
-                <div style={{fontSize:12, color:"var(--c-dim)"}}>Affects 5 outputs in flight.</div>
-              </div>
-            </div>
-          </div>
-        </Reveal>
-        <Reveal delay={180}>
-          <div className="card" style={{padding: 18}}>
-            <div className="eyebrow" style={{marginBottom: 10}}>Brandolph recommends</div>
-            <div style={{display:"flex", flexDirection:"column", gap: 10}}>
-              <div style={{padding: 10, borderRadius: 8, border:"1px dashed var(--c-line-2)"}}>
-                <div style={{fontSize:13, color:"var(--c-ink)"}}>Run a producer-named microlot in Aug.</div>
-                <div style={{fontSize:11.5, color:"var(--c-faint)", marginTop: 4}}><em>Because Honduras worked — repeat the pattern with a different country.</em></div>
-              </div>
-              <div style={{padding: 10, borderRadius: 8, border:"1px dashed var(--c-line-2)"}}>
-                <div style={{fontSize:13, color:"var(--c-ink)"}}>Kill the brewing-kit page.</div>
-                <div style={{fontSize:11.5, color:"var(--c-faint)", marginTop: 4}}><em>Because it dilutes the subscription story and converts at 0.4%.</em></div>
-              </div>
-            </div>
-          </div>
-        </Reveal>
-      </div>
-
-      <Reveal>
-        <div style={{display:"grid", gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr)", gap: 18}}>
-          <div className="card" style={{padding: 0, overflow:"hidden"}}>
-            <div style={{padding:"16px 20px", borderBottom:"1px solid var(--c-line)", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-              <div>
-                <div className="eyebrow" style={{marginBottom: 4}}>Assembly · Pricing relaunch</div>
-                <div style={{fontSize: 14, color:"var(--c-dim)"}}>{assembly.agents.length} specialists · from {[...new Set(assembly.agents.map(a => a.dept))].length} departments</div>
-              </div>
-              <span className="credit credit--pending">{assembly.totalCr} cr</span>
-            </div>
-            <div style={{padding: 12, display:"grid", gridTemplateColumns:"1fr 1fr", gap: 8}}>
-              {assembly.agents.map(a => {
-                const accent = window.CI_DEPT_COLORS[a.dept] || "var(--neutral-300)";
-                return (
-                  <div key={a.id} style={{display:"flex", alignItems:"center", gap:10, padding:"10px 12px", border:"1px solid var(--c-line)", borderRadius: 8, borderLeft:`3px solid ${accent}`, background:"var(--c-card)"}}>
-                    <span style={{fontFamily:"var(--font-mono)", fontSize:9, color:"var(--c-faint)"}}>{a.code}</span>
-                    <div style={{flex:1, minWidth: 0}}>
-                      <div style={{fontSize: 12.5, fontWeight: 500, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{a.name}</div>
-                      <div style={{fontFamily:"var(--font-mono)", fontSize: 9.5, color:"var(--c-faint)", letterSpacing:"0.06em", textTransform:"uppercase"}}>{a.dept}</div>
-                    </div>
-                    <span className="credit" style={{fontSize:10}}>{a.cr}</span>
+          <div className="card" style={{padding: 22}}>
+            <div className="eyebrow" style={{marginBottom: 14}}>Workspace state</div>
+            <div style={{display:"flex", flexDirection:"column", gap: 12}}>
+              {steps.map((step, i) => (
+                <div key={step.label} style={{display:"grid", gridTemplateColumns:"28px 1fr", gap: 10, alignItems:"start"}}>
+                  <span style={{
+                    width: 24, height: 24, borderRadius: 999,
+                    display:"inline-flex", alignItems:"center", justifyContent:"center",
+                    background: step.done ? "var(--green-50, rgba(127,163,122,0.16))" : "var(--neutral-50)",
+                    color: step.done ? "var(--green-600)" : "var(--c-faint)",
+                    fontFamily:"var(--font-mono)", fontSize: 11,
+                  }}>{step.done ? "✓" : i + 1}</span>
+                  <div>
+                    <div style={{fontSize: 13.5, fontWeight: 600, color:"var(--c-ink)"}}>{step.label}</div>
+                    <div style={{fontSize: 12.5, color:"var(--c-dim)", marginTop: 2, lineHeight: 1.45}}>{step.text}</div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <BioChip bioScore={tweaks.bioScore || 91} />
-        </div>
-      </Reveal>
-
-      <Reveal>
-        <Composer value="" onChange={() => {}} onSend={() => {}} placeholder="Brief Brandolph on the next thing…" />
-      </Reveal>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════ */
-/* Variant D — CREATE (the launchpad — default home)                */
-/* Workspace switcher — multi-brand is a Suite-plan feature. */
-function WorkspaceBar() {
-  const [open, setOpen] = useBState(false);
-  const [active, setActive] = useBState("vinilo");
-  const ws = window.CI_WORKSPACES || [];
-  const cur = ws.find(w => w.id === active) || ws[0];
-  if (!cur) return null;
-  return (
-    <div style={{maxWidth:1080, margin:"0 auto 16px", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-      <div style={{position:"relative"}}>
-        <button onClick={() => setOpen(o => !o)} className="card" style={{display:"flex", alignItems:"center", gap:10, padding:"7px 12px", cursor:"pointer", border:"1px solid var(--c-line)"}}>
-          <span style={{width:30, height:30, borderRadius:8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:13}}>{cur.initial}</span>
-          <div style={{textAlign:"left", lineHeight:1.2}}>
-            <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{cur.name}</div>
-            <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)"}}>BIO {cur.bio}% · {cur.plan}</div>
-          </div>
-          <Icon name="chev" size={14} />
-        </button>
-        {open && (
-          <>
-            <div onClick={() => setOpen(false)} style={{position:"fixed", inset:0, zIndex:40}} />
-            <div style={{position:"absolute", top:"calc(100% + 6px)", left:0, zIndex:41, width:288, background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:12, boxShadow:"var(--shadow-lg)", padding:6}}>
-              <div className="eyebrow" style={{padding:"6px 10px"}}>Switch workspace</div>
-              {ws.map(w => (
-                <button key={w.id} onClick={() => { setActive(w.id); setOpen(false); }}
-                  style={{display:"flex", alignItems:"center", gap:10, width:"100%", textAlign:"left", border:"none", background:"transparent", padding:"8px 10px", borderRadius:8, cursor:"pointer"}}
-                  onMouseEnter={e => e.currentTarget.style.background = "var(--neutral-50)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <span style={{width:26, height:26, borderRadius:7, background: w.id === active ? "var(--neutral-900)" : "var(--neutral-50)", color: w.id === active ? "#fff" : "var(--c-dim)", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:12}}>{w.initial}</span>
-                  <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:13, fontWeight:500, color:"var(--c-ink)"}}>{w.name}</div>
-                    <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)"}}>BIO {w.bio}% · {w.campaigns} campaigns</div>
-                  </div>
-                  {w.id === active && <Icon name="check" size={14} />}
-                </button>
+                </div>
               ))}
-              <div style={{height:1, background:"var(--c-line)", margin:"6px 8px"}} />
-              <button style={{display:"flex", alignItems:"center", gap:8, width:"100%", textAlign:"left", border:"none", background:"transparent", padding:"8px 10px", borderRadius:8, cursor:"pointer", color:"var(--c-ink)", fontSize:13}}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--neutral-50)"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                <Icon name="plus" size={14} /> New workspace
-                <span style={{fontFamily:"var(--font-mono)", fontSize:9, color:"var(--c-faint)", marginLeft:"auto", letterSpacing:"0.1em"}}>SUITE PLAN</span>
-              </button>
             </div>
-          </>
-        )}
-      </div>
-      <div style={{display:"flex", alignItems:"center", gap:7, fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.12em", textTransform:"uppercase"}}>
-        <BrandolphDot /> Brandolph is reading {cur.name}
+            <div style={{height:1, background:"var(--c-line)", margin:"18px 0"}} />
+            <div style={{display:"flex", gap:10, alignItems:"flex-start", color:"var(--c-dim)"}}>
+              <Icon name="bio" size={17} />
+              <div style={{fontSize:12.5, lineHeight:1.5}}>
+                {snapshot.sourceCount > 0
+                  ? `${snapshot.sourceCount} evidence source${snapshot.sourceCount === 1 ? "" : "s"} attached to this BIO.`
+                  : "Official pages and client files are treated as evidence, not inspiration."}
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
 }
 
-/* Mini analytics — credits · campaigns + success · library peek + in-flight. */
-function HomeDashboard({ go }) {
-  const briefs = window.CI_BRIEFS;
-  const credits = window.CI_CREDITS;
-  const shipped = briefs.filter(b => ["shipped","delivered","approved"].includes(b.status)).length;
-  const successRate = Math.round((shipped / briefs.length) * 100);
-  const inFlight = briefs.filter(b => b.status === "in-production" || b.status === "approved");
-  const recent = window.CI_OUTPUTS.filter(o => o.kind !== "upload").slice(0, 4);
-  const big = (color) => ({ fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:36, fontWeight:500, lineHeight:1, color: color || "var(--c-ink)" });
-  const cardStyle = { padding:18, display:"flex", flexDirection:"column", gap:10, height:"100%", boxSizing:"border-box" };
+/* Real dashboard — no invented success rates, campaign counts, or fake library items. */
+function HomeDashboard({ go, snapshot }) {
+  const briefs = snapshot.briefs || [];
+  const credits = snapshot.credits;
+  const outputs = snapshot.outputs || [];
+  const inFlight = briefs.filter(b => ["draft","active","in-production","approved"].includes(b.status));
+  const recent = outputs.slice(0, 4);
+
+  if (snapshot.loading) {
+    return (
+      <div style={{maxWidth:1080, margin:"0 auto"}}>
+        <div className="card" style={{padding: 22, display:"flex", alignItems:"center", gap: 10}}>
+          <BrandolphDot state="thinking" size={11} />
+          <span style={{fontSize: 13, color:"var(--c-dim)"}}>Loading workspace state…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{maxWidth:1080, margin:"0 auto"}}>
-      <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:14, marginBottom:18, alignItems:"stretch"}}>
-        <Reveal>
-          <div className="card" style={cardStyle}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">Credits this cycle</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("credits")}>Ledger →</button></div>
-            <div style={{display:"flex", alignItems:"baseline", gap:8}}><span style={big()}>{credits.balance}</span><span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>/ {credits.monthly} · {credits.resetsInDays}d left</span></div>
-            <div style={{height:6, background:"var(--neutral-50)", borderRadius:999, overflow:"hidden", display:"flex"}}>
-              {credits.split.filter(s => s.credits > 0).map((s, i) => <div key={i} style={{flex: s.pct || 1, background: s.color}} />)}
-            </div>
-          </div>
-        </Reveal>
-        <Reveal delay={80}>
-          <div className="card" style={cardStyle}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">Campaigns</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("briefs")}>All briefs →</button></div>
-            <div style={{display:"flex", alignItems:"baseline", gap:20}}>
-              <div><div style={big()}>{briefs.length}</div><div className="eyebrow" style={{marginTop:5}}>created</div></div>
-              <div><div style={big("var(--green-600)")}>{successRate}%</div><div className="eyebrow" style={{marginTop:5}}>success rate</div></div>
-            </div>
-            <div style={{fontSize:12, color:"var(--c-faint)"}}>{inFlight.length} in flight · {shipped} shipped</div>
-          </div>
-        </Reveal>
-        <Reveal delay={160}>
-          <div className="card" style={cardStyle}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">Library</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("library")}>Open →</button></div>
-            <div style={{display:"flex", flexDirection:"column", gap:7, marginTop:2}}>
-              {recent.map(o => (
-                <div key={o.id} style={{display:"flex", alignItems:"center", gap:8, fontSize:12.5}}>
-                  <span style={{width:6, height:6, borderRadius:"50%", background:"var(--yellow-500)", flexShrink:0}} />
-                  <span style={{flex:1, minWidth:0, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", color:"var(--c-ink)"}}>{o.type}</span>
-                  <span style={{fontFamily:"var(--font-mono)", fontSize:9.5, color:"var(--c-faint)", textTransform:"uppercase"}}>{o.kind}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Reveal>
-      </div>
-
-      {inFlight.length > 0 && (
-        <Reveal>
-          <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:12}}>
-            <h3 style={{fontSize:16, margin:0, letterSpacing:"-0.005em"}}>In flight · {inFlight.length}</h3>
-            <button className="btn btn--link" style={{fontSize:12}} onClick={() => go("briefs")}>View all →</button>
-          </div>
-          <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap:12}}>
-            {inFlight.map(b => (
-              <a key={b.id} href={"#/board/" + b.id} className="card" style={{padding:16, textDecoration:"none", color:"inherit", cursor:"pointer", display:"flex", flexDirection:"column", gap:7}}>
-                <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10}}><span className="eyebrow">{b.type}</span><StatusPill status={b.status} /></div>
-                <div style={{fontSize:14.5, fontWeight:500, color:"var(--c-ink)", letterSpacing:"-0.005em"}}>{b.title}</div>
-                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop:7, borderTop:"1px dashed var(--c-line-2)"}}>
-                  <div style={{display:"flex", gap:3}}>
-                    {b.agents.slice(0, 5).map(aid => { const a = window.CI_AGENTS.find(x => x.id === aid); return <span key={aid} title={a?.name} style={{width:9, height:9, borderRadius:"50%", background: window.CI_DEPT_COLORS[a?.dept] || "var(--neutral-400)", outline:"1px solid var(--c-line)"}} />; })}
-                  </div>
-                  <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{b.credits} cr · {b.createdAt}</span>
-                </div>
+    <div className="home-dashboard">
+      <section className="home-dashboard__work">
+        <div className="home-dashboard__heading">
+          <div><div className="eyebrow">Work in progress</div><h2>{inFlight.length ? "Active briefs" : "No active briefs"}</h2></div>
+          <button className="btn btn--link" onClick={() => go("briefs")}>View briefs <Icon name="arrow" size={13} /></button>
+        </div>
+        {inFlight.length ? (
+          <div className="home-dashboard__briefs">
+            {inFlight.slice(0, 4).map((brief) => (
+              <a key={brief.id} href={"#/board/" + brief.id} className="home-dashboard__brief">
+                <div><span className="eyebrow">{brief.type || "Brief"}</span><h3>{brief.payload?.title || brief.title || "Untitled brief"}</h3></div>
+                <div className="home-dashboard__brief-meta"><StatusPill status={brief.status} /><span>{(brief.runs || []).length} run{(brief.runs || []).length === 1 ? "" : "s"}</span><Icon name="arrow" size={13} /></div>
               </a>
             ))}
           </div>
-        </Reveal>
-      )}
+        ) : (
+          <div className="home-dashboard__empty">
+            <Icon name="brief" size={24} />
+            <div><strong>Your certified BIO is ready.</strong><span>Describe the business change above to create the first brief.</span></div>
+          </div>
+        )}
+
+        <div className="home-dashboard__heading home-dashboard__heading--library">
+          <div><div className="eyebrow">Recent output</div><h2>Library</h2></div>
+          <button className="btn btn--link" onClick={() => go("library")}>Open library <Icon name="arrow" size={13} /></button>
+        </div>
+        {recent.length ? (
+          <div className="home-dashboard__outputs">
+            {recent.map((output) => (
+              <button key={output.id} onClick={() => go("library")}>
+                <span className="home-dashboard__output-icon"><Icon name={output.kind === "image" ? "canvas" : "files"} size={15} /></span>
+                <span>{readableOutputTitle(output)}</span>
+                <small>{output.kind || "output"}</small>
+                <Icon name="arrow" size={13} />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="home-dashboard__quiet">Finished specialist work will appear here. Nothing is pre-filled or simulated.</p>
+        )}
+      </section>
+
+      <aside className="home-dashboard__aside">
+        <div className="home-dashboard__status">
+          <div className="home-dashboard__status-head"><span className="home-dashboard__status-icon home-dashboard__status-icon--bio"><Icon name="bio" size={18} /></span><span className="eyebrow">Brand canon</span></div>
+          <h3>{snapshot.brand?.name || "Brand"} BIO</h3>
+          <p>Version {snapshot.bio?.version || "-"} is certified and used for every new brief.</p>
+          <div className="home-dashboard__status-line"><span>Confidence</span><strong>{snapshot.bio?.score != null ? `${snapshot.bio.score}/100` : "Reviewed"}</strong></div>
+          <button className="btn btn--ghost" onClick={() => go("bio")}>Open BIO <Icon name="arrow" size={13} /></button>
+        </div>
+        <div className="home-dashboard__status">
+          <div className="home-dashboard__status-head"><span className="home-dashboard__status-icon"><Icon name="credit" size={18} /></span><span className="eyebrow">Credits</span></div>
+          <div className="home-dashboard__credit-value">{credits ? credits.balance : "Not loaded"}<span>{credits ? "available" : "ledger"}</span></div>
+          {credits?.monthly > 0 && <div className="home-dashboard__credit-track"><span style={{width:`${Math.min(100, Math.max(0, (credits.balance / credits.monthly) * 100))}%`}} /></div>}
+          <button className="btn btn--ghost" onClick={() => go("credits")}>Open ledger <Icon name="arrow" size={13} /></button>
+        </div>
+      </aside>
     </div>
   );
 }
 
 function HomeCreate({ tweaks, go }) {
-  const [scope, setScope] = useBState("all");
+  const snapshot = useHomeWorkspaceSnapshot();
+
+  if (snapshot.loading) {
+    return (
+      <div style={{padding:"34px 36px 72px"}}>
+        <div style={{maxWidth: 760, margin:"0 auto"}}>
+          <div className="card" style={{padding: 24, display:"flex", alignItems:"center", gap: 12}}>
+            <BrandolphDot state="thinking" size={11} />
+            <span style={{fontSize: 14, color:"var(--c-dim)"}}>Reading workspace state…</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (snapshot.error) {
+    return (
+      <div style={{padding:"34px 36px 72px"}}>
+        <div className="card" style={{maxWidth: 760, margin:"0 auto", padding: 24, borderLeft:"3px solid var(--pink-500)"}}>
+          <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>Workspace state unavailable</div>
+          <div style={{fontSize: 14, color:"var(--c-dim)", lineHeight: 1.5}}>{snapshot.error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (snapshot.stage !== "ready") {
+    return <FirstRunOnboarding snapshot={snapshot} go={go} />;
+  }
+
+  return <HomeCreateReady tweaks={tweaks} go={go} snapshot={snapshot} />;
+}
+
+function HomeCreateReady({ tweaks, go, snapshot }) {
   const [mode, setMode]   = useBState("flow");
   const [input, setInput] = useBState(() => {
     /* Pick up a "Reuse" prefill posted from the Library — when set,
@@ -798,6 +442,7 @@ function HomeCreate({ tweaks, go }) {
   const [sharp, setSharp]       = useBState({ loading: false, data: null, error: null });
   const [answers, setAnswers]   = useBState({});            /* { 0: "...", 1: "...", 2: "..." } */
   const [qStep, setQStep]       = useBState(0);             /* sharpening wizard: current question index */
+  const [briefDraft, setBriefDraft] = useBState({ title:"", objective:"", tension:"", direction:"" });
 
   /* Resolve the actual assembly — Sharpener's proposed specialists take
      precedence; fall back to the mock density-based pick filtered to
@@ -813,14 +458,8 @@ function HomeCreate({ tweaks, go }) {
     return assembly;
   }, [sharp.data, assembly]);
 
-  const tryPrompts = [
-    { eyebrow:"Conversion",    text:"Launch a Q1 product drop with the pricing page", est: 42 },
-    { eyebrow:"Repositioning", text:"Reposition the brand for a younger audience",    est: 68 },
-    { eyebrow:"Seasonal",      text:"A holiday social campaign that doesn't feel like every other one", est: 36 },
-    { eyebrow:"Acquisition",   text:"Landing page that converts cold traffic",         est: 28 },
-  ];
-
-  const flowsInFlight = window.CI_BRIEFS.filter(b => b.status === "in-production" || b.status === "approved");
+  const creditBalance = snapshot.credits?.balance;
+  const bioLabel = snapshot.bio ? `BIO v${snapshot.bio.version} · ${snapshot.bio.score ?? "—"}/100` : "BIO unavailable";
 
   const handleStart = async () => {
     if (!input.trim()) return;
@@ -831,6 +470,7 @@ function HomeCreate({ tweaks, go }) {
     setPhase("sharpening");
     setSharp({ loading: true, data: null, error: null });
     setAnswers({});
+    setBriefDraft({ title:"", objective:"", tension:"", direction:"" });
     setQStep(0);
     setTimeout(() => reviewRef.current?.scrollIntoView({ behavior:"smooth", block:"nearest" }), 80);
     try {
@@ -841,6 +481,12 @@ function HomeCreate({ tweaks, go }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       setSharp({ loading: false, data: json, error: null });
+      setBriefDraft({
+        title: String(json.title || input.trim().split(/\s+/).slice(0, 8).join(" ")).trim(),
+        objective: String(json.sharpenedBrief || input.trim()).trim(),
+        tension: String(json.tension || "").trim(),
+        direction: String(json.orchestrationRationale || json.deliveryPlan?.orchestrationRationale || "").trim(),
+      });
     } catch (e) {
       setSharp({ loading: false, data: null, error: e?.message || String(e) });
     }
@@ -858,15 +504,18 @@ function HomeCreate({ tweaks, go }) {
     const ctx = {
       rawBrief:      input.trim(),
       composedBrief: composeBriefText(),
-      title:         sharp.data?.title || "",
-      sharpenedBrief: sharp.data?.sharpenedBrief || "",
-      tension:       sharp.data?.tension || "",
+      title:         briefDraft.title || sharp.data?.title || "",
+      sharpenedBrief: briefDraft.objective || sharp.data?.sharpenedBrief || input.trim(),
+      tension:       briefDraft.tension || sharp.data?.tension || "",
       questions:     sharp.data?.questions || [],
       answers,
       refusals:      sharp.data?.refusals || [],
+      orchestrationRationale: briefDraft.direction || sharp.data?.orchestrationRationale || sharp.data?.deliveryPlan?.orchestrationRationale || "",
       specialistIds: realAssembly.agents.map((a) => a.id),
       deliveryPlan:  sharp.data?.deliveryPlan || null,
       totalCr:       realAssembly.totalCr,
+      briefApprovedAt: new Date().toISOString(),
+      approvalState: "brief-approved",
       ts:            Date.now(),
     };
     try { sessionStorage.setItem("ci_run_context", JSON.stringify(ctx)); } catch (e) {}
@@ -884,7 +533,7 @@ function HomeCreate({ tweaks, go }) {
        senior operator briefing a teammate: paragraph + paragraph. */
     const blocks = [];
     const data = sharp.data;
-    const sharpened = data?.sharpenedBrief?.trim();
+    const sharpened = (briefDraft.objective || data?.sharpenedBrief || "").trim();
     const raw       = input.trim();
 
     blocks.push(sharpened || raw);
@@ -902,8 +551,12 @@ function HomeCreate({ tweaks, go }) {
       blocks.push(`Clarifications from the operator: ${clarifs}`);
     }
 
-    if (data?.tension) {
-      blocks.push(`The tension underneath this: ${data.tension}`);
+    if (briefDraft.tension || data?.tension) {
+      blocks.push(`The tension underneath this: ${briefDraft.tension || data.tension}`);
+    }
+
+    if (briefDraft.direction) {
+      blocks.push(`Execution direction: ${briefDraft.direction}`);
     }
 
     if (data?.refusals?.length) {
@@ -967,6 +620,7 @@ function HomeCreate({ tweaks, go }) {
     setAgentStates({}); setAgentOutputs({}); setRunErr(null);
     setSharp({ loading: false, data: null, error: null });
     setAnswers({});
+    setBriefDraft({ title:"", objective:"", tension:"", direction:"" });
   };
 
   const isActive = phase !== "idle";
@@ -976,10 +630,8 @@ function HomeCreate({ tweaks, go }) {
       {/* HERO — the launchpad. The workspace switcher lives in the
           dock under the logo now; the in-page bar was redundant. */}
       <Reveal>
-        <section style={{
-          background: "linear-gradient(180deg, var(--yellow-50) 0%, transparent 70%)",
-          borderRadius: 24,
-          padding: "56px 32px 24px",
+        <section className="create-launchpad" style={{
+          padding: "40px 32px 28px",
           marginBottom: isActive ? 0 : 32,
           transition: "margin-bottom 200ms ease",
         }}>
@@ -988,41 +640,24 @@ function HomeCreate({ tweaks, go }) {
               CaastorOS · Brandolph
             </div>
             <h1 style={{
-              fontFamily:"Georgia, serif", fontStyle:"italic",
-              fontSize: 56, lineHeight: 1.08, letterSpacing:"-0.015em",
-              margin: 0, color:"var(--c-ink)", fontWeight: 500,
+              fontFamily:"var(--font-sans)", fontStyle:"normal",
+              fontSize: 40, lineHeight: 1.12, letterSpacing:0,
+              margin: 0, color:"var(--c-ink)", fontWeight: 650,
             }}>
-              What do you want to <em style={{background:"var(--yellow-300)", padding:"0 6px", fontStyle:"italic"}}>create</em>?
+              What needs to change?
             </h1>
             <p style={{
               fontSize: 16, color:"var(--c-dim)", lineHeight: 1.55,
               margin: "16px auto 0", maxWidth: 520,
             }}>
-              Describe the change you want made — not the deliverable. Brandolph reads the BIO, sharpens the brief, assembles the team, and shows you the cost before anything runs.
+              Describe the business outcome. Brandolph reads the certified BIO, sharpens the brief, and shows you the smallest useful crew before anything runs.
             </p>
-
-            {/* Brand scope pills */}
-            <div style={{display:"flex", alignItems:"center", justifyContent:"center", gap: 8, marginTop: 28, flexWrap:"wrap"}}>
-              <span className="eyebrow" style={{marginRight: 4}}>Scope</span>
-              {[
-                {k:"all",          l:"All Vinilo"},
-                {k:"subscription", l:"Subscription"},
-                {k:"cafe",         l:"Café"},
-                {k:"wholesale",    l:"Wholesale"},
-              ].map(s => (
-                <button key={s.k} onClick={() => setScope(s.k)}
-                  className={"pill" + (scope === s.k ? " pill--dark" : "")}
-                  style={{cursor:"pointer", height: 30, padding:"0 14px", fontSize: 11}}>
-                  {s.l}
-                </button>
-              ))}
-            </div>
 
             {/* Composer */}
             <div style={{
               marginTop: 24, background:"var(--c-card)",
               border: isActive ? "1.5px solid var(--yellow-500)" : "1.5px solid var(--c-line-2)",
-              borderRadius: 16, padding: 18, textAlign:"left",
+              borderRadius: 8, padding: 18, textAlign:"left",
               boxShadow: isActive
                 ? "0 0 0 4px rgba(248,192,54,0.12), var(--shadow-md)"
                 : "var(--shadow-md)",
@@ -1036,7 +671,7 @@ function HomeCreate({ tweaks, go }) {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); if (phase !== "idle") setPhase("idle"); }}
                 onKeyDown={handleKeyDown}
-                placeholder="e.g. Make the Summer Tuesdays campaign earn the slow afternoon back — café-first, no discount, lift Tuesday footfall by 18%."
+                placeholder="e.g. Turn the next product launch into a two-week system across social, email, and landing page."
                 rows={3}
                 style={{
                   width:"100%", border:"none", outline:"none", resize:"none",
@@ -1049,7 +684,7 @@ function HomeCreate({ tweaks, go }) {
                 borderTop:"1px dashed var(--c-line)",
                 display:"flex", justifyContent:"space-between", alignItems:"center", gap: 12,
               }}>
-                <div style={{display:"flex", gap: 6}}>
+                <div className="create-launchpad__modes">
                   {[
                     {k:"flow",   l:"Full flow",   icon:"sparkles"},
                     {k:"words",  l:"Words only",  icon:"brief"},
@@ -1062,7 +697,7 @@ function HomeCreate({ tweaks, go }) {
                         background: mode === m.k ? "var(--yellow-500)" : "transparent",
                         color: mode === m.k ? "var(--c-ink)" : "var(--c-dim)",
                         border: mode === m.k ? "1px solid var(--yellow-500)" : "1px solid var(--c-line)",
-                        borderRadius: 8, fontSize: 12, fontFamily:"inherit",
+                        borderRadius: 6, fontSize: 12, fontFamily:"inherit",
                         cursor:"pointer", display:"inline-flex", alignItems:"center", gap: 6,
                         fontWeight: mode === m.k ? 500 : 400,
                         transition:"all 140ms ease",
@@ -1072,11 +707,6 @@ function HomeCreate({ tweaks, go }) {
                   ))}
                 </div>
                 <div style={{display:"flex", alignItems:"center", gap: 12}}>
-                  <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.06em"}}>
-                    <kbd style={{background:"var(--c-bg)", padding:"2px 6px", borderRadius: 4, border:"1px solid var(--c-line)"}}>⌘</kbd>
-                    <span style={{margin:"0 4px"}}>+</span>
-                    <kbd style={{background:"var(--c-bg)", padding:"2px 6px", borderRadius: 4, border:"1px solid var(--c-line)"}}>↵</kbd>
-                  </span>
                   <button className="btn btn--primary" disabled={!input.trim()} onClick={handleStart}>
                     {isActive ? "Re-brief" : "Start"} <Icon name="arrow" size={14} />
                   </button>
@@ -1085,7 +715,7 @@ function HomeCreate({ tweaks, go }) {
             </div>
 
             <div style={{marginTop: 16, fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.06em"}}>
-              <BrandolphDot /> &nbsp;BIO 91% · Brandolph will sharpen your brief before assembly · Asking is free
+              <BrandolphDot /> &nbsp;{bioLabel} / Brandolph sharpens the brief before assembly / Asking is free
             </div>
           </div>
 
@@ -1119,24 +749,45 @@ function HomeCreate({ tweaks, go }) {
                       <p style={{margin: 0, fontSize: 13.5, color:"var(--c-dim)", marginBottom: 14, lineHeight: 1.5}}>
                         {sharp.error}. You can run the brief as-written.
                       </p>
-                      <button className="btn btn--primary" onClick={handleProceed}>Proceed with raw brief →</button>
+                      <button className="btn btn--primary" onClick={handleProceed}>Use raw brief &amp; review crew <Icon name="arrow" size={14} /></button>
                     </>
                   )}
 
                   {!sharp.loading && sharp.data && (
                     <>
                       <div className="eyebrow eyebrow--yellow" style={{marginBottom: 8}}>Brandolph · sharpening</div>
-                      {sharp.data.tension && (
-                        <p style={{margin: 0, fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17, color:"var(--c-ink)", lineHeight: 1.45, marginBottom: 12}}>
-                          {sharp.data.tension}
-                        </p>
-                      )}
-                      {sharp.data.sharpenedBrief && (
-                        <div style={{padding: 12, background:"var(--c-bg)", borderRadius: 10, marginBottom: 20}}>
-                          <div className="eyebrow" style={{marginBottom: 4}}>How a CMO would write this</div>
-                          <p style={{margin: 0, fontSize: 13.5, color:"var(--c-ink)", lineHeight: 1.55}}>{sharp.data.sharpenedBrief}</p>
+                      <div style={{padding: 16, background:"var(--c-bg)", border:"1px solid var(--c-line)", borderRadius: 8, marginBottom: 20}}>
+                        <div style={{display:"flex", justifyContent:"space-between", gap:12, alignItems:"baseline", marginBottom:12}}>
+                          <div className="eyebrow">Decision brief</div>
+                          <span style={{fontSize:11, color:"var(--c-faint)"}}>Edit anything Brandolph misunderstood.</span>
                         </div>
-                      )}
+                        <div style={{display:"grid", gap:12}}>
+                          <label style={{display:"grid", gap:6, fontSize:11.5, fontWeight:650, color:"var(--c-dim)"}}>
+                            Title
+                            <input className="input" value={briefDraft.title}
+                              onChange={(e) => setBriefDraft((draft) => ({...draft, title:e.target.value}))}
+                              style={{height:40, fontWeight:600}} />
+                          </label>
+                          <label style={{display:"grid", gap:6, fontSize:11.5, fontWeight:650, color:"var(--c-dim)"}}>
+                            Objective
+                            <textarea value={briefDraft.objective}
+                              onChange={(e) => setBriefDraft((draft) => ({...draft, objective:e.target.value}))}
+                              rows={4} style={{width:"100%", boxSizing:"border-box", padding:"10px 12px", border:"1px solid var(--c-line-2)", borderRadius:8, background:"var(--c-card)", color:"var(--c-ink)", font:"inherit", fontSize:13.5, lineHeight:1.5, resize:"vertical"}} />
+                          </label>
+                          <label style={{display:"grid", gap:6, fontSize:11.5, fontWeight:650, color:"var(--c-dim)"}}>
+                            Business tension
+                            <textarea value={briefDraft.tension}
+                              onChange={(e) => setBriefDraft((draft) => ({...draft, tension:e.target.value}))}
+                              rows={2} style={{width:"100%", boxSizing:"border-box", padding:"10px 12px", border:"1px solid var(--c-line-2)", borderRadius:8, background:"var(--c-card)", color:"var(--c-ink)", font:"inherit", fontSize:13, lineHeight:1.5, resize:"vertical"}} />
+                          </label>
+                          <label style={{display:"grid", gap:6, fontSize:11.5, fontWeight:650, color:"var(--c-dim)"}}>
+                            Execution direction
+                            <textarea value={briefDraft.direction}
+                              onChange={(e) => setBriefDraft((draft) => ({...draft, direction:e.target.value}))}
+                              rows={2} style={{width:"100%", boxSizing:"border-box", padding:"10px 12px", border:"1px solid var(--c-line-2)", borderRadius:8, background:"var(--c-card)", color:"var(--c-ink)", font:"inherit", fontSize:13, lineHeight:1.5, resize:"vertical"}} />
+                          </label>
+                        </div>
+                      </div>
 
                       {(sharp.data.questions || []).length > 0 && (
                         <div style={{display:"flex", flexDirection:"column", gap: 10, marginBottom: 18}}>
@@ -1167,7 +818,12 @@ function HomeCreate({ tweaks, go }) {
 
                       {(sharp.data.proposedSpecialists || []).length > 0 && (
                         <div style={{padding: 12, background:"var(--c-bg)", borderRadius: 10, marginBottom: 18}}>
-                          <div className="eyebrow" style={{marginBottom: 6}}>Proposed crew</div>
+                          <div className="eyebrow" style={{marginBottom: 6}}>Suggested roles</div>
+                          {(sharp.data.orchestrationRationale || sharp.data.deliveryPlan?.orchestrationRationale) && (
+                            <p style={{margin:"0 0 10px", fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5}}>
+                              {sharp.data.orchestrationRationale || sharp.data.deliveryPlan.orchestrationRationale}
+                            </p>
+                          )}
                           <div style={{display:"flex", flexWrap:"wrap", gap: 6}}>
                             {sharp.data.proposedSpecialists.map((id) => {
                               const a = window.CI_AGENTS.find((x) => x.id === id);
@@ -1186,7 +842,7 @@ function HomeCreate({ tweaks, go }) {
                       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop: 12, borderTop:"1px dashed var(--c-line)"}}>
                         <button className="btn btn--link" style={{fontSize: 12}} onClick={handleReset}>← Re-brief</button>
                         <button className="btn btn--primary" onClick={handleProceed}>
-                          Proceed to assembly <Icon name="arrow" size={14} />
+                          Approve brief &amp; review crew <Icon name="arrow" size={14} />
                         </button>
                       </div>
                     </>
@@ -1268,8 +924,12 @@ function HomeCreate({ tweaks, go }) {
                       <div style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-dim)"}}>
                         Total{" "}
                         <strong style={{color:"var(--c-ink)"}}>{realAssembly.totalCr} cr</strong>
-                        <span style={{color:"var(--c-faint)", margin:"0 8px"}}>·</span>
-                        {window.CI_CREDITS.balance - (phase === "done" ? realAssembly.totalCr : 0)} remaining after
+                        {typeof creditBalance === "number" && (
+                          <>
+                            <span style={{color:"var(--c-faint)", margin:"0 8px"}}>·</span>
+                            {Math.max(0, creditBalance - (phase === "done" ? realAssembly.totalCr : 0))} remaining after
+                          </>
+                        )}
                       </div>
                       {phase === "proposing" && (
                         <button className="btn btn--primary" onClick={handleRun}>
@@ -1349,18 +1009,14 @@ function HomeCreate({ tweaks, go }) {
       </Reveal>
 
       {/* Mini analytics dashboard — only at idle */}
-      {!isActive && <HomeDashboard go={go} />}
+      {!isActive && <HomeDashboard go={go} snapshot={snapshot} />}
     </div>
   );
 }
 
 /* Dispatcher — chooses which home variant to render */
 function BrandolphHome({ tweaks, setTweak, go }) {
-  const v = tweaks.homeVariant || "create";
-  if (v === "create")  return <HomeCreate  tweaks={tweaks} go={go} />;
-  if (v === "cards")   return <HomeCards   tweaks={tweaks} />;
-  if (v === "desk")    return <HomeDesk    tweaks={tweaks} />;
-  return <HomeConsole tweaks={tweaks} />;
+  return <HomeCreate tweaks={tweaks} go={go} />;
 }
 
 Object.assign(window, { BrandolphHome });

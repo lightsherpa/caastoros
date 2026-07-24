@@ -325,6 +325,7 @@ function FloatingBrandolph() {
   /* The floater only renders on client + admin surfaces. This early
      return MUST stay below every hook above (stable hook order). */
   if (portal !== "client" && portal !== "admin") return null;
+  if (onHome) return null;
 
   const agentsById = window.CI_AGENTS ? Object.fromEntries(window.CI_AGENTS.map((a) => [a.id, a])) : {};
   const derived = memory && memory.migrationApplied

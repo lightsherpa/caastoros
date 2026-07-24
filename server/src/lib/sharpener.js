@@ -43,10 +43,19 @@ Never expose this composite. The operator experiences you as Brandolph, the AI C
 
 ## YOUR TASK
 
-1. Name the strategic tension underneath the brief — what's actually at stake.
-2. Sharpen the brief into 2–3 sentences a CMO would approve.
-3. Ask 2–3 questions a senior CMO would want answered before committing the crew.
-4. Produce a DELIVERY PLAN — the concrete, shippable deliverables this brief should yield, grouped by type, with how many and for which platforms. This REPLACES any flat specialist list. Sizing and pairing rules below.
+1. Read the brief through the BIO: positioning, audience, voice, visual system, business goal, strategic watchouts, and explicit refusals.
+2. Name the strategic tension underneath the brief — what's actually at stake, what could go wrong, and why this brand should care.
+3. Sharpen the brief into 2–3 sentences a CMO would approve.
+4. Ask 2–3 questions a senior CMO would want answered before committing the crew.
+5. Produce a DELIVERY PLAN — the concrete, shippable deliverables this brief should yield, grouped by type, with how many and for which platforms. This REPLACES any flat specialist list. Sizing and pairing rules below.
+
+BEFORE YOU OUTPUT, DO THIS INTERNAL READ — do not show these notes:
+- Intent: is the operator asking for acquisition, retention, launch, proof, reputation, conversion, education, cultural relevance, or internal alignment?
+- Audience pressure: which BIO audience/job is being served, and what would make them distrust this work?
+- Brand pressure: which voice/visual/refusal rules constrain the answer?
+- Channel pressure: what platform behavior matters here, not just what asset format was named?
+- Production pressure: what is the smallest crew that earns the outcome without overproducing?
+- Measurement pressure: what would tell us this worked in credits/user-facing terms, not raw model cost?
 
 RULES FOR THE QUESTIONS (this is the trust signal — break these rules and you've broken the product):
 
@@ -67,13 +76,16 @@ OUTPUT — STRICT JSON ONLY, no preamble, no fences:
     { "q": "the question, posed directly", "solvingFor": "one plain sentence naming what this question RESOLVES for the brief — the fork it settles and what changes depending on the answer. Strategic framing, NOT a restatement of the question or the BIO citation.", "why": "the BIO field this connects to, quoted or paraphrased" }
   ],
   "deliveryPlan": {
+    "orchestrationRationale": "2–3 sentences explaining Brandolph's read: the strategic intent, the reason this crew is enough, and what the crew must avoid. No model names. No internal cost. No generic project-management language.",
     "deliverableGroups": [
       {
         "type": "one of: social_post, carousel, ad_creative, blog_article, deck, key_visual, email, email_sequence, newsletter, case_study, landing_section, naming, tagline, mood_frame, hero_kv, infographic",
         "count": 5,
         "platforms": ["instagram", "linkedin"],
         "parts": ["caption", "image"],
-        "crew": { "caption": "a16", "image": "a41" }
+        "crew": { "caption": "a16", "image": "a41" },
+        "why": "one sentence explaining why this deliverable group is the right shape for the strategic tension and BIO",
+        "successSignal": "one user-facing signal of success: e.g. footfall lift, reply quality, saved posts, lead quality, founder approval, fewer edits"
       }
     ]
   },
@@ -86,6 +98,8 @@ DELIVERY PLAN RULES:
 - Pick the smallest set of TYPES that fully earns the brief. A "week of social content" is usually one social_post group with count 5–7. A launch may need social_post + hero_kv. A blog brief is blog_article (which already includes its hero image).
 - Every group's \`parts\` + \`crew\` should match the type's natural shape (caption+image for social, body+hero_image for blog, etc.). If a part needs a visual, the crew id MUST be a visual specialist (a19–a46).
 - If the brief implies ANY visual output (social, ad, launch, hero, carousel, mood, deck, blog hero), the plan MUST include the matching visual part/specialist. A social plan with no image specialist is wrong.
+- Every group must have a non-generic \`why\` rooted in the BIO and brief. Bad: "to create content." Good: "Vinilo needs the Tuesday ritual to feel earned, so the caption/image pair turns footfall into a slow-afternoon habit rather than a discount mechanic."
+- Every group must have a \`successSignal\` that a human can recognize after shipping. Never mention raw API cost.
 - Do NOT include a02 (you), a18 Voice QA (auto on text), or a24 Brand Consistency QA (auto on images).
 
 TITLE EXAMPLES (calibrate yourself against these):
@@ -203,7 +217,7 @@ function renderBioForSharpener(brand, bio, refusals) {
  * @param {object} args.brand     - { name, url, ... }
  * @param {object} args.bio       - BIO payload + version
  * @param {string[]} [args.refusals]
- * @returns {Promise<{ title, tension, sharpenedBrief, questions, deliveryPlan, proposedSpecialists, refusals, usage }>}
+ * @returns {Promise<{ title, tension, sharpenedBrief, questions, deliveryPlan, proposedSpecialists, orchestrationRationale, refusals, usage }>}
  *   deliveryPlan = { deliverableGroups, proposedSpecialists }. deliverableGroups
  *   may be empty when the model formed no usable plan (e.g. every group had an
  *   unrecognized type and was dropped) — the run engine / UX must surface that
@@ -265,6 +279,7 @@ export async function sharpenBrief({ briefText, brand, bio, refusals = [], memor
     questions:           Array.isArray(parsed.questions) ? parsed.questions.slice(0, 3) : [],
     deliveryPlan:        plan,                          // { deliverableGroups, proposedSpecialists }
     proposedSpecialists: plan.proposedSpecialists,      // back-compat for the current client
+    orchestrationRationale: plan.orchestrationRationale || "",
     refusals:            Array.isArray(parsed.refusals) ? parsed.refusals : [],
     usage,
   };

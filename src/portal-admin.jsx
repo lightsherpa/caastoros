@@ -1,6 +1,6 @@
 import React from "react";
 import { apiFetch } from "./lib/supabase-browser.js";
-const { Icon, BrandolphDot } = window;
+const { Icon } = window;
 
 const { useState, useEffect, useMemo, useCallback } = React;
 
@@ -370,7 +370,7 @@ function SpecEditor({ spec, onClose, onSaved }) {
               </Field>
 
               <div style={{display:"grid", gridTemplateColumns:"1fr 100px", gap: 12}}>
-                <Field label="Model route" hint="Vendor-prefixed route string. Examples: anthropic/claude-sonnet-4-6, openrouter/google/gemini-2.5-pro, vendor/fal/flux-1.1-pro">
+                <Field label="Model route" hint="Vendor-prefixed route string. Examples: anthropic/claude-sonnet-4-6, openrouter/google/gemini-3.6-flash, vendor/fal/flux-1.1-pro">
                   <input value={form.modelRoute} onChange={(e) => setForm({ ...form, modelRoute: e.target.value })}
                     style={{ ...inputStyle, fontFamily:"var(--font-mono)", fontSize: 12.5 }}
                     onKeyDown={(e) => e.stopPropagation()} />

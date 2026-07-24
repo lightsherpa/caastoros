@@ -1,66 +1,111 @@
-// ─────────────────────────────────────────────────────────────────────
-// Image prompt composer — flattens the brand's visual identity + the
-// brief into a single concise prompt string for image generators.
-//
-// Image models (Flux, Recraft, etc.) take ONE text prompt, not the
-// four-layer message structure text LLMs use. So we collapse the
-// BIO's visual slice + the spec's role + the brief into ~80–150 words
-// of dense, descriptive language — what a senior art director would
-// write on a brief.
-// ─────────────────────────────────────────────────────────────────────
+// Image generators receive one flat string, so this composer turns the brief,
+// specialist intent, and BIO into a compact, production-ready art brief.
+
+function clean(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function list(values, separator = "; ") {
+  if (!Array.isArray(values)) return "";
+  return values.map(clean).filter(Boolean).join(separator);
+}
+
+function firstValue(...values) {
+  return values.map(clean).find(Boolean) || "";
+}
+
+function outputDirection(payload, role) {
+  const output = payload?.output && typeof payload.output === "object" ? payload.output : {};
+  const width = payload?.dimensions?.width || payload?.dimensions?.w;
+  const height = payload?.dimensions?.height || payload?.dimensions?.h;
+  const dimensions = payload?.dimensions && typeof payload.dimensions === "object"
+    ? (width && height ? `${width}x${height}` : "")
+    : payload?.dimensions;
+  const format = firstValue(payload?.outputFormat, payload?.format, output?.format, "high-resolution image");
+  const crop = firstValue(payload?.crop, output?.crop, "full-bleed crop");
+  let aspect = firstValue(payload?.aspectRatio, payload?.aspect_ratio, output?.aspectRatio, output?.aspect_ratio, dimensions);
+
+  if (!aspect) {
+    if (/hero|banner|blog|editorial|key visual/i.test(role)) aspect = "16:9 landscape";
+    else if (/story|reel|vertical/i.test(role)) aspect = "9:16 portrait";
+    else if (/social|post|identity|mood/i.test(role)) aspect = "1:1 square";
+    else aspect = "4:3 landscape";
+  }
+
+  return `${format}; ${crop}; ${aspect}; compose for the final crop with no critical subject matter at the edges`;
+}
+
+function cameraDirection(payload, role) {
+  const explicit = firstValue(payload?.camera, payload?.viewpoint, payload?.lens);
+  if (explicit) return explicit;
+  if (/pack|packaging|product|still life/i.test(role)) return "three-quarter product viewpoint with an 85mm-equivalent lens, disciplined perspective, and precise edge definition";
+  if (/lifestyle|editorial|documentary/i.test(role)) return "observational eye-level viewpoint with a 35mm-equivalent lens, natural perspective, and layered environmental depth";
+  if (/identity|mood|art direction/i.test(role)) return "deliberate straight-on or orthographic viewpoint with a 65mm-equivalent lens and graphic spatial relationships";
+  return "eye-level viewpoint with a 50mm-equivalent natural perspective, believable depth, and restrained depth of field";
+}
+
+function brandEvidence({ brand, bio, visual }) {
+  const evidence = [];
+  const name = firstValue(brand?.name, bio?.identity?.name);
+  if (name) evidence.push(`${name} brand world`);
+  if (bio?.identity?.positioning) evidence.push(clean(bio.identity.positioning));
+  if (bio?.identity?.pillars?.length) evidence.push(`pillars: ${list(bio.identity.pillars, ", ")}`);
+  if (visual.imagery?.length) evidence.push(`recognizable imagery cues: ${list(visual.imagery)}`);
+  return evidence.join("; ");
+}
 
 export function composeImagePrompt({ spec, brand, bio, refusals = [], brief, sourceText = null, artDirection = null }) {
-  const v = bio?.visual || {};
-  const lines = [];
+  const visual = bio?.visual || {};
+  const payload = spec?.payload || {};
+  const role = firstValue(payload.role, payload.objective, "brand image");
+  const subject = clean(artDirection) || clean(brief) || clean(sourceText) || role;
+  const prompt = [];
 
-  /* Lead with the task — what to depict. */
-  lines.push(String(brief || "").trim());
+  prompt.push(`SUBJECT & ACTION: ${subject}. Make the primary subject and its action immediately legible; show a specific moment, not a generic theme.`);
 
-  /* When a paired copy specialist supplied explicit art direction, it
-     becomes the dominant instruction — the image IS the scene the copy
-     was written for. Still text-free (the copy lives on its own card). */
   if (artDirection) {
-    lines.push(`Art direction (follow precisely): ${String(artDirection).trim()} Do not render any text in the image.`);
+    prompt.push(`ART DIRECTION — FOLLOW PRECISELY: ${clean(artDirection)}. Do not render any text in the image.`);
   }
 
-  /* When this image illustrates a specific copy deliverable (a social post
-     caption, a blog hero), depict its subject — never typeset the words. */
   if (sourceText) {
-    lines.push(`The image accompanies this copy: "${String(sourceText).slice(0, 240)}". Depict its subject and mood; do not render the text itself.`);
+    prompt.push(`COPY CONTEXT: The image accompanies this copy: "${clean(sourceText).slice(0, 240)}". Depict the copy's subject, emotional beat, and implied world; do not render the text itself, typeset it, or quote it.`);
   }
 
-  /* Spec role — what KIND of image (hero, editorial, identity, etc.) */
-  const role = spec?.payload?.role || spec?.payload?.objective || "";
-  if (role) lines.push(`Style direction: ${role}.`);
+  const composition = firstValue(payload?.composition, "one unmistakable focal point, clear foreground/midground/background separation, controlled visual rhythm, and intentional negative space");
+  prompt.push(`COMPOSITION & HIERARCHY: ${composition}, appropriate to ${role}.`);
+  prompt.push(`CAMERA / VIEWPOINT: ${cameraDirection(payload, role)}; follow a more specific supplied art direction when present.`);
+  const lighting = firstValue(payload?.lighting, visual?.lighting, "motivated, directional natural light with shaped highlights and shadows, dimensional contrast, and no flat studio wash");
+  prompt.push(`LIGHT: ${lighting}.`);
+  const materials = firstValue(payload?.materials, payload?.texture, visual?.materials, "physically credible surfaces, tactile micro-texture, natural imperfections, accurate reflections, and realistic contact shadows; avoid synthetic CGI smoothness");
+  prompt.push(`MATERIAL & TEXTURE: ${materials}.`);
 
-  /* Brand's visual palette + type + imagery cues */
-  if (v.palette?.length) {
-    const pal = v.palette.map((p) => `${p.name || ""} ${p.hex || ""}`.trim()).filter(Boolean).join(", ");
-    if (pal) lines.push(`Palette: ${pal}.`);
-  }
-  if (v.imagery?.length) {
-    lines.push(`Imagery direction: ${v.imagery.join("; ")}.`);
-  }
-  if (v.avoid?.length) {
-    lines.push(`AVOID at all costs: ${v.avoid.join("; ")}.`);
-  }
+  const palette = (visual.palette || [])
+    .map((color) => `${clean(color?.name)} ${clean(color?.hex)}`.trim())
+    .filter(Boolean)
+    .join(", ");
+  prompt.push(`PALETTE: ${palette || "a restrained, coherent palette derived from the subject and environment"}; preserve color separation and natural skin/product tones where applicable.`);
 
-  /* Brand voice as visual register — editorial vs playful, etc. */
+  const imagery = list(visual.imagery);
+  const environment = firstValue(payload?.environment, imagery, "a specific, plausible real-world setting with purposeful contextual details");
+  prompt.push(`ENVIRONMENT: ${environment}; every prop and background element must support the story.`);
+
+  const evidence = brandEvidence({ brand, bio, visual });
+  prompt.push(`BRAND EVIDENCE: ${evidence || "express the brand through consistent art direction, distinctive details, and a repeatable visual point of view"}. Show evidence through subject, styling, palette, and setting rather than unsupported logos or invented packaging.`);
+
   if (bio?.voice?.register) {
-    lines.push(`Visual register matches the brand voice: ${bio.voice.register}.`);
+    prompt.push(`VISUAL REGISTER: ${clean(bio.voice.register)}.`);
   }
 
-  /* Pillars / positioning to anchor the feeling */
-  if (bio?.identity?.positioning) lines.push(`Brand positioning: ${bio.identity.positioning}`);
-  if (bio?.identity?.pillars?.length) lines.push(`Brand pillars: ${bio.identity.pillars.join(", ")}.`);
+  prompt.push(`OUTPUT: ${outputDirection(payload, role)}.`);
 
-  /* Refusals as explicit don'ts */
-  if (Array.isArray(refusals) && refusals.length) {
-    lines.push(`Do NOT include any of: ${refusals.slice(0, 5).join(" | ")}.`);
-  }
+  const negatives = [
+    ...(Array.isArray(visual.avoid) ? visual.avoid : []),
+    ...(Array.isArray(refusals) ? refusals.slice(0, 8) : []),
+  ].map(clean).filter(Boolean);
+  const uniqueNegatives = [...new Set(negatives)];
+  prompt.push(`NEGATIVE CONSTRAINTS: No text, typography, captions, watermarks, signatures, or UI; no invented logos or illegible pseudo-lettering; no generic stock-photo staging; no clutter competing with the focal subject; no distorted anatomy, duplicate objects, warped geometry, plastic skin, oversharpening, or excessive HDR${uniqueNegatives.length ? `; also exclude: ${uniqueNegatives.join(" | ")}` : ""}.`);
 
-  /* Always include a quality nudge */
-  lines.push("Editorial-grade composition. High craft. Real-world plausibility.");
+  prompt.push("FINISH: Editorial-grade composition, production-ready detail, high craft, and real-world plausibility.");
 
-  return lines.join(" ");
+  return prompt.join(" ");
 }

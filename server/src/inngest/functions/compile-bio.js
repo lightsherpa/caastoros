@@ -39,7 +39,7 @@ const V2 = process.env.DISCOVERY_V2 === "1";
 const COMPILER_SPEC = {
   payload: {
     name: "a30 BIO Compiler",
-    modelRouting: { primary: "openrouter/google/gemini-2.5-pro", reason: "cost-optimized BIO synthesis (rev-2 §17 — Steward catches quality drift)" },
+    modelRouting: { primary: "openrouter/google/gemini-3.6-flash", reason: "current high-quality BIO synthesis route; Steward catches quality drift" },
     cr_estimate: 40,
   },
 };
@@ -104,7 +104,7 @@ Additive keys (emit ALL THREE in the same JSON object):
 const VERIFIER_SPEC = {
   payload: {
     name: "BIO Evidence Verifier",
-    modelRouting: { primary: "openrouter/google/gemini-2.5-flash", reason: "cheap support check for high-impact BIO claims" },
+    modelRouting: { primary: "openrouter/google/gemini-3.5-flash-lite", reason: "low-cost support check for high-impact BIO claims" },
     cr_estimate: 5,
   },
 };

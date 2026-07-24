@@ -56,6 +56,15 @@ function notify() {
   window.dispatchEvent(new Event("ci_auth_change"));
 }
 
+function authErrorMessage(err) {
+  const raw = err?.message || String(err);
+  const normalized = raw.toLowerCase();
+  if (normalized.includes("unsupported provider") || normalized.includes("provider is not enabled")) {
+    return "Google sign-in is not enabled yet for this Supabase project. Enable Auth > Providers > Google in Supabase, then add this app URL to Auth > URL Configuration > Redirect URLs. You can still create an account with email and password.";
+  }
+  return raw;
+}
+
 /* Resolve role + workspace from `users` table after auth fires. */
 async function resolveProfile(authUser) {
   if (!authUser) return null;
@@ -270,7 +279,7 @@ function Login({ role = "client", go, initialMode = "signin" }) {
         go(profile.role === "team" ? "team" : "home");
       }
     } catch (err) {
-      const msg = err?.message || String(err);
+      const msg = authErrorMessage(err);
       if (msg.toLowerCase().includes("check your inbox")) setInfo(msg);
       else setError(msg);
     } finally {
@@ -282,7 +291,7 @@ function Login({ role = "client", go, initialMode = "signin" }) {
   const onGoogle = async () => {
     setBusy(true); setError(null); setInfo(null);
     try { await signInWithGoogle(); }            /* redirects away on success */
-    catch (err) { setError(err?.message || String(err)); setBusy(false); }
+    catch (err) { setError(authErrorMessage(err)); setBusy(false); }
   };
 
   const showToggle   = mode === "signin" || mode === "signup";

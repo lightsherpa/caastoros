@@ -37,8 +37,8 @@ test("normalizePlan derives unique proposedSpecialists across groups", () => {
 });
 
 test("normalizePlan returns empty plan for junk input", () => {
-  assert.deepEqual(normalizePlan(null), { deliverableGroups: [], proposedSpecialists: [] });
-  assert.deepEqual(normalizePlan({}), { deliverableGroups: [], proposedSpecialists: [] });
+  assert.deepEqual(normalizePlan(null), { deliverableGroups: [], proposedSpecialists: [], orchestrationRationale: "" });
+  assert.deepEqual(normalizePlan({}), { deliverableGroups: [], proposedSpecialists: [], orchestrationRationale: "" });
 });
 
 test("wrapLegacy turns a flat specialist list into count:1 generic groups", () => {
@@ -67,10 +67,27 @@ test("wrapLegacy with non-array input yields an empty plan", () => {
   const out = wrapLegacy("a12");
   assert.deepEqual(out.deliverableGroups, []);
   assert.deepEqual(out.proposedSpecialists, []);
+  assert.equal(out.orchestrationRationale, "");
 });
 
 test("normalizePlan caps groups at MAX_GROUPS (cost guardrail)", () => {
   const many = Array.from({ length: MAX_GROUPS + 2 }, () => ({ type: "email", count: 1 }));
   const out = normalizePlan({ deliverableGroups: many });
   assert.equal(out.deliverableGroups.length, MAX_GROUPS);
+});
+
+test("normalizePlan preserves orchestration rationale and per-group why fields", () => {
+  const out = normalizePlan({
+    orchestrationRationale: "The crew is narrow because the brief is about a ritual, not a campaign sprawl.",
+    deliverableGroups: [{
+      type: "social_post",
+      count: 2,
+      platforms: ["instagram"],
+      why: "Caption plus image makes the Tuesday ritual visible and repeatable.",
+      successSignal: "saved posts and Tuesday footfall lift",
+    }],
+  });
+  assert.equal(out.orchestrationRationale, "The crew is narrow because the brief is about a ritual, not a campaign sprawl.");
+  assert.equal(out.deliverableGroups[0].why, "Caption plus image makes the Tuesday ritual visible and repeatable.");
+  assert.equal(out.deliverableGroups[0].successSignal, "saved posts and Tuesday footfall lift");
 });

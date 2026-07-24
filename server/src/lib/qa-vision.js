@@ -19,7 +19,7 @@ const QA_SPEC = {
   payload: {
     name: "a24 Brand Consistency QA",
     modelRouting: {
-      primary: "openrouter/google/gemini-2.5-flash",
+      primary: "openrouter/google/gemini-3.5-flash-lite",
       reason: "high-volume vision QA; cheap + reliable JSON verdicts",
     },
     cr_estimate: 1,

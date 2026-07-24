@@ -19,6 +19,7 @@ app.post("/start", requireAuth, async (c) => {
   const { workspaceId } = c.get("auth");
   const body = await c.req.json().catch(() => ({}));
   const url = typeof body.url === "string" ? body.url.trim() : "";
+  const brandName = typeof body.brandName === "string" ? body.brandName.trim() : "";
   const instagram = typeof body.instagram === "string" ? body.instagram.trim() : undefined;
   if (!url) return c.json({ error: "url required" }, 400);
 
@@ -37,8 +38,11 @@ app.post("/start", requireAuth, async (c) => {
     brandId = brand.id;
   }
 
-  // Update brand.url if it differs (so future discoveries can default to it)
-  await supabaseAdmin.from("brands").update({ url }).eq("id", brandId);
+  // Update brand.url/name if provided so first-run placeholder brands become real workspaces.
+  await supabaseAdmin.from("brands").update({
+    url,
+    ...(brandName ? { name: brandName } : {}),
+  }).eq("id", brandId);
 
   // Fire the event — compile-bio function picks it up asynchronously.
   // If the queue is unreachable (e.g. Inngest dev server not running in

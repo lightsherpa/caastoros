@@ -1,6 +1,6 @@
 # CaastorOS — APIs + Agents implementation plan
 
-_Status: PLAN. Consolidates and supersedes the earlier `api-integration-plan.md`, `specialists-plan.md`, and `specialist-prompting-plan.md`. The goal is a single sequenced path that takes the prototype from `window.CI_*` mocks to one real brand running end-to-end with all 33 specialists callable. Read the older docs for the why behind individual decisions; this is the how._
+_Status: PLAN. Consolidates the implementation path from `window.CI_*` mocks to one real brand running end-to-end. The current catalog has 55 L2 specialists: 49 non-motion/video specialists are in this completion scope, while the five `Motion & Sound` specialists and `a44 Style Frames` are explicitly deferred._
 
 ---
 
@@ -10,7 +10,7 @@ One brand. Live. End-to-end.
 
 ```
 URL → Discovery → BIO → Brief (+ clarify) → Brandolph routes
-    → Specialists run (copy · social · image · web · deck)
+    → Live specialists run (strategy · concept · copy · visual · web · research)
     → QA gate → Outputs on the canvas → Credits reconciled
 ```
 
@@ -52,7 +52,7 @@ Every L2 specialist run, regardless of department or model, is invoked the same 
 
 ```ts
 runSpecialist({
-  specialistId,         // a01..a33
+  specialistId,         // current catalog ids a01..a55
   brandId,              // → loads the canonical BIO at version pinned to the run
   briefId,              // → loads the sharpened brief + clarifications
   inputs?: { uploads, priorOutputIds, extraContext },
@@ -85,9 +85,17 @@ The runner is one function. It does not know what a Conversion Copywriter is —
 [ TASK CONTEXT ]          the sharpened brief + clarifications + prior outputs
 ```
 
-`CI_DEPT_SPECS` (`portal-data.js:167`) holds the per-department templates today. They become the seed for the `specs` table; per-specialist overrides go to `specialist_specs`.
+`CI_DEPT_SPECS` holds seven per-department fallback templates. `CI_SPECIALIST_SPECS` holds bespoke per-specialist behavior. A department fallback can keep a prototype runnable, but it does not satisfy the completion gate for an in-scope specialist.
 
-### 2.3 Structured output (kill the "rationale" derivation)
+### 2.3 Catalog/spec completion gate
+
+The source-of-truth catalog is 55 records across seven departments: Strategy 6, Concept 8, Copy 11, Visual 11, Web & UX 7, Motion & Sound 5, and Research & Ops 7. The catalog has 50 live records and five `soon` records; the current completion scope contains 49 specialists because `a44 Style Frames` is video preproduction despite living under Visual.
+
+Before this milestone is called complete, every in-scope record, independent of status, must own a bespoke `CI_SPECIALIST_SPECS[id]` entry with non-empty `role`, `objective`, `method`, `outputContract`, `voice`, `refusals`, and `bioSlices`. Every bespoke id must also resolve to a catalog record. `server/src/lib/specialist-spec-coverage.test.mjs` enforces that contract directly against `src/portal-data.js`. Internal specialists (`a30`, `a33`) remain in scope.
+
+Motion/video is explicitly outside this milestone. No provider integration, activation, renderer, or motion QA work is required for `a27`, `a28`, `a44`, `a50`, `a51`, or `a52`.
+
+### 2.4 Structured output (kill the "rationale" derivation)
 
 Every text specialist returns:
 
@@ -105,16 +113,14 @@ No more `outputRationale` derivation. Each output node on the canvas shows `body
 
 | Stage | Vendor (primary / fallback) | Model | Used by | Cache | Notes |
 |---|---|---|---|---|---|
-| Text — L1 (judgment) | Anthropic / — | Opus 4.7 | Brandolph, a01, a04, a07, a08, a10, a11, a15, a30 | yes, PLATFORM+BIO | Long-context positioning judgment |
-| Text — L2 (production) | Anthropic / OpenAI | Sonnet 4.6 / GPT-5 | a02, a03, a06, a09, a13, a16 | yes | Most copy + concept specialists |
-| Text — cheap | Anthropic / Google | Haiku 4.5 / Gemini Flash | a14, a17, a18, a24, a33 | yes | Subject lines, QA, microcopy |
-| Image | fal.run (Flux 1.1 Pro) / OpenAI gpt-image-1 | — | a19, a20, a21, a22, a23 | n/a | Single image provider behind one interface |
+| Text — L1 (judgment) | Anthropic / — | Opus | Brandolph and judgment-heavy Strategy/Concept/Copy specialists | yes, PLATFORM+BIO | Exact route comes from each catalog/spec row |
+| Text — L2 (production) | Anthropic / OpenRouter | Sonnet / GPT-5 / Gemini | Live Strategy, Concept, Copy, Visual, Web & UX, Research & Ops text specialists | yes | Shared text runner; bespoke behavior lives in specs |
+| Image | fal.run | GPT Image / Flux / Recraft | Live Visual specialists plus Iconography and Mood Board | n/a | One image interface with per-specialist routes |
 | Vision (BIO extract) | Anthropic Claude (vision) | Sonnet | Discovery palette/type extraction | n/a | Screenshot in, structured palette+type out |
 | Scrape | Firecrawl / Exa | — | a31 Site Scanner, Discovery | per-URL 24h | Clean markdown; Exa for "find competitors" |
 | Search | Exa | — | a32 Competitor Map | per-query 24h | Semantic search w/ summaries |
 | Web build | v0 platform API / Framer | — | a25, a26, a29 | n/a | Generates JSX/HTML for landing + email |
-| Deck | Gamma API | — | a27 | n/a | Inputs structured outline; gets back a deck URL |
-| Motion | ElevenLabs (VO) + Runway (video) | — | a28 | n/a | Brief + script → VO + cut |
+| Deck / motion / audio | Deferred | — | a27, a28, a44, a50, a51, a52 | n/a | Explicitly outside this completion scope |
 | PDF parse | Mistral OCR / LlamaParse | — | BIO source uploads | 30d | When user feeds Brandolph a PDF |
 | Color extract | node-vibrant (local) | — | Discovery palette fallback | n/a | Cheaper than vision for first pass |
 | Auth + DB + Storage | Supabase | — | everything | n/a | One vendor for the boring layer |
@@ -136,7 +142,7 @@ POST /api/bios/:brandId/sources   { url|file } → adds a source, kicks off re-r
 POST /api/briefs                  { brandId, requestText } → { briefId, clarifications }
 POST /api/briefs/:id/answer       { qa: [...] } → { sharpenedBrief }
 
-GET  /api/specialists             returns directory (33)
+GET  /api/specialists             returns catalog (55; 50 live, 5 soon)
 GET  /api/specialists/:id         spec (team) or display (client) shape
 POST /api/specialists/:id/preview { brandId, sampleBriefId } → { composedPrompt, dryRunOutput, qa }   ← test harness
 
@@ -156,9 +162,9 @@ Authentication is row-level: every endpoint resolves `workspaceId` from session 
 
 ---
 
-## 4. Agent inventory — bringing the 33 live
+## 4. Specialist inventory — completing the 49 non-motion/video specs
 
-Brandolph is the L1 operator (orchestrator). The 33 specialists are L2 producers. L3 are humans on the team and stay out of this plan.
+Brandolph is the L1 operator (orchestrator). The catalog contains 55 L2 specialists; 49 are in scope here regardless of status. L3 are humans on the team and stay out of this plan.
 
 ### 4.1 Brandolph (L1)
 
@@ -171,38 +177,50 @@ Brandolph is the L1 operator (orchestrator). The 33 specialists are L2 producers
 
 Brandolph is **not** a specialist row. It's the runner that *invokes* specialists, plus the four endpoints above. Internally it shares the four-layer prompt composer; only the SPEC layer differs (Brandolph has its own).
 
-### 4.2 The 33 specialists (build-order tiers)
+### 4.2 The expanded catalog
 
-The fastest path to "live brand" runs four specialists (one per output kind on the demo brief). Everything else can stage in behind them. Order is by **dependency** (text < image < composed), not department.
+The catalog must be read from data, not reconstructed from the original 33-record plan.
+
+| Department | IDs | Count | Scope |
+|---|---|---:|---|
+| Strategy | a01-a05, a34 | 6 | live / included |
+| Concept | a06-a11, a35-a36 | 8 | live / included |
+| Copy | a12-a18, a37-a40 | 11 | live / included |
+| Visual | a19-a22, a24, a41-a46 | 11 | 10 included; a44 deferred video preproduction |
+| Web & UX | a23, a25, a26, a29, a47-a49 | 7 | live / included |
+| Motion & Sound | a27, a28, a50-a52 | 5 | soon / deferred |
+| Research & Ops | a30-a33, a53-a55 | 7 | live / included |
+
+The fastest path to a live brand still begins with a small vertical slice. Fan-out then covers all 49 in-scope records over the shared runtime, without using status as a spec-coverage exemption.
 
 **Tier T1 — bring up the runtime (text only)**
 
 | ID | Name | Dept | Model | Why first |
 |---|---|---|---|---|
-| a30 | BIO Compiler | Discovery & Ops | Opus | Without it, no BIO. Wires the Discovery → BIO endpoint. |
-| a02 | The Sharpener | CMO Suite | Sonnet | Without it, briefs are just request text. |
+| a30 | BIO Compiler | Research & Ops | Gemini Pro | Without it, no BIO. Wires the Discovery → BIO endpoint. |
+| a02 | The Sharpener | Strategy | Sonnet | Without it, briefs are just request text. |
 | a12 | Conversion Copy | Copy | GPT-5 / Sonnet | The first node a customer wants to see fill in live. |
 | a18 | Voice QA | Copy | Haiku | The QA gate. Output cannot be `approved` without it. |
 
-**Tier T2 — broaden text coverage**
+**Tier T2 — complete bespoke text specs and broaden text coverage**
 
-a01 Diagnostician, a03 Strategist, a04 Tension-Finder, a05 Refuser, a06 Territory Mapper, a07 Namer, a09 Pull-Quote, a13 Email Sequence, a14 Subject Lines, a15 Long-form, a16 Social Captions, a17 Microcopy. All share the text runner; they're config rows over the same kernel.
+Cover all live Strategy, Concept, Copy, and text-producing Research & Ops records, including expanded ids a34-a40 and a53-a55. They share the text runner, but each must own a bespoke spec rather than relying only on a department template.
 
 **Tier T3 — image specialists**
 
-a19 Identity Drafts (Recraft), a20 Hero KV (Flux), a21 Editorial Image (gpt-image-1), a24 Brand Consistency QA (Haiku + vision). Adds: image provider interface, object storage, longer job timeouts, per-image cost.
+a19-a22, a24, a35, a41-a43, a45-a46, and a23/a48 where their output route is image-based. Adds the image provider interface, object storage, longer job timeouts, per-image cost, and output-shape handling.
 
 **Tier T4 — research + ops**
 
-a31 Site Scanner (Firecrawl/Exa), a32 Competitor Map (Exa), a33 Audit & Ledger (Haiku). Adds: research tools to the runner's tool list.
+a30-a33 and a53-a55. Adds research tools to the runner and keeps internal specialists (`a30`, `a33`) covered even though they are hidden from the public directory.
 
 **Tier T5 — composed outputs**
 
-a25 Page Composer (v0), a26 Email Build (v0), a27 Deck Build (Gamma). Adds: vendor-specific output shapes (JSX bundle, MJML, deck URL).
+a25 Page Composer, a26 Email Build, a29 Framer Builder, a47 Component Library, and a49 Wireframe / Flow. Adds vendor-specific web output shapes without pulling deferred deck/motion work into scope.
 
-**Tier T6 — soon→live**
+**Deferred — Motion & Sound**
 
-a08, a10, a11, a22, a23, a28, a29. Currently `status: "soon"`. Move to live once their dependencies (motion vendor, packaging tooling) are wired.
+`a27`, `a28`, `a44`, `a50`, `a51`, and `a52` are deferred. Deck, motion/video, voiceover, storyboard, style-frame, and sonic-provider work belongs to a later milestone and is not part of the current completion claim.
 
 ### 4.3 The spec row for every specialist
 
@@ -210,7 +228,7 @@ Already partly modeled. Make this the canonical `specs` table:
 
 ```ts
 {
-  id,                    // a01..a33
+  id,                    // current catalog ids a01..a55
   version,               // bump on every change; runs pin to the version they used
   code, name, dept,
   role, objective,
@@ -309,7 +327,7 @@ Each phase is shippable and visible on the canvas. Stop here if budget runs out 
 
 ### P4 — Text fan-out _(1–2 weeks)_
 
-- Tier T2 specialists go live (12 records). All share the runtime — most of the work is spec data + per-dept BIO slices.
+- Complete bespoke specs and runtime coverage for every text specialist in the 49-record scope. All share the runtime; most work is spec data, tools, and per-department BIO slices.
 - Prompt caching turned on; verify >90% cache hit on PLATFORM+BIO.
 
 **Done when:** every text-only specialist on the brief board can run.
@@ -328,10 +346,10 @@ Each phase is shippable and visible on the canvas. Stop here if budget runs out 
 
 - a25 Page Composer (v0 SDK).
 - a26 Email Build (v0 + Resend preview).
-- a27 Deck Build (Gamma API).
+- a29 Framer Builder plus the live Web & UX support specialists.
 - Output kinds in `CI_OUTPUT_KINDS` map to real rendering surfaces.
 
-**Done when:** a brief ships a full assembly — page + emails + deck + image — from one click.
+**Done when:** a brief ships a full in-scope assembly — page + emails + image — from one click.
 
 ### P7 — Multi-tenant + Stripe + tier gates _(1–2 weeks)_
 
@@ -342,11 +360,11 @@ Each phase is shippable and visible on the canvas. Stop here if budget runs out 
 
 **Done when:** the product can be sold.
 
-### P8 — Soon → live + motion + ops _(ongoing)_
+### P8 — Deferred Motion & Sound _(separate milestone)_
 
-- a08, a10, a11 (concept), a22, a23 (design), a28 (motion), a29 (Framer).
-- Motion needs ElevenLabs + Runway + a storyboard handoff to L3 — likely a bigger build.
-- a33 Audit & Ledger writes monthly invoices.
+- Scope `a27`, `a28`, `a44`, and `a50-a52` only after the 49 in-scope specs and runtime paths are complete.
+- Select deck, motion/video, storyboard, voiceover, and audio providers and define their output/QA contracts separately.
+- None of this work blocks the current completion gate.
 
 ---
 
@@ -407,7 +425,7 @@ credits = ceil(
 | Image gen drifts off-brand | high | med | a24 Brand Consistency QA is in the runtime, not optional — outputs without a passing QA never reach the canvas |
 | Long-running specialists hit edge timeout | med | high | All long jobs run on Inngest workers, never on the edge — SSE only forwards |
 | RLS misconfig leaks brands across workspaces | low | catastrophic | RLS tests in CI; security review before P7 ships |
-| 33-spec rollout balloons | med | low | Tier order (§4.2) lets us stop at any tier with a working product |
+| 49-spec rollout balloons | med | low | Executable coverage plus tier order (§4.2) keeps the gap visible and the runtime shippable |
 
 ---
 

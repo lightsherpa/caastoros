@@ -39,8 +39,8 @@ function flattenSystem(system) {
  *
  * @param {object} params
  * @param {string} params.model        - OpenRouter model id, e.g. "openai/gpt-5",
- *                                        "google/gemini-2.5-flash", or with modifier
- *                                        "google/gemini-2.5-flash:floor" (cheapest provider).
+ *                                        "google/gemini-3.5-flash-lite", or with modifier
+ *                                        "google/gemini-3.5-flash-lite:floor" (cheapest provider).
  * @param {Array|string} params.system - Anthropic-style array OR plain string; flattened on send.
  * @param {Array} params.messages      - [{ role, content }, ...]
  * @param {number} [params.maxTokens]  - max output tokens

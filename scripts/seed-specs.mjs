@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────
 // P0-006 · Seed the `specs` table from src/portal-data.js
 //
-// Reads CI_AGENTS (33 rows) + CI_DEPT_SPECS (6 dept templates) +
+// Reads the expanded CI_AGENTS catalog + CI_DEPT_SPECS (department templates) +
 // CI_DEPT_META (per-dept capabilities/tier) from the existing
 // browser-side mock file, and writes one `specs` row per specialist
 // with `version=1` and `active=true` (for live status) or `active=false`
@@ -76,8 +76,8 @@ const MODEL_MAP = {
   haiku:       "anthropic/claude-haiku-4-5-20251001",
   // Non-Claude text → OpenRouter
   gpt5:        "openrouter/openai/gpt-5",
-  gemPro:      "openrouter/google/gemini-2.5-pro",
-  gemFlash:    "openrouter/google/gemini-2.5-flash",
+  gemPro:      "openrouter/google/gemini-3.6-flash",
+  gemFlash:    "openrouter/google/gemini-3.5-flash-lite",
   // Image — all via fal.ai (one key, one bill, multiple models)
   gptimage:    "vendor/fal/gpt-image-2",      /* real GPT Image 2 via fal (openai/gpt-image-2) */
   flux:        "vendor/fal/flux-1.1-pro",     /* Pro — Hero, OOH, Identity, Pack: $0.04/img */
@@ -96,6 +96,44 @@ function resolveRoute(shortKey) {
   console.warn(`Unknown model short key "${shortKey}" — defaulting to anthropic/claude-sonnet-4-6`);
   return "anthropic/claude-sonnet-4-6";
 }
+
+const REQUIRED_SPEC_FIELDS = ["role", "objective", "method", "outputContract", "voice", "refusals", "bioSlices"];
+const EXCLUDED_MOTION_VIDEO_IDS = new Set(["a44"]); // Style Frames is video preproduction despite living in Visual.
+
+function defaultBioSlices(department) {
+  return department === "Copy"           ? ["voice", "forbidden"]
+       : department === "Visual"         ? ["palette", "type", "imagery"]
+       : department === "Concept"        ? ["positioning", "audience"]
+       : department === "Web & UX"       ? ["voice", "palette", "type"]
+       : department === "Motion & Sound" ? ["voice", "imagery"]
+       : department === "Strategy"       ? ["positioning", "audience", "goals", "strategic"]
+       : department === "Research & Ops" ? ["positioning"]
+       :                                    ["positioning", "voice"];
+}
+
+function assertInScopeSpecCoverage() {
+  const failures = [];
+  for (const agent of CI_AGENTS) {
+    if (agent.dept === "Motion & Sound" || EXCLUDED_MOTION_VIDEO_IDS.has(agent.id)) continue;
+    const override = CI_SPECIALIST_SPECS[agent.id];
+    if (!override) {
+      failures.push(`${agent.id}: missing bespoke CI_SPECIALIST_SPECS entry`);
+      continue;
+    }
+    for (const field of REQUIRED_SPEC_FIELDS) {
+      const value = override[field];
+      const missing = value == null
+        || (typeof value === "string" && value.trim() === "")
+        || (Array.isArray(value) && value.length === 0);
+      if (missing) failures.push(`${agent.id}: missing ${field}`);
+    }
+  }
+  if (failures.length) {
+    throw new Error(`In-scope specialist spec validation failed:\n- ${failures.join("\n- ")}`);
+  }
+}
+
+assertInScopeSpecCoverage();
 
 // ─── Build the spec payload per agent ──────────────────────────────
 function buildPayload(agent) {
@@ -123,9 +161,14 @@ function buildPayload(agent) {
     objective: pick("objective"),
     method: pick("method") ?? [],
     outputContract: pick("outputContract"),
+    evidenceContract: pick("evidenceContract"),
+    handoffContract: pick("handoffContract") ?? pick("handoffRequirements"),
+    structuredOutput: pick("structuredOutput"),
+    qaContract: pick("qaContract"),
     voice: pick("voice"),
     tools: pick("tools") ?? [],
     refusals: pick("refusals") ?? [],
+    qaGates: pick("qaGates") ?? [],
     // Routing — vendor-prefixed route string the model router dispatches on
     modelRouting: { primary: resolveRoute(agent.model), fallback: null, reason: `seeded from CI_AGENTS (model: ${agent.model})` },
     // Department-inherited
@@ -138,14 +181,7 @@ function buildPayload(agent) {
     cr_estimate: agent.cr,
     status: agent.status,
     // BIO slices per dept — what the specialist reads from the BIO at run time
-    bioSlices: agent.dept === "Copy"           ? ["voice", "forbidden"]
-            : agent.dept === "Visual"          ? ["palette", "type", "imagery"]
-            : agent.dept === "Concept"         ? ["positioning", "audience"]
-            : agent.dept === "Web & UX"        ? ["voice", "palette", "type"]
-            : agent.dept === "Motion & Sound"  ? ["voice", "imagery"]
-            : agent.dept === "Strategy"        ? ["positioning", "audience", "goals", "strategic"]
-            : agent.dept === "Research & Ops"  ? ["positioning"]
-            :                                    ["positioning", "voice"],
+    bioSlices: pick("bioSlices") ?? defaultBioSlices(agent.dept),
   };
 }
 

@@ -37,6 +37,8 @@ function normalizeGroup(raw) {
     platforms: platforms.length ? platforms : [DEFAULT_PLATFORM],
     parts: [...spec.parts],
     crew,
+    why: typeof raw.why === "string" ? raw.why.trim().slice(0, 360) : "",
+    successSignal: typeof raw.successSignal === "string" ? raw.successSignal.trim().slice(0, 220) : "",
   };
 }
 
@@ -51,7 +53,13 @@ export function normalizePlan(plan) {
   for (const g of deliverableGroups) {
     for (const part of g.parts) ids.add(g.crew[part]);
   }
-  return { deliverableGroups, proposedSpecialists: [...ids] };
+  return {
+    deliverableGroups,
+    proposedSpecialists: [...ids],
+    orchestrationRationale: typeof plan?.orchestrationRationale === "string"
+      ? plan.orchestrationRationale.trim().slice(0, 700)
+      : "",
+  };
 }
 
 export function wrapLegacy(specialistIds = []) {
@@ -64,7 +72,7 @@ export function wrapLegacy(specialistIds = []) {
       parts: ["output"],
       crew: { output: id },
     }));
-  return { deliverableGroups, proposedSpecialists: [...new Set(deliverableGroups.map((g) => g.crew.output))] };
+  return { deliverableGroups, proposedSpecialists: [...new Set(deliverableGroups.map((g) => g.crew.output))], orchestrationRationale: "" };
 }
 
 // crOf: (agentId) => number of credits for that specialist. Returns null when

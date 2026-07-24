@@ -1,6 +1,6 @@
 import React from "react";
 import { supabase, apiFetch } from "./lib/supabase-browser.js";
-const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory } = window;
+const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, LiveBriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, Onboarding, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
 
@@ -105,7 +105,7 @@ function useRoute() {
   const parse = () => {
     const h = (window.location.hash || "").replace(/^#\/?/, "") || "home";
     const [main, ...rest] = h.split("/");
-    return { id: main, param: rest.join("/") || null };
+    return { id: main, param: rest[0] || null, sub: rest[1] || null };
   };
   const [route, setRoute] = useShellState(parse());
   useShellEffect(() => {
@@ -130,7 +130,7 @@ function useBrandList() {
     const load = async () => {
       const { data } = await supabase
         .from("brands")
-        .select("id, name, created_at")
+        .select("id, name, url, created_at")
         .order("created_at", { ascending: true });
       if (cancelled) return;
       setState({ brands: data || [], loading: false });
@@ -269,157 +269,6 @@ function WorkspaceSwitcher() {
         </div>
       )}
     </div>
-  );
-}
-
-/* Logo / brandmark mini ----------------------------------------- */
-function Brandmark() {
-  return (
-    <div style={{display:"flex", alignItems:"baseline", gap: 5}}>
-      <img src="caastor/assets/logo-full-yellow.png" alt="CaastorOS"
-        className="brand-logo" style={{height: 34, width:"auto", display:"block", alignSelf:"center"}} />
-      <span style={{fontFamily:"var(--font-mono)", fontSize: 15, fontWeight: 600, color:"var(--c-ink)", letterSpacing:"0.01em"}}>OS</span>
-    </div>
-  );
-}
-
-/* Sidebar --------------------------------------------------------- */
-function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bioScore }) {
-  const routes = portal === "team" ? TEAM_ROUTES : CLIENT_ROUTES;
-  const isClient = portal === "client";
-  const credits = useLiveCredits();
-  return (
-    <nav className="sidebar">
-      {/* Workspace badge */}
-      <div style={{padding:"18px 16px 14px", borderBottom:"1px solid var(--c-line)"}}>
-        <Brandmark />
-      </div>
-
-      {/* Brand selector (client) / team identity (team) */}
-      <div style={{padding:"14px 16px 12px", borderBottom:"1px solid var(--c-line)"}}>
-        {isClient ? (
-          <div className="card" style={{padding:"10px 12px", background:"var(--c-bg)", boxShadow:"none"}}>
-            <div style={{display:"flex", alignItems:"center", gap: 10}}>
-              <div style={{
-                width:30, height:30, borderRadius: 7, background:"var(--neutral-900)",
-                color:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
-                fontFamily:"var(--font-mono)", fontSize:13, fontWeight:600,
-              }}>V</div>
-              <div style={{flex:1, minWidth: 0}}>
-                <div style={{fontSize:13, fontWeight: 500, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{brandName}</div>
-                <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>BIO {bioScore}%</div>
-              </div>
-              <button className="btn btn--icon btn--ghost" aria-label="Switch brand" style={{height:26, width:26}}>
-                <Icon name="chev" size={14} />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="card" style={{padding:"10px 12px", background:"var(--c-bg)", boxShadow:"none"}}>
-            <div style={{display:"flex", alignItems:"center", gap: 10}}>
-              <img src="caastor/assets/profile-1.jpg" alt="" style={{width:30, height:30, borderRadius:"50%", objectFit:"cover"}} />
-              <div style={{flex:1, minWidth: 0}}>
-                <div style={{fontSize:13, fontWeight: 500, color:"var(--c-ink)"}}>Aitana Vives</div>
-                <div className="eyebrow">Senior designer</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Nav items */}
-      <div className="scroll" style={{flex:1, overflowY:"auto", padding:"12px 12px"}}>
-        <div style={{display:"flex", flexDirection:"column", gap: 1}}>
-          {routes.map((r, i) => {
-            const showSection = i === 0 || r.section !== routes[i - 1].section;
-            const active = currentRoute === r.id
-              || (r.id === "briefs" && currentRoute === "brief-detail")
-              || (r.id === "bio" && currentRoute === "discovery")
-              || (r.id === "specialists" && currentRoute === "specialist-new")
-              || (r.id === "team" && currentRoute === "team-job");
-            return (
-              <React.Fragment key={r.id}>
-                {showSection && (
-                  <div className="eyebrow" style={{padding: i === 0 ? "4px 12px 8px" : "16px 12px 8px"}}>
-                    {r.section}
-                  </div>
-                )}
-                <button onClick={() => onNav(r.id)}
-                  className={"navitem" + (active ? " navitem--active" : "")}
-                  style={{border:"none", background: undefined, textAlign:"left", width:"100%"}}>
-                  <Icon name={r.icon} size={16} />
-                  <span>{r.label}</span>
-                  {r.id === "bio" && currentRoute !== "discovery" && bioScore < 70 && <BrandolphDot />}
-                </button>
-              </React.Fragment>
-            );
-          })}
-        </div>
-
-        {isClient && (
-          <>
-            <div className="eyebrow" style={{padding:"18px 12px 8px"}}>Brandolph</div>
-            <div className="card" style={{background:"var(--c-bg)", boxShadow:"none", padding:"10px 12px"}}>
-              <div style={{display:"flex", alignItems:"center", gap: 8, marginBottom: 6}}>
-                <BrandolphDot />
-                <span className="eyebrow eyebrow--yellow">Active</span>
-              </div>
-              <div style={{fontSize: 12, color:"var(--c-dim)", lineHeight: 1.4}}>
-                Reading your BIO. Watching the pricing relaunch through review.
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Credits / portal switch footer */}
-      {isClient ? (
-        <div style={{padding:"12px 16px", borderTop:"1px solid var(--c-line)"}}>
-          <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom: 6}}>
-            <span className="eyebrow">Credits</span>
-            <span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-dim)"}}>
-              <strong style={{color:"var(--c-ink)"}}>{credits.balance}</strong> / {credits.monthly > 0 ? credits.monthly : "∞"}
-            </span>
-          </div>
-          <div style={{height:6, background:"var(--c-line)", borderRadius: 999, overflow:"hidden"}}>
-            <div style={{
-              height:"100%", width: `${credits.monthly > 0 ? Math.min(100, (credits.balance / credits.monthly) * 100) : 100}%`,
-              background:"var(--yellow-500)", borderRadius:999, transition:"width 600ms ease",
-            }} />
-          </div>
-          <button className="btn btn--link" style={{marginTop: 8, fontSize:12}} onClick={() => onNav("credits")}>
-            View ledger →
-          </button>
-        </div>
-      ) : (
-        <div style={{padding:"12px 16px", borderTop:"1px solid var(--c-line)"}}>
-          <div className="eyebrow" style={{marginBottom:6}}>This week</div>
-          <div style={{display:"flex", justifyContent:"space-between", fontSize:13}}>
-            <span style={{color:"var(--c-dim)"}}>Jobs delivered</span>
-            <strong style={{fontFamily:"var(--font-mono)"}}>14</strong>
-          </div>
-          <div style={{display:"flex", justifyContent:"space-between", fontSize:13, marginTop: 4}}>
-            <span style={{color:"var(--c-dim)"}}>Credits earned</span>
-            <strong style={{fontFamily:"var(--font-mono)", color:"var(--green-600)"}}>+1,847</strong>
-          </div>
-        </div>
-      )}
-
-      <button
-        onClick={onLogout}
-        style={{
-          margin:"0 16px 16px", padding:"10px 12px",
-          background:"var(--neutral-900)", color:"#fff",
-          border:"none", borderRadius: 10,
-          fontFamily:"var(--font-mono)", fontSize:10.5, letterSpacing:"0.14em",
-          textTransform:"uppercase", fontWeight:500, cursor:"pointer",
-          display:"flex", alignItems:"center", justifyContent:"space-between",
-        }}
-      >
-        Log out
-        <Icon name="arrow" size={14} />
-      </button>
-    </nav>
   );
 }
 
@@ -583,14 +432,15 @@ function TopBar({ portal, route, brandName, go }) {
       <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap: 14}}>
         <NotificationBell />
         {isClient && (
-          <button onClick={() => go && go("home")}
+          <button onClick={() => go && go(route === "canvas" ? "briefs" : "home")}
             style={{
               display:"inline-flex", alignItems:"center", gap:7, height:32, padding:"0 14px",
               background:"var(--neutral-900)", color:"#fff", border:"none", borderRadius:9,
               fontFamily:"var(--font-sans)", fontWeight:600, fontSize:13, letterSpacing:"-0.01em",
               cursor:"pointer", boxShadow:"0 2px 6px rgba(0,0,0,0.18)",
             }}>
-            <Icon name="plus" size={14} /> Start a brief
+            <Icon name={route === "canvas" ? "arrowLeft" : "plus"} size={14} />
+            {route === "canvas" ? "Exit Canvas" : "Start a brief"}
           </button>
         )}
         {isClient && (
@@ -604,9 +454,11 @@ function TopBar({ portal, route, brandName, go }) {
   );
 }
 
-/* App-wide menu — a persistent, always-open sidebar with a prominent
-   brand logo at the top. No collapse. */
-function AppDock({ portal, currentRoute, onNav, onLogout }) {
+/* V3 app rail — compact by default and expandable on demand. The prototype
+   proved the interaction; this production version keeps live workspaces,
+   credits, account state, and role-aware routes. */
+const NAV_EXPANDED_KEY = "ci_nav_expanded";
+function AppDock({ portal, currentRoute, shellMode, onNav, onLogout }) {
   /* Admins see the client nav + the admin extras. Team users see their
      own nav unchanged. This keeps the admin's everyday surfaces intact
      and just adds operator tooling at the bottom of the dock. */
@@ -628,21 +480,60 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
   const homeRoute = portal === "team" ? "team" : "home";
   const isHome = currentRoute === homeRoute;
   const goHome = () => onNav(homeRoute);
+  const [expanded, setExpanded] = useShellState(() => {
+    try { return localStorage.getItem(NAV_EXPANDED_KEY) === "true"; }
+    catch { return false; }
+  });
+  const [profileOpen, setProfileOpen] = useShellState(false);
+  const credits = useLiveCredits();
+  const tier = useWorkspaceTier();
+  const currentBrandId = useCurrentBrandId();
+  const { brands } = useBrandList();
+  const currentBrand = brands.find((brand) => brand.id === currentBrandId) || brands[0];
+  const userName = window.CI_USER?.name || "Account";
+  const userInitials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "CA";
+  const planName = window.CI_TIERS?.[tier] || `Tier ${tier}`;
+
+  useShellEffect(() => {
+    if (shellMode !== "workspace") return;
+    setExpanded(false);
+    setProfileOpen(false);
+  }, [shellMode]);
+
+  useShellEffect(() => {
+    if (!profileOpen) return;
+    const onKey = (event) => { if (event.key === "Escape") setProfileOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [profileOpen]);
+
+  const toggleExpanded = () => {
+    const next = !expanded;
+    setExpanded(next);
+    setProfileOpen(false);
+    try { localStorage.setItem(NAV_EXPANDED_KEY, String(next)); } catch {}
+  };
+  const navigate = (routeId) => { setProfileOpen(false); onNav(routeId); };
+
   return (
-    <nav className="app-dock" aria-label="Navigation">
-      <button
-        className={"app-dock__logo" + (isHome ? "" : " app-dock__logo--linked")}
-        onClick={isHome ? undefined : goHome}
-        disabled={isHome}
-        title={isHome ? "CaastorOS" : "Back to dashboard"}
-        aria-label={isHome ? "CaastorOS" : "Back to dashboard"}
-      >
-        {!isHome && (
-          <span className="app-dock__back" aria-hidden="true"><Icon name="arrowLeft" size={13} /></span>
-        )}
-        <img src="caastor/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height:30, width:"auto", flexShrink:0}} />
-        <span className="app-dock__os">OS</span>
-      </button>
+    <nav className={`app-dock ${expanded ? "app-dock--expanded" : "app-dock--collapsed"}`} aria-label="Navigation" data-expanded={expanded}>
+      <div className="app-dock__head">
+        <button
+          className={"app-dock__logo" + (isHome ? "" : " app-dock__logo--linked")}
+          onClick={isHome ? undefined : goHome}
+          disabled={isHome}
+          title={isHome ? "CaastorOS" : "Back to dashboard"}
+          aria-label={isHome ? "CaastorOS" : "Back to dashboard"}
+        >
+          <span className="app-dock__brand-mark"><img src="caastor/assets/icon-white.svg" alt="" /></span>
+          <span className="app-dock__brand-name">CAASTOR<span className="app-dock__os">OS</span></span>
+        </button>
+        <button className="app-dock__toggle" onClick={toggleExpanded}
+          aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
+          aria-expanded={expanded} title={expanded ? "Collapse navigation" : "Expand navigation"}>
+          <Icon name={expanded ? "arrowLeft" : "arrow"} size={16} />
+        </button>
+      </div>
       {portal !== "team" && <WorkspaceSwitcher />}
       <div className="app-dock__items">
         {routes.map((r, i) => (
@@ -650,17 +541,39 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
             {(i === 0 || r.section !== routes[i - 1].section) && r.section && (
               <div className="app-dock__section">{r.section}</div>
             )}
-            <button className={"app-dock__item" + (isActive(r.id) ? " app-dock__item--active" : "")} onClick={() => onNav(r.id)}>
+            <button data-route={r.id} className={"app-dock__item" + (isActive(r.id) ? " app-dock__item--active" : "")} onClick={() => navigate(r.id)}
+              aria-label={r.label} title={expanded ? undefined : r.label}>
               <span className="app-dock__icon"><Icon name={r.icon} size={18} /></span>
-              <span>{r.label}</span>
+              <span className="app-dock__label">{r.label}</span>
             </button>
           </React.Fragment>
         ))}
       </div>
-      <button className="app-dock__item app-dock__logout" onClick={onLogout}>
-        <span className="app-dock__icon"><Icon name="arrowLeft" size={18} /></span>
-        <span>Log out</span>
-      </button>
+      <div className="app-dock__account">
+        <button className={"app-dock__profile-trigger" + (profileOpen ? " is-open" : "")}
+          onClick={() => setProfileOpen((open) => !open)} aria-expanded={profileOpen}
+          aria-label="Open account menu" title={expanded ? undefined : "Account"}>
+          {window.CI_USER?.avatar
+            ? <img className="app-dock__avatar" src={window.CI_USER.avatar} alt="" />
+            : <span className="app-dock__avatar app-dock__avatar--initials">{userInitials}</span>}
+          <span className="app-dock__profile-copy"><strong>{userName}</strong><small>{planName} plan</small></span>
+          <Icon name="chev" size={13} />
+        </button>
+        {profileOpen && (
+          <>
+            <button className="app-dock__profile-scrim" onClick={() => setProfileOpen(false)} aria-label="Close account menu" />
+            <aside className="app-dock__profile-menu" aria-label="Account menu">
+              <header>
+                <span className="app-dock__avatar app-dock__avatar--initials">{userInitials}</span>
+                <div><strong>{userName}</strong><small>{currentBrand?.name || "Workspace"} · {portal}</small></div>
+              </header>
+              <button onClick={() => navigate("credits")}><Icon name="credit" size={16} /><span><strong>Plan &amp; credits</strong><small>{credits.balance} credits available</small></span><Icon name="arrow" size={13} /></button>
+              <button onClick={() => navigate("settings")}><Icon name="settings" size={16} /><span><strong>Account settings</strong><small>Workspace and preferences</small></span><Icon name="arrow" size={13} /></button>
+              <button onClick={onLogout}><Icon name="arrowLeft" size={16} /><span><strong>Log out</strong><small>End this session</small></span></button>
+            </aside>
+          </>
+        )}
+      </div>
     </nav>
   );
 }
@@ -697,7 +610,7 @@ function App() {
      experiment was rolled back per user direction — keep the brand
      plumbing (switcher + data refetch) without recoloring the UI. */
   const currentBrandId = useCurrentBrandId();
-  const { brands: allBrands } = useBrandList();
+  const { brands: allBrands, loading: brandsLoading } = useBrandList();
   const currentBrandName = allBrands.find((b) => b.id === currentBrandId)?.name
                         || allBrands[0]?.name
                         || window.CI_BRAND?.name
@@ -713,13 +626,20 @@ function App() {
     if (session._recovery) return;                            // stay on the recovery form until new password set
     if (session._pending) return;                             // bootstrap profile lacks real role — wait for async resolve
     if (onLoginRoute) { go(session.role === "team" ? "team" : "home"); return; }
-    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery" || route.id === "specialist-new" || route.id === "canvas" || route.id === "board" || route.id === "upgrade";
+    const selectedBrand = allBrands.find((brand) => brand.id === currentBrandId) || allBrands[0];
+    const selectedName = String(selectedBrand?.name || "").trim().toLowerCase();
+    const selectedIsPlaceholder = !selectedName || ["my brand", "untitled brand", "new brand"].includes(selectedName);
+    if (!brandsLoading && (session.role === "client" || session.role === "admin") && route.id === "home" && selectedIsPlaceholder) {
+      go("onboarding");
+      return;
+    }
+    const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "onboarding" || route.id === "discovery" || route.id === "specialist-new" || route.id === "canvas" || route.id === "board" || route.id === "upgrade";
     const isTeamRoute  = TEAM_ROUTES.some(r => r.id === route.id) || route.id === "team-job";
     const isAdminRoute = ADMIN_ROUTES.some(r => r.id === route.id);
     if (session.role === "client" && !isClientRoute) go("home");
     if (session.role === "team"   && !isTeamRoute  ) go("team");
     if (session.role === "admin"  && !isClientRoute && !isAdminRoute) go("home");
-  }, [session, route.id, route.param, onLoginRoute]);
+  }, [session, route.id, route.param, onLoginRoute, brandsLoading, allBrands, currentBrandId]);
 
   /* Not signed in → show the matching login screen.
      OR signed in but in PASSWORD_RECOVERY state (user clicked the
@@ -739,14 +659,18 @@ function App() {
     go("login");
   };
 
+  if (route.id === "onboarding") {
+    return <Onboarding key={route.param || "default"} go={go} initialStep={route.param === "brand" ? 2 : route.param === "profile" ? 1 : undefined} />;
+  }
+
   return (
     <div className="app" data-screen-label={portal === "client" ? "Client portal" : "Team portal"}>
       <WorkspaceLogo shellMode={shellMode} />
-      <AppDock portal={portal} currentRoute={route.id} onNav={go} onLogout={logout} />
+      <AppDock portal={portal} currentRoute={route.id} shellMode={shellMode} onNav={go} onLogout={logout} />
       <div style={{display:"flex", flexDirection:"column", minWidth:0}}>
         <TopBar portal={portal} route={route.id} brandName={currentBrandName} go={go} />
         <main className="scroll" style={{flex:1, overflowY:"auto"}}>
-          <div className="route-view" key={route.id + "/" + (route.param || "")}>
+          <div className="route-view" key={route.id + "/" + (route.param || "") + "/" + (route.sub || "")}>
             <ScreenRouter route={route} go={go} tweaks={tweaks} setTweak={setTweak} />
           </div>
         </main>
@@ -765,12 +689,13 @@ function App() {
 function ScreenRouter({ route, go, tweaks, setTweak }) {
   switch(route.id) {
     case "home":         return <BrandolphHome tweaks={tweaks} setTweak={setTweak} go={go} />;
+    case "onboarding":   return <Onboarding go={go} initialStep={route.param === "brand" ? 2 : route.param === "profile" ? 1 : undefined} />;
     case "discovery":    return <Discovery go={go} newBrand={route.param === "new"} />;
     case "bio":          return <BioViewer go={go} bioScore={tweaks.bioScore} />;
     case "briefs":       return <BriefsLibrary go={go} />;
     case "library":      return <Library go={go} />;
     case "board":        return <BriefBoard id={route.param} go={go} />;
-    case "brief-detail": return <BriefBoard id={route.param} go={go} />;
+    case "brief-detail": return <LiveBriefDetail id={route.param} initialTab={route.sub} go={go} />;
     case "specialists":  return <SpecialistsDirectory go={go} />;
     case "specialist-new": return <SpecialistAuthor go={go} />;
     case "canvas":       return <CanvasView go={go} />;
@@ -1046,6 +971,6 @@ function PortalTweaks({ tweaks, setTweak, ds, setDs }) {
   );
 }
 
-Object.assign(window, { App, Sidebar, TopBar, Brandmark, AppDock });
+Object.assign(window, { App, TopBar, AppDock });
 
 export { App };

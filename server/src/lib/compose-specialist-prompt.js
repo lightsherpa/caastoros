@@ -14,7 +14,7 @@
 // which is fine — non-Anthropic models don't honor it anyway.
 // ─────────────────────────────────────────────────────────────────────
 
-const PLATFORM_PREAMBLE = `You are inside CaastorOS — a brand-methodology platform that lets a brand work like it has a senior CMO and a 33-person crew on call.
+const PLATFORM_PREAMBLE = `You are inside CaastorOS — a brand-methodology platform that lets a brand work like it has a senior CMO and a specialist crew on call.
 
 You are a senior L2 specialist on a brand's crew. Brandolph (the L1 operator) routed this task to you specifically because of your role. Every output you produce is read against the Brand Intelligence Object (BIO) below. The BIO has been certified by a senior human (the Brand Steward) — never contradict it.
 
@@ -73,7 +73,7 @@ function renderBioSlice(brand, bio, slices, refusals) {
     if (bio?.voice?.forbidden?.length) lines.push(`\nFORBIDDEN WORDS (never use, no exceptions): ${bio.voice.forbidden.join(", ")}`);
   }
 
-  if (include.has("palette") || include.has("type")) {
+  if (include.has("palette") || include.has("type") || include.has("imagery")) {
     if (bio?.visual?.palette?.length) lines.push(`\nPALETTE: ${bio.visual.palette.map((p) => `${p.name || ""} ${p.hex || ""}`.trim()).join(", ")}`);
     if (bio?.visual?.type?.length)    lines.push(`TYPE: ${bio.visual.type.map((t) => `${t.kind || ""}: ${t.family || ""}`).join(" · ")}`);
     if (bio?.visual?.imagery?.length) lines.push(`IMAGERY: ${bio.visual.imagery.join(" · ")}`);
@@ -105,7 +105,15 @@ function renderSpecLayer(spec) {
     p.method.forEach((m) => lines.push(`- ${m}`));
   }
   if (p.outputContract)   lines.push(`\nOUTPUT CONTRACT: ${p.outputContract}`);
+  if (p.evidenceContract) lines.push(`\nEVIDENCE CONTRACT: ${p.evidenceContract}`);
+  const handoffContract = p.handoffContract || p.handoffRequirements;
+  if (handoffContract)    lines.push(`\nHANDOFF CONTRACT: ${handoffContract}`);
+  if (p.structuredOutput) lines.push(`\nSTRUCTURED OUTPUT (VALID JSON ONLY): ${typeof p.structuredOutput === "string" ? p.structuredOutput : JSON.stringify(p.structuredOutput)}`);
   if (p.voice)            lines.push(`\nYOUR VOICE: ${p.voice}`);
+  if (Array.isArray(p.qaGates) && p.qaGates.length) {
+    lines.push(`\nQUALITY GATES (check each before shipping):`);
+    p.qaGates.forEach((g) => lines.push(`- ${g}`));
+  }
   if (Array.isArray(p.refusals) && p.refusals.length) {
     lines.push(`\nSPECIALIST REFUSALS:`);
     p.refusals.forEach((r) => lines.push(`- ${r}`));
@@ -116,11 +124,14 @@ function renderSpecLayer(spec) {
 function renderTaskLayer(brief, priorOutputs) {
   const lines = [`## TASK`, "", String(brief || "").trim()];
   if (Array.isArray(priorOutputs) && priorOutputs.length) {
-    lines.push(`\n## PRIOR OUTPUTS (read but don't repeat)`);
+    lines.push(`\n## PRIOR OUTPUTS — AUTHORITATIVE HANDOFFS`);
+    lines.push("Treat committed choices, named territories, approved copy, dimensions, and constraints below as upstream decisions. Build from them without paraphrasing them back. Preserve exact names and claims. If two handoffs conflict, name the conflict briefly and follow the BIO plus the newest explicit decision.");
     priorOutputs.forEach((o) => {
       const body = typeof o.body === "string" ? o.body : (o.body?.text || JSON.stringify(o.body || ""));
-      lines.push(`- [${o.kind || "output"}] ${body.slice(0, 240)}${body.length > 240 ? "…" : ""}`);
+      const owner = o.specialist_id ? ` · ${o.specialist_id}` : "";
+      lines.push(`\n### ${o.kind || "output"}${owner}\n${body.slice(0, 1600)}${body.length > 1600 ? "…" : ""}`);
     });
+    lines.push("\nYour output must make the next specialist's job easier: state final choices unambiguously and include every field required by your HANDOFF CONTRACT.");
   }
   return lines.join("\n");
 }

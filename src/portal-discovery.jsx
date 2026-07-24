@@ -177,10 +177,15 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
   /* Three-bucket source state (rev-2 §5.3). Empty arrays on mount.
      `Start extraction` fires the compile-bio Inngest event via
      /api/discovery/start; the SPA can then poll bios for the result. */
+  const onboardingPrefill = React.useMemo(() => {
+    try { return JSON.parse(sessionStorage.getItem("ci_onboarding_discovery") || "{}"); }
+    catch { return {}; }
+  }, []);
   const [uploadsByBucket, setUploadsByBucket] = useDState({ foundations: [], visual: [], voice: [] });
-  const [brandName, setBrandName] = useDState("");
-  const [url, setUrl] = useDState("");
-  const [instagram, setInstagram] = useDState("");
+  const [brandName, setBrandName] = useDState(onboardingPrefill.brandName || "");
+  const [existingBrand, setExistingBrand] = useDState(null);
+  const [url, setUrl] = useDState((onboardingPrefill.url || "").replace(/^https?:\/\//i, ""));
+  const [instagram, setInstagram] = useDState(onboardingPrefill.instagram || "");
   const [intake, setIntake] = useDState({ offer: "", audience: "", never: "", priority: "", competitors: "" });
   const [busy, setBusy] = useDState(false);
   const [error, setError] = useDState(null);
@@ -197,6 +202,32 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
     priority: intake.priority.trim(),
     competitors: intake.competitors.trim(),
   }).filter(([, value]) => value);
+
+  useDEffect(() => {
+    if (newBrand) return;
+    let alive = true;
+    (async () => {
+      const wantedId = window.getCurrentBrandId?.();
+      let brand = null;
+      if (wantedId) {
+        const { data } = await supabase.from("brands").select("id, name, url").eq("id", wantedId).maybeSingle();
+        brand = data;
+      }
+      if (!brand) {
+        const { data: brands } = await supabase
+          .from("brands")
+          .select("id, name, url")
+          .order("created_at", { ascending: true })
+          .limit(1);
+        brand = brands?.[0] || null;
+      }
+      if (!alive || !brand) return;
+      setExistingBrand(brand);
+      setBrandName((prev) => prev || brand.name || "");
+      setUrl((prev) => prev || (brand.url || "").replace(/^https?:\/\//i, ""));
+    })().catch(() => {});
+    return () => { alive = false; };
+  }, [newBrand]);
 
   const resolveExistingBrandId = async () => {
     const current = window.getCurrentBrandId?.();
@@ -281,7 +312,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
       }
       const res = await apiFetch("/api/discovery/start", {
         method: "POST",
-        body: JSON.stringify({ url: targetUrl, instagram, brandId }),
+        body: JSON.stringify({ url: targetUrl, instagram, brandId, brandName: brandName.trim() }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
@@ -289,6 +320,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
       }
       const { eventId } = await res.json();
       console.log("[Discovery] fired", { eventId, brandId, url: targetUrl });
+      try { sessionStorage.removeItem("ci_onboarding_discovery"); } catch {}
       onNext();
     } catch (err) {
       setError(err?.message || String(err));
@@ -320,7 +352,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
       <Reveal delay={150}>
         <div className="card" style={{padding: 28}}>
           <div style={{display:"flex", flexDirection:"column", gap: 18}}>
-            {newBrand && (
+            {(newBrand || existingBrand) && (
               <div>
                 <label style={{display:"block", fontSize:12, fontWeight:500, color:"var(--c-ink)", marginBottom: 8}}>
                   Brand name <span style={{color:"var(--pink-500)"}}>·</span>

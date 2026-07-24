@@ -1,82 +1,103 @@
 # Specialist creation & prompting — plan
 
-_Status: PLAN. How an L2 specialist is defined, prompted, routed, and authored. Builds on the data shapes already in `portal-data.js` (`CI_AGENTS`, `CI_DEPT_META`, `CI_MODELS`, `CI_BRAND`/BIO) and the drawer's "System prompt · summarised" placeholder._
+_Status: IMPLEMENTED for the 49-specialist non-motion/video scope. This plan reflects the expanded catalog currently defined in `src/portal-data.js`._
 
-## 1. What a specialist *is* (the record)
+## 0. Catalog baseline and completion scope
 
-Today each `CI_AGENTS` entry is display metadata: `id, code, dept, name, job, model, cr, status`. To make a specialist *runnable*, extend the record (or a parallel `CI_SPECIALIST_SPECS` map keyed by id) with a **prompt spec**:
+`CI_AGENTS` now contains **55 L2 specialists across seven departments**:
 
-```
+| Department | Catalog | Live | Completion scope |
+|---|---:|---:|---:|
+| Strategy | 6 | 6 | 6 |
+| Concept | 8 | 8 | 8 |
+| Copy | 11 | 11 | 11 |
+| Visual | 11 | 11 | 10 |
+| Web & UX | 7 | 7 | 7 |
+| Motion & Sound | 5 | 0 | 0 |
+| Research & Ops | 7 | 7 | 7 |
+| **Total** | **55** | **50** | **49** |
+
+This milestone is complete only when **all 49 non-motion/video specialists** have valid bespoke prompt specs, regardless of current status. Motion/video work is explicitly deferred: the five `Motion & Sound` records (`a27`, `a28`, `a50`, `a51`, `a52`) plus `a44 Style Frames` (video preproduction housed under Visual) are not part of this completion gate. Their existing draft specs may remain, but they do not count toward completion.
+
+`CI_SPECIALIST_SPECS` contains a complete bespoke entry for every in-scope specialist. The standalone test is the authoritative regression gate; static counts here must stay aligned with the catalog.
+
+`server/src/lib/specialist-spec-coverage.test.mjs` is the executable catalog gate. It evaluates `src/portal-data.js` and fails when any in-scope catalog record has no own entry in `CI_SPECIALIST_SPECS`, when that entry is missing a required core field, or when the bespoke map contains an unknown specialist id. Department templates are useful runtime fallbacks, but do not satisfy bespoke-spec completion.
+
+## 1. What a specialist spec is
+
+`CI_AGENTS` remains lean directory and routing metadata: `id, code, dept, name, job, model, cr, status`, with optional `internal`. Runnable behavior belongs in `CI_SPECIALIST_SPECS`, keyed by specialist id.
+
+Every in-scope bespoke spec must define these core fields directly:
+
+```js
 {
-  id, code, dept, name, model, cr, status,        // existing
-  role,            // one-line identity ("a conversion copywriter who…")
-  objective,       // what a good run produces
-  inputs: [...],   // what it reads: ["BIO", "brief", "prior outputs", "uploads"]
-  method: [...],   // ordered steps the specialist follows
-  outputContract,  // shape/length/format it must return + how it's judged
-  refusals: [...], // hard "won't do" rules (brand + safety)
-  voice,           // voice constraints (inherits brand voice, may narrow)
-  modelRouting,    // primary model + fallback + why
-  tools: [...],    // e.g. ["Exa search","image-gen","none"]
+  role,            // non-empty one-line identity
+  objective,       // non-empty statement of a successful run
+  method,          // non-empty ordered string[]
+  outputContract,  // non-empty shape, limits, and acceptance contract
+  voice,           // non-empty specialist-specific voice constraint
+  refusals,        // non-empty hard-rule string[]
+  bioSlices,       // non-empty BIO field-name string[]
 }
 ```
 
-`CI_DEPT_META` already gives department-level **capabilities / bestFor / turnaround / tierFrom** — the per-specialist spec narrows those to the individual.
+Optional fields such as `tools`, `inputs`, and `modelRouting` can be added as the runtime needs them. `CI_DEPT_SPECS` provides department defaults for composition and migration, while `CI_DEPT_META` provides shared `capabilities`, `bestFor`, `turnaround`, and `tierFrom`. Neither replaces the bespoke core fields above for an in-scope specialist.
 
 ## 2. The prompt is assembled, not authored as one blob
 
-A specialist's effective system prompt is **composed at run time** from four layers, so brand truth lives in one place and specialists stay small:
+A specialist's effective system prompt is composed at run time from four layers:
 
 ```
-[ PLATFORM PREAMBLE ]   constant — "you are an L2 specialist inside Caastor
-                        Intelligence; Brandolph (L1) routed this brief to you;
-                        you do not chat, you produce a deliverable."
+[ PLATFORM PREAMBLE ]   constant L2 role and operating constraints
         +
-[ BRAND CONTEXT (BIO) ] injected from the Brand Intelligence Object: positioning,
-                        voice, audience, mandatories, the forbidden-words list,
-                        the pricing formula — the canon every output is judged on.
+[ BRAND CONTEXT (BIO) ] the department-relevant BIO slice and brand refusals
         +
 [ SPECIALIST SPEC ]     role · objective · method · outputContract · refusals · voice
-                        (the per-specialist fields above)
         +
-[ TASK CONTEXT ]        the sharpened brief + relevant prior outputs/uploads for THIS run.
+[ TASK CONTEXT ]        sharpened brief + relevant prior outputs/uploads
 ```
 
-This mirrors the drawer's summarised prompt ("You are a {name}. You read the Brand Intelligence Object before responding. You write with conviction and refuse outputs that contradict the BIO…") — that sentence is the seam between PLATFORM PREAMBLE and BRAND CONTEXT, made real.
+This keeps brand truth centralized while making each specialist's judgment, process, and deliverable contract independently reviewable. A BIO change must not require edits to 49 specs.
 
-**Why layered:** the BIO changes (re-run discovery) without touching 33 specs; refusals can be set globally (brand) and extended per specialist; voice is inherited then narrowed.
+## 3. BIO grounding and refusals
 
-## 3. BIO grounding & refusals (the "shape not produce" guarantee)
+- Every prompt carries only the BIO slices relevant to that specialist's department.
+- Brand-global refusals are inherited; bespoke `refusals` narrow and extend them.
+- Brand Consistency QA (`a24`) applies those rules before an output becomes `approved`.
+- The team-side drawer exposes the composed PLATFORM + BIO + SPEC prompt and lists refusals in plain language.
 
-- Every prompt **must** carry the BIO slice relevant to the department (Copy gets voice + forbidden words; Design gets palette + type; Concept gets positioning + audience).
-- **Refusal rules** are first-class, not vibes. They already show up in the QA output ("No use of 'unlock' or 'limited'. Annual price respects 11.4× formula. Voice drift index 0.14 ≤ 0.20."). Encode them as a machine-checkable list on the brand + per specialist, and have the **Brand Consistency QA specialist (a24)** run them as a gate before an output is marked `approved`.
-- Surface refusals in the UI: the drawer's "Reveal full prompt (admin only)" expands to show PLATFORM + BIO + SPEC; a "Refusals" section lists the won't-dos in plain language for the client.
+The core-field gate checks authoring completeness, not semantic quality. Spec review and dry runs must still verify that each role, method, contract, voice, and refusal set is genuinely distinct and appropriate.
 
 ## 4. Model routing
 
-- `CI_MODELS` already maps each specialist to a model with a brand colour (team-only visibility). Make routing explicit in the spec: `modelRouting: { primary, fallback, reason }`.
-- **Client side:** hidden (they see "Specialist", not the model). **Team side:** shown via `ModelChip` + a one-line "routed to Opus because this needs long-context positioning judgment."
-- Routing belongs to the spec, not hardcoded in components — so changing a specialist's model is a data edit.
+- `CI_AGENTS[].model` remains the current catalog route key.
+- Persisted specs make routing explicit as `modelRouting: { primary, fallback, reason }` when seeded to the backend.
+- Clients see the specialist and department, never vendor/model details.
+- Team views may show the model plus the routing reason.
+- Routing is data, not component logic.
 
-## 5. Authoring flow (how a new specialist gets created)
+## 5. Authoring flow
 
-Phased, smallest-useful-first:
+1. **Close the coverage gap.** Author bespoke specs for every uncovered in-scope specialist until the standalone coverage test passes; the test output is the authoritative current gap.
+2. **Dry-run harness.** Run each specialist against a sample brief and BIO, then apply the refusal/QA gate before accepting the spec.
+3. **Admin authoring.** Add identity, core spec fields, routing, credits, tier, status, and a live composed-prompt preview.
+4. **Versioning and governance.** Changes to live specs create versions and retain the tested BIO version and diff.
+5. **Brandolph-assisted authoring.** Brandolph may propose a draft spec, but a human reviews it before activation.
 
-- **A — Admin authoring screen (team portal).** A "New specialist" form: identity (name, dept, code auto-suggested), the spec fields (role/objective/method/outputContract/refusals/voice), model routing, credit cost, tier, status (draft → live → soon). Live **prompt preview** pane that assembles the four layers against the current BIO so the author sees the real composed prompt.
-- **B — Test harness.** "Dry run" the specialist against a sample brief + the BIO; show the output and run the QA refusal gate on it. Iterate before setting `status: "live"`.
-- **C — Versioning & governance.** Specs are versioned; changing a live specialist creates a new version with a diff; the BIO version it was tested against is recorded. Ties into Settings → "rules that hold across every brief, every specialist."
-- **D — Brandolph-assisted authoring.** Brandolph proposes a spec from a plain-English description ("I need someone who writes launch emails for wholesale buyers") → pre-fills the form → author edits. Closes the loop with the L1 operator persona.
+Motion/video authoring, vendor integration, and activation are a later milestone and do not block steps 1-4 for the 49 in-scope specialists.
 
-## 6. How this connects to what's built
+## 6. Connections to the product
 
-- The **drawer** is the read view of a spec; "Reveal full prompt" → the composed-prompt preview (§2). Add a "Refusals" + "Reads from BIO" section.
-- **Assembly** (Create/Console): when Brandolph assembles a crew, each picked specialist contributes its spec; the run cost = Σ `cr`. This is the M3 "pending-assembly store" hook.
-- **Library/outputs** already carry `agentId` + a QA output — wire the QA gate (§3) to set an output's `status`.
+- The specialist drawer is the read view of a spec and its composed prompt.
+- Assembly contributes each selected specialist's spec and sums `cr` estimates.
+- Library outputs currently retain legacy `agentId` keys; the terminology migration can preserve compatibility while the UI says "specialist."
+- Seeded backend rows inherit catalog metadata and department metadata, but the source bespoke spec remains `CI_SPECIALIST_SPECS[specialist.id]`.
 
-## 7. Decisions to confirm before building any of this
+## 7. Completion criteria
 
-1. **Where do specs live** — extend `CI_AGENTS` records, or a separate `CI_SPECIALIST_SPECS` map? (Recommend separate map: keeps the directory list lean, specs load on demand.)
-2. **Refusals model** — brand-global list + per-specialist additions? (Recommend yes.)
-3. **Authoring surface** — team-portal admin screen (recommend) vs. settings sub-page.
-4. **Real vs mock** — this is still a prototype; first build the **composed-prompt preview + spec data** (no backend), then the authoring form, then (later) an actual model call.
-5. Whether to do the **code-identifier rename (M4)** before adding specs, so new code uses `specialist*` naming from the start.
+- `CI_AGENTS` evaluates to exactly the current 55-record catalog.
+- Every record outside the six deferred motion/video roles, regardless of status, has its own bespoke spec.
+- Each scoped spec has non-empty `role`, `objective`, `method`, `outputContract`, `voice`, `refusals`, and `bioSlices` fields of the expected type.
+- Every `CI_SPECIALIST_SPECS` key resolves to a catalog specialist id.
+- The standalone Node coverage test passes.
+- Motion/video remains deferred and cannot be used to claim or block completion of this milestone.

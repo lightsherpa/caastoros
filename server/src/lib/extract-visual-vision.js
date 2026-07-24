@@ -19,7 +19,7 @@ const VISUAL_VISION_SPEC = {
   payload: {
     name: "Visual Imagery Extractor",
     modelRouting: {
-      primary: "openrouter/google/gemini-2.5-flash",
+      primary: "openrouter/google/gemini-3.5-flash-lite",
       reason: "one-shot vision read of brand imagery; cheap + reliable JSON",
     },
     cr_estimate: 1,

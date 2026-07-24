@@ -64,10 +64,6 @@ export const FAL_ROUTES = {
   },
 };
 
-export function hasKey() {
-  return Boolean(process.env.FAL_API_KEY);
-}
-
 export function isImageRoute(route) {
   return typeof route === "string" && route.startsWith("vendor/fal/");
 }

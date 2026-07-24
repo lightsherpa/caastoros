@@ -32,6 +32,7 @@ import { composeSpecialistPrompt } from "../lib/compose-specialist-prompt.js";
 import { composeImagePrompt } from "../lib/compose-image-prompt.js";
 import { voiceQa } from "../lib/qa-voice.js";
 import { visionQa } from "../lib/qa-vision.js";
+import { checkVisualDirection, contractFromSpecialist, qaSpecialistOutput } from "../lib/qa-specialist-output.js";
 import { recordSignal } from "../lib/brandolph-memory.js";
 import { generate as generateImage, isImageRoute } from "../lib/models/fal-image.js";
 import { maxTokensForDeliverables, parseDeliverables, buildDeliverableContract, falSizeForPlatform } from "../lib/deliverables.js";
@@ -315,13 +316,46 @@ app.post("/stream", requireAuth, async (c) => {
         const qaUsage = { cost_usd: 0 };
         parsed.deliverables.forEach((d, i) => {
           const dq = dqResults[i];
-          if (!dq.passed) passedAll = false;
+          const visualQa = dlv.withVisualDirection
+            ? checkVisualDirection({ value: d, contract: { visualDirection: true } })
+            : { passed: true, issues: [] };
+          if (!dq.passed || !visualQa.passed) passedAll = false;
           if (typeof dq.usage?.cost_usd === "number") qaUsage.cost_usd += dq.usage.cost_usd;
-          deliverables.push({ ...d, platform: dlv.platform || "generic", qa: dq, status: dq.passed ? "approved" : "flagged" });
+          const combinedQa = {
+            ...dq,
+            passed: dq.passed && visualQa.passed,
+            violations: [
+              ...(dq.violations || []),
+              ...visualQa.issues.map((item) => `${item.code}: ${item.message}`),
+            ],
+            visual_direction_qa: visualQa,
+          };
+          deliverables.push({ ...d, platform: dlv.platform || "generic", qa: combinedQa, status: combinedQa.passed ? "approved" : "flagged" });
         });
-        qa = { passed: passedAll, voice_match: null, violations: [], usage: qaUsage, malformed: parsed.malformed, deliverable_count: deliverables.length };
+        qa = {
+          passed: passedAll && !parsed.malformed,
+          voice_match: null,
+          violations: parsed.malformed ? ["format.invalid_deliverables: Output did not match the required deliverables JSON contract."] : [],
+          usage: qaUsage,
+          malformed: parsed.malformed,
+          deliverable_count: deliverables.length,
+        };
       } else {
         qa = await voiceQa({ body: output, bio: brandBio.bio, refusals: brandBio.refusals });
+        const contractQa = qaSpecialistOutput({
+          output,
+          specialist: effectiveSpec,
+          contract: contractFromSpecialist(effectiveSpec),
+        });
+        qa = {
+          ...qa,
+          passed: qa.passed && contractQa.passed,
+          violations: [
+            ...(qa.violations || []),
+            ...contractQa.issues.map((item) => `${item.code}: ${item.message}`),
+          ],
+          contract_qa: contractQa,
+        };
       }
       await stream.writeSSE({ event: "qa", data: JSON.stringify(qa) });
 
