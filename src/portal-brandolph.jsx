@@ -425,7 +425,8 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
      through /api/runs/stream yet so we filter them out of the assembly. */
   const TEXT_MODELS  = new Set(["opus", "sonnet", "haiku", "gpt5", "gemFlash36", "gemFlash"]);
   const IMAGE_MODELS = new Set(["flux", "fluxSchnell", "gptimage", "recraft"]);
-  const RUNNABLE = (m) => TEXT_MODELS.has(m) || IMAGE_MODELS.has(m);
+  const TOOL_MODELS  = new Set(["exa"]);   // web research (exa); v0/framer specialists rerouted to Sonnet
+  const RUNNABLE = (m) => TEXT_MODELS.has(m) || IMAGE_MODELS.has(m) || TOOL_MODELS.has(m);
   const rawAssembly = useBMemo(() => getAssembly(tweaks.assemblyDensity || 7), [tweaks.assemblyDensity]);
   const assembly = useBMemo(() => ({
     ...rawAssembly,

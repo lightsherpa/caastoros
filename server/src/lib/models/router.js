@@ -21,6 +21,7 @@
 
 import * as anthropic from "./anthropic.js";
 import * as openrouter from "./openrouter.js";
+import * as exa from "./exa.js";
 
 /**
  * Stream a text completion through the right vendor.
@@ -62,7 +63,15 @@ export async function* streamCompletion({ spec, system, messages, maxTokens }) {
     return;
   }
 
+  // Web research via Exa (not a chat model — yields formatted findings as a
+  // single block, then done, so it flows through this same text path).
+  if (route.startsWith("vendor/exa")) {
+    yield* exa.streamCompletion({ model: route, system, messages, maxTokens: budget });
+    return;
+  }
+
   if (route.startsWith("vendor/")) {
+    // fal (image) is handled by runs.js; gamma/elevenlabs aren't integrated yet.
     yield { type: "error", message: `Non-text vendor route "${route}" — use image/web/search modules, not the text router.` };
     return;
   }
@@ -91,5 +100,6 @@ export function isRouteAvailable(route) {
   if (typeof route !== "string") return false;
   if (route.startsWith("anthropic/")) return anthropic.hasKey();
   if (route.startsWith("openrouter/")) return openrouter.hasKey();
+  if (route.startsWith("vendor/exa")) return exa.hasKey();
   return false;
 }

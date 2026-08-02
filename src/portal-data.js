@@ -103,9 +103,9 @@ window.CI_AGENTS = [
   { id:"a46", code:"L2-46", dept:"Visual", name:"Lifestyle / Product Photo",job:"Style direction + image gen for ecom + lifestyle photography.",                                       model:"fluxSchnell",     cr:10, status:"live" },
 
   // Web & UX (7) — was "Web & Email"; Iconography moved IN; Motion/Deck moved OUT
-  { id:"a25", code:"L2-25", dept:"Web & UX", name:"Page Composer",    job:"Landing + product pages, structured for v0/Framer.",                                                       model:"v0",       cr:16, status:"live" },
-  { id:"a26", code:"L2-26", dept:"Web & UX", name:"Email Build",      job:"Email HTML with Klaviyo + Customer.io conventions.",                                                       model:"v0",       cr:10, status:"live" },
-  { id:"a29", code:"L2-29", dept:"Web & UX", name:"Framer Builder",   job:"Framer-native sites for marketing surfaces.",                                                              model:"framer",   cr:14, status:"live" },
+  { id:"a25", code:"L2-25", dept:"Web & UX", name:"Page Composer",    job:"Landing + product pages, structured for v0/Framer.",                                                       model:"sonnet",   cr:16, status:"live" },
+  { id:"a26", code:"L2-26", dept:"Web & UX", name:"Email Build",      job:"Email HTML with Klaviyo + Customer.io conventions.",                                                       model:"sonnet",   cr:10, status:"live" },
+  { id:"a29", code:"L2-29", dept:"Web & UX", name:"Framer Builder",   job:"Framer-native sites for marketing surfaces.",                                                              model:"sonnet",   cr:14, status:"live" },
   { id:"a23", code:"L2-23", dept:"Web & UX", name:"Iconography",      job:"Custom icons consistent with the visual identity — UI primitives, not identity marks.",                    model:"recraft",  cr:6,  status:"live" },
   { id:"a47", code:"L2-47", dept:"Web & UX", name:"Component Library", job:"Design tokens + component kit — the building blocks for the system.",                                      model:"haiku",   cr:8,  status:"live" },
   { id:"a48", code:"L2-48", dept:"Web & UX", name:"Email Designer",    job:"Visual email templates — layout, hierarchy, modules. Hands off to Email Build for HTML.",                  model:"fluxSchnell",     cr:7,  status:"live" },

@@ -84,11 +84,10 @@ const MODEL_MAP = {
   fluxSchnell: "vendor/fal/flux-schnell",     /* Schnell — drafts, variants, social: $0.003/img (13× cheaper) */
   recraft:     "vendor/fal/recraft-v3",
   // Other non-text vendors — wired in later phases
-  exa:         "vendor/exa",
-  elevenlabs:  "vendor/elevenlabs",
-  v0:          "vendor/v0",
-  gamma:       "vendor/gamma",
-  framer:      "vendor/framer",
+  exa:         "vendor/exa/search",          /* Exa web research (Site Scanner, Competitor Map) */
+  elevenlabs:  "vendor/elevenlabs",           /* not integrated (audio — deferred) */
+  gamma:       "vendor/gamma",                /* not integrated (decks — deferred) */
+  /* v0/framer removed — Page Composer, Email Build, Framer Builder route to Sonnet (see CI_AGENTS). */
 };
 
 function resolveRoute(shortKey) {
