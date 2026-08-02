@@ -71,12 +71,12 @@ console.log(`Departments: ${Object.keys(CI_DEPT_SPECS).join(", ")}`);
 //                          dedicated modules in P5+; the text router rejects this prefix.
 const MODEL_MAP = {
   // Anthropic (text) — direct
-  opus:        "anthropic/claude-opus-4-7",
+  opus:        "anthropic/claude-opus-5",   /* Opus 5 — same $5/$25 as 4.7, better reasoning, 512-token cache min (4.7 was 2048) */
   sonnet:      "anthropic/claude-sonnet-4-6",
   haiku:       "anthropic/claude-haiku-4-5-20251001",
   // Non-Claude text → OpenRouter
   gpt5:        "openrouter/openai/gpt-5",
-  gemPro:      "openrouter/google/gemini-3.6-flash",
+  gemFlash36:  "openrouter/google/gemini-3.6-flash",   /* was misnamed "gemPro" — it is Flash, not Pro */
   gemFlash:    "openrouter/google/gemini-3.5-flash-lite",
   // Image — all via fal.ai (one key, one bill, multiple models)
   gptimage:    "vendor/fal/gpt-image-2",      /* real GPT Image 2 via fal (openai/gpt-image-2) */

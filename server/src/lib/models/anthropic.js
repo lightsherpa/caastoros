@@ -49,6 +49,14 @@ export async function* streamCompletion({ model, system, messages, maxTokens = 8
     const run = client.messages.stream({
       model,
       max_tokens: maxTokens,
+      // Thinking OFF, explicitly. On Opus 4.7 / Sonnet 4.6 omitting this meant
+      // "no thinking"; on Opus 5 / Sonnet 5 omitting it means adaptive thinking
+      // is ON — and max_tokens caps thinking + response text TOGETHER. Our
+      // budgets are small (router derives cr_estimate*100, floor 200), so a
+      // thinking-on model would burn the whole budget before emitting a word.
+      // Turning thinking on is a per-specialist decision that must come with a
+      // raised budget; it is not a free side effect of a model upgrade.
+      thinking: { type: "disabled" },
       system,                  // SDK accepts string OR array-of-blocks; cache_control passes through
       messages: messages.map((m) => ({
         role: m.role === "assistant" ? "assistant" : "user",

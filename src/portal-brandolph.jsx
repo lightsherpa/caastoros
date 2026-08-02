@@ -423,7 +423,7 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
   /* Wired models — text (Anthropic + OpenRouter) AND image (fal.ai).
      Other vendors (exa/v0/gamma/framer/elevenlabs) aren't dispatched
      through /api/runs/stream yet so we filter them out of the assembly. */
-  const TEXT_MODELS  = new Set(["opus", "sonnet", "haiku", "gpt5", "gemPro", "gemFlash"]);
+  const TEXT_MODELS  = new Set(["opus", "sonnet", "haiku", "gpt5", "gemFlash36", "gemFlash"]);
   const IMAGE_MODELS = new Set(["flux", "fluxSchnell", "gptimage", "recraft"]);
   const RUNNABLE = (m) => TEXT_MODELS.has(m) || IMAGE_MODELS.has(m);
   const rawAssembly = useBMemo(() => getAssembly(tweaks.assemblyDensity || 7), [tweaks.assemblyDensity]);
@@ -457,6 +457,26 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
     }
     return assembly;
   }, [sharp.data, assembly]);
+
+  /* §7 live credit estimate — swaps the static cr sum for a trailing-30d
+     COMPUTED total at crew-approval time. Crew-scoped (no brief needed).
+     Refetches only when the crew id-set changes; always falls back to the
+     static realAssembly.totalCr on load/error/crew-mismatch so the number
+     never blanks and the static cr computation stays as the fallback. */
+  const [liveEstimate, setLiveEstimate] = useBState(null);
+  const crewKey = realAssembly.agents.map((a) => a.id).join(",");
+  useBEffect(() => {
+    if (phase !== "proposing" || !crewKey) return;
+    let alive = true;
+    apiFetch(`/api/briefs/estimate?crew=${encodeURIComponent(crewKey)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d && typeof d.total_credits === "number") setLiveEstimate({ ...d, crewKey }); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [crewKey, phase]);
+  const displayCredits = (liveEstimate && liveEstimate.crewKey === crewKey)
+    ? liveEstimate.total_credits
+    : realAssembly.totalCr;
 
   const creditBalance = snapshot.credits?.balance;
   const bioLabel = snapshot.bio ? `BIO v${snapshot.bio.version} · ${snapshot.bio.score ?? "—"}/100` : "BIO unavailable";
@@ -513,7 +533,7 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
       orchestrationRationale: briefDraft.direction || sharp.data?.orchestrationRationale || sharp.data?.deliveryPlan?.orchestrationRationale || "",
       specialistIds: realAssembly.agents.map((a) => a.id),
       deliveryPlan:  sharp.data?.deliveryPlan || null,
-      totalCr:       realAssembly.totalCr,
+      totalCr:       displayCredits,
       briefApprovedAt: new Date().toISOString(),
       approvalState: "brief-approved",
       ts:            Date.now(),
@@ -862,7 +882,7 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
                           {phase === "done" ? "Assembly · complete" : "Assembly · ready to run"}
                         </div>
                         <div style={{fontSize: 15, fontWeight: 500, color:"var(--c-ink)"}}>
-                          {realAssembly.agents.length} specialists · {realAssembly.totalCr} credits
+                          {realAssembly.agents.length} specialists · {displayCredits} credits
                         </div>
                         <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginTop: 3, letterSpacing:"0.04em"}}>
                           {[...new Set(realAssembly.agents.map(a => a.dept))].join(" · ")}
@@ -923,17 +943,17 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
                     }}>
                       <div style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-dim)"}}>
                         Total{" "}
-                        <strong style={{color:"var(--c-ink)"}}>{realAssembly.totalCr} cr</strong>
+                        <strong style={{color:"var(--c-ink)"}}>{displayCredits} cr</strong>
                         {typeof creditBalance === "number" && (
                           <>
                             <span style={{color:"var(--c-faint)", margin:"0 8px"}}>·</span>
-                            {Math.max(0, creditBalance - (phase === "done" ? realAssembly.totalCr : 0))} remaining after
+                            {Math.max(0, creditBalance - (phase === "done" ? displayCredits : 0))} remaining after
                           </>
                         )}
                       </div>
                       {phase === "proposing" && (
                         <button className="btn btn--primary" onClick={handleRun}>
-                          Run — {realAssembly.totalCr} credits <Icon name="arrow" size={14} />
+                          Run — {displayCredits} credits <Icon name="arrow" size={14} />
                         </button>
                       )}
                       {phase === "running" && (

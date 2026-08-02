@@ -38,12 +38,12 @@ window.CI_CREDITS = {
 
 /* AI models referenced by agents ---------------------------------- */
 window.CI_MODELS = {
-  opus:        { label: "Opus 4.1",        color: "var(--model-opus)"        },
+  opus:        { label: "Opus 5",          color: "var(--model-opus)"        },
   sonnet:      { label: "Sonnet 4.6",      color: "var(--model-sonnet)"      },
   haiku:       { label: "Haiku 4.5",       color: "var(--model-haiku)"       },
   gpt5:        { label: "GPT-5",           color: "var(--model-gpt5)"        },
   gptimage:    { label: "GPT-Image",       color: "var(--model-gptimage)"    },
-  gemPro:      { label: "Gemini Pro",      color: "var(--model-gem-pro)"     },
+  gemFlash36:  { label: "Gemini 3.6 Flash", color: "var(--model-gem-pro)"    },
   gemFlash:    { label: "Gemini Flash",    color: "var(--model-gem-flash)"   },
   flux:        { label: "Flux 1.1 Pro",    color: "var(--model-flux)"        },
   fluxSchnell: { label: "Flux Schnell",    color: "var(--model-flux)"        },
@@ -64,7 +64,7 @@ window.CI_AGENTS = [
   { id:"a03", code:"L2-03", dept:"Strategy", name:"The Strategist",     job:"Comms plan, channel rationale, sequencing.",                                                              model:"sonnet",   cr:6,  status:"live" },
   { id:"a04", code:"L2-04", dept:"Strategy", name:"The Tension-Finder", job:"Surfaces the contradictions a CMO would want named.",                                                     model:"sonnet",     cr:8,  status:"live" },
   { id:"a05", code:"L2-05", dept:"Strategy", name:"The Refuser",        job:"Says no with reasons. Owns the 'what we are not doing'.",                                                 model:"haiku",   cr:4,  status:"live" },
-  { id:"a34", code:"L2-34", dept:"Strategy", name:"Audience Profiler",  job:"Deep persona work from the BIO. The audience as a senior would describe them, not a CRM segment.",       model:"gemPro",     cr:7,  status:"live" },
+  { id:"a34", code:"L2-34", dept:"Strategy", name:"Audience Profiler",  job:"Deep persona work from the BIO. The audience as a senior would describe them, not a CRM segment.",       model:"gemFlash36",     cr:7,  status:"live" },
 
   // Concept (8) — added Mood Board + Campaign Architect; all six original now live
   { id:"a06", code:"L2-06", dept:"Concept", name:"The Territory Mapper", job:"Three creative territories per brief, with the recommended one named.",                                  model:"sonnet",   cr:6,  status:"live" },
@@ -84,8 +84,8 @@ window.CI_AGENTS = [
   { id:"a16", code:"L2-16", dept:"Copy", name:"Social Captions",   job:"Captions that hold voice across platforms.",                                                                   model:"sonnet",  cr:3,  status:"live" },
   { id:"a17", code:"L2-17", dept:"Copy", name:"Microcopy & UX",    job:"Form labels, error states, onboarding micro.",                                                                 model:"haiku",    cr:2,  status:"live" },
   { id:"a18", code:"L2-18", dept:"Copy", name:"Voice QA",          job:"Reads finished copy against the BIO. Flags drift.",                                                            model:"haiku",    cr:2,  status:"live" },
-  { id:"a37", code:"L2-37", dept:"Copy", name:"Headlines",         job:"20 headline variants in one pass — for the press, the page, the deck.",                                       model:"gemPro",   cr:3,  status:"live" },
-  { id:"a38", code:"L2-38", dept:"Copy", name:"Ad Copy",           job:"Paid social, search, display variants — sized per platform spec.",                                              model:"gemPro",   cr:5,  status:"live" },
+  { id:"a37", code:"L2-37", dept:"Copy", name:"Headlines",         job:"20 headline variants in one pass — for the press, the page, the deck.",                                       model:"gemFlash36",   cr:3,  status:"live" },
+  { id:"a38", code:"L2-38", dept:"Copy", name:"Ad Copy",           job:"Paid social, search, display variants — sized per platform spec.",                                              model:"gemFlash36",   cr:5,  status:"live" },
   { id:"a39", code:"L2-39", dept:"Copy", name:"Product Copy",      job:"Descriptions, features, benefit ladders. The ecom workhorse.",                                                  model:"gemFlash",   cr:6,  status:"live" },
   { id:"a40", code:"L2-40", dept:"Copy", name:"Press & Bio",       job:"Releases, founder bios, about pages, partnership announcements.",                                              model:"sonnet",   cr:8,  status:"live" },
 
@@ -119,13 +119,13 @@ window.CI_AGENTS = [
   { id:"a52", code:"L2-52", dept:"Motion & Sound", name:"Sonic Logo",        job:"Audio brand cues — sonic logos, intros, transitions.",                                               model:"elevenlabs", cr:8,  status:"soon" },
 
   // Research & Ops (7) — was "AI Discovery & Ops"; BIO Compiler + Audit marked internal (hidden from directory)
-  { id:"a30", code:"L2-30", dept:"Research & Ops", name:"BIO Compiler",       job:"Compiles the Brand Intelligence Object from intake.",                                                model:"gemPro",     cr:10, status:"live", internal:true },
+  { id:"a30", code:"L2-30", dept:"Research & Ops", name:"BIO Compiler",       job:"Compiles the Brand Intelligence Object from intake.",                                                model:"gemFlash36",     cr:10, status:"live", internal:true },
   { id:"a31", code:"L2-31", dept:"Research & Ops", name:"Site Scanner",       job:"Scrapes + scores brand surfaces. Powers extraction.",                                                model:"exa",      cr:3,  status:"live" },
   { id:"a32", code:"L2-32", dept:"Research & Ops", name:"Competitor Map",     job:"Maps the category. Names the table around the brand.",                                              model:"exa",      cr:4,  status:"live" },
   { id:"a33", code:"L2-33", dept:"Research & Ops", name:"Audit & Ledger",     job:"Reconciles spend, flags variance, writes invoices.",                                                model:"haiku",    cr:1,  status:"live", internal:true },
   { id:"a53", code:"L2-53", dept:"Research & Ops", name:"SEO Brief",          job:"Content briefs with keyword targets + AEO structure.",                                              model:"gemFlash",   cr:5,  status:"live" },
   { id:"a54", code:"L2-54", dept:"Research & Ops", name:"Trend Snapshot",     job:"Cultural + category read against the brief. What's moving right now.",                              model:"gemFlash", cr:3,  status:"live" },
-  { id:"a55", code:"L2-55", dept:"Research & Ops", name:"Insights Synthesis", job:"Turns interview transcripts, surveys, NPS into a one-page CMO read.",                                model:"gemPro",   cr:7,  status:"live" },
+  { id:"a55", code:"L2-55", dept:"Research & Ops", name:"Insights Synthesis", job:"Turns interview transcripts, surveys, NPS into a one-page CMO read.",                                model:"gemFlash36",   cr:7,  status:"live" },
 ];
 
 window.CI_DEPTS = ["Strategy","Concept","Copy","Visual","Web & UX","Motion & Sound","Research & Ops"];

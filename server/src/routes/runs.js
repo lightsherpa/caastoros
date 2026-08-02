@@ -37,6 +37,7 @@ import { recordSignal } from "../lib/brandolph-memory.js";
 import { generate as generateImage, isImageRoute } from "../lib/models/fal-image.js";
 import { maxTokensForDeliverables, parseDeliverables, buildDeliverableContract, falSizeForPlatform } from "../lib/deliverables.js";
 import { assertCreditsAvailable, creditErrorResponse, estimateRunCredits } from "../lib/credits.js";
+import { reconcileRunCost } from "../lib/pricing.js";
 
 const app = new Hono();
 
@@ -359,12 +360,48 @@ app.post("/stream", requireAuth, async (c) => {
       }
       await stream.writeSSE({ event: "qa", data: JSON.stringify(qa) });
 
-      /* 5. Update runs with completion stats + cost. */
+      /* 5. Update runs with completion stats + reconciled cost (§7).
+         Real cost from token/image usage priced at the pricing row in force
+         when the run started; QA model calls fold in via extraCostUsd. The
+         cost engine never throws into this path — reconcileRunCost returns an
+         error string instead. A run MUST NEVER fail because costing failed:
+         on error we persist cost_usd null + the flag and charge the cr
+         estimate (creditsDebited) as the fallback charge. */
       const endedIso = new Date().toISOString();
       const latencyMs = Date.parse(endedIso) - Date.parse(startedIso);
-      const baseCost = usage?.cost_usd ?? null;
-      const qaCost = qa.usage?.cost_usd ?? null;
-      const totalCost = baseCost != null || qaCost != null ? (baseCost || 0) + (qaCost || 0) : null;
+
+      /* Map the normalized vendor usage → cost-engine buckets. This codebase
+         only ever writes the 5m ephemeral cache, so cache_creation_tokens →
+         cache_write_5m_tokens; 1h is always 0. batched:false (streaming path,
+         not the Batch API). */
+      const costUsage = {
+        input_tokens:          usage?.prompt_tokens || 0,
+        cache_read_tokens:     usage?.cached_tokens || 0,
+        cache_write_5m_tokens: usage?.cache_creation_tokens || 0,
+        cache_write_1h_tokens: 0,
+        output_tokens:         usage?.completion_tokens || 0,
+        batched: false,
+      };
+      const recon = await reconcileRunCost({
+        route,
+        usage: costUsage,
+        images: isImage ? 1 : 0,
+        startedAt: startedIso,
+        vendorCostUsd: usage?.cost_usd ?? null,     // OpenRouter + fal report this; Anthropic doesn't
+        extraCostUsd: qa.usage?.cost_usd || 0,      // QA (voice/vision) model calls
+      });
+      const creditsCharged = recon.error ? creditsDebited : recon.credits;
+      if (recon.error) {
+        console.error("[runs] costing failed run", runId, route, recon.error, "— charging cr fallback", creditsDebited);
+      }
+      const usagePersist = {
+        ...costUsage,
+        images:         isImage ? 1 : 0,
+        provider:       usage?.provider || null,
+        model:          modelUsed || null,
+        vendor_cost_usd: usage?.cost_usd ?? null,
+        qa_cost_usd:    qa.usage?.cost_usd || 0,
+      };
 
       await supabaseAdmin.from("runs").update({
         status: "completed",
@@ -372,7 +409,11 @@ app.post("/stream", requireAuth, async (c) => {
         prompt_tokens: usage?.prompt_tokens,
         completion_tokens: usage?.completion_tokens,
         cached_tokens: usage?.cached_tokens,
-        cost_usd: totalCost,
+        usage: usagePersist,
+        cost_usd: recon.cost_usd,
+        credits_charged: creditsCharged,
+        pricing_row_id: recon.pricing_row_id,
+        cost_error: recon.error,
         ended_at: endedIso,
         latency_ms: latencyMs,
       }).eq("id", runId);
@@ -427,9 +468,9 @@ app.post("/stream", requireAuth, async (c) => {
       await supabaseAdmin.from("ledger").insert({
         workspace_id: workspaceId,
         run_id: runId,
-        credits: creditsDebited,
+        credits: creditsCharged,
         kind: qa.passed ? "run" : "run_flagged",
-        balance_after: creditCheck.balance - creditsDebited,
+        balance_after: creditCheck.balance - creditsCharged,
       });
 
       /* Brandolph memory · signal this run + any re-run/revision context. */
@@ -513,7 +554,7 @@ app.post("/stream", requireAuth, async (c) => {
             name: spec.payload?.name,
             version: spec.version,
           },
-          credits_debited: creditsDebited,
+          credits_debited: creditsCharged,
         }),
       });
     } catch (err) {

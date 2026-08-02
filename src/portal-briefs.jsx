@@ -2290,7 +2290,7 @@ function BriefRunCanvas({ context, onClear, go }) {
    specialists get image models. The cost-default already picked the
    right one — these are for "escalate to premium" or "try cheaper". */
 const TEXT_RERUN_OPTIONS = [
-  { route: "anthropic/claude-opus-4-7",            label: "Opus 4.7",            note: "Premium — deepest reasoning" },
+  { route: "anthropic/claude-opus-5",              label: "Opus 5",              note: "Premium — deepest reasoning" },
   { route: "anthropic/claude-sonnet-4-6",          label: "Sonnet 4.6",          note: "Balanced workhorse" },
   { route: "anthropic/claude-haiku-4-5-20251001",  label: "Haiku 4.5",           note: "Fast + cheap" },
   { route: "openrouter/google/gemini-3.6-flash",       label: "Gemini 3.6 Flash",      note: "Current high-quality synthesis" },
