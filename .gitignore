@@ -20,3 +20,6 @@ Caastor V3/
 .impeccable/
 artifacts/
 website/local-preview/
+
+# Built/inlined explainer output (the source .html is tracked; this is generated)
+*.selfcontained.html

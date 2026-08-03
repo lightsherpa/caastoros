@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CaastorOS — Explainer 90s</title>
+<!-- Explainer 90s · cliente (startups/PyMEs) · CTA "Reserva tu demo" · ES-ES · 16:9 · voz en off + música.
+     7 frames (.slide) de 1280×720. Design system lifted verbatim del deck iLab.
+     Importar a Adobe Express con selector .slide → animar transiciones → exportar MP4.
+     Guion de voz en off (≈197 palabras / ~131 wpm): ver los comentarios "VO:" de cada escena. -->
+<meta name="hz:slide-selector" content=".slide" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans+Condensed:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --yellow:#F8C036; --yellow-dim:#C49726;
+    --ink:#0E0D0C; --ink-2:#161514;
+    --white:#F5F4F0; --faint:#999894; --dim:#6B6B6B;
+    --line:rgba(255,255,255,0.07); --line-2:rgba(255,255,255,0.04);
+    --mint:#5EC4A8; --purple:#9B7FE8; --pink:#E86F8A; --blue:#5B9BD5; --orange:#E8874A; --green:#5EC477;
+    --font-sans:'IBM Plex Sans Condensed', system-ui, sans-serif;
+    --font-body:'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ background:#000; color:var(--white); font-family:var(--font-body); -webkit-font-smoothing:antialiased; }
+  body{ padding:28px 0; display:flex; flex-direction:column; align-items:center; gap:28px; }
+
+  /* one .slide = one video frame */
+  .slide{ width:1280px; height:720px; position:relative; background:var(--ink); padding:58px 76px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 30px 90px rgba(0,0,0,0.6); }
+  .center-slide{ align-items:center; justify-content:center; text-align:center; }
+  .tint{ background:rgba(248,192,54,0.02); }
+
+  .eyebrow{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--yellow); display:block; margin-bottom:16px; }
+  h1{ font-family:var(--font-sans); font-weight:700; font-size:76px; line-height:0.98; letter-spacing:-0.025em; color:var(--white); }
+  h1 em{ color:var(--yellow); font-style:normal; }
+  h2{ font-family:var(--font-sans); font-weight:700; font-size:44px; line-height:1.05; letter-spacing:-0.02em; color:var(--white); }
+  h2 em{ color:var(--yellow); font-style:italic; }
+  .insight-h{ font-family:var(--font-sans); font-weight:700; font-size:56px; line-height:1.04; letter-spacing:-0.03em; color:var(--white); }
+  .insight-h em{ color:var(--yellow); font-style:italic; }
+  .body{ font-family:var(--font-body); font-weight:300; font-size:17px; line-height:1.6; color:var(--faint); }
+  .body strong{ color:var(--white); font-weight:400; }
+  .lead-faint{ font-family:var(--font-body); font-weight:300; font-size:19px; line-height:1.55; color:var(--faint); max-width:820px; }
+  .lead-faint strong{ color:var(--white); font-weight:400; }
+  .kicker-foot{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); margin-top:28px; }
+  .kicker-foot b{ color:var(--white); font-weight:500; }
+
+  .hero-grid{ position:absolute; inset:0; background-image:radial-gradient(rgba(248,192,54,0.05) 1px, transparent 1px); background-size:54px 54px; opacity:0.7; pointer-events:none; }
+  .hero-radial{ position:absolute; inset:0; background:radial-gradient(ellipse 70% 60% at 50% 0%, rgba(248,192,54,0.10), transparent 60%); pointer-events:none; }
+
+  .topbar{ display:flex; align-items:center; gap:14px; position:relative; z-index:2; }
+  .topbar img{ height:26px; width:auto; }
+  .nav-sub{ font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--faint); text-transform:uppercase; }
+
+  /* mascot — inline SVG, 2-tone: yellow body, ink features */
+  .brandolph{ position:absolute; pointer-events:none; animation:float 6s ease-in-out infinite; }
+  .brandolph path, .brandolph rect{ fill:var(--ink); }
+  .brandolph .st3{ fill:var(--yellow); }
+  @keyframes float{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-12px);} }
+
+  .tagsrow{ display:flex; flex-wrap:wrap; gap:9px; margin-top:30px; position:relative; z-index:2; }
+  .mtag{ font-family:var(--font-mono); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); border:1px solid var(--line); border-radius:30px; padding:8px 16px; background:rgba(255,255,255,0.02); }
+  .mtag.sig{ color:var(--ink); background:var(--yellow); border-color:var(--yellow); }
+
+  .pain{ list-style:none; display:flex; flex-direction:column; gap:1px; background:var(--line); border-radius:12px; overflow:hidden; margin-top:30px; }
+  .pain li{ background:var(--ink-2); padding:22px 26px; display:flex; gap:20px; align-items:flex-start; }
+  .pain .n{ font-family:var(--font-mono); font-size:13px; color:var(--yellow); padding-top:3px; }
+  .pain strong{ display:block; font-family:var(--font-sans); font-weight:600; font-size:21px; letter-spacing:-0.01em; color:var(--white); margin-bottom:4px; }
+  .pain span{ font-family:var(--font-body); font-weight:300; font-size:15px; line-height:1.5; color:var(--faint); }
+  .pink-note{ margin-top:18px; display:inline-block; font-family:var(--font-mono); font-size:12px; letter-spacing:0.06em; color:var(--pink); border:1px solid rgba(232,111,138,0.3); background:rgba(232,111,138,0.06); border-radius:30px; padding:8px 16px; }
+
+  .chips{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border-radius:12px; overflow:hidden; margin-top:32px; max-width:900px; }
+  .chip-cell{ background:var(--ink-2); padding:22px 24px; }
+  .chip-cell .ck{ font-family:var(--font-mono); font-size:12px; font-weight:500; letter-spacing:0.16em; text-transform:uppercase; color:var(--white); }
+  .chip-cell .cv{ font-family:var(--font-body); font-weight:300; font-size:13.5px; line-height:1.45; color:var(--faint); margin-top:8px; }
+
+  .steps{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border-radius:12px; overflow:hidden; margin-top:30px; }
+  .step{ background:var(--ink-2); padding:24px 22px; }
+  .step .sk{ font-family:var(--font-mono); font-size:12px; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); margin-bottom:12px; }
+  .step .st{ font-family:var(--font-sans); font-weight:600; font-size:19px; color:var(--white); margin-bottom:6px; }
+  .step .sd{ font-family:var(--font-body); font-weight:300; font-size:13px; line-height:1.5; color:var(--faint); }
+  .brandolph-tag{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--faint); margin-top:18px; }
+  .brandolph-tag b{ color:var(--yellow); font-weight:500; }
+
+  .shot{ border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--ink-2); box-shadow:0 28px 70px rgba(0,0,0,0.5); margin-top:26px; max-width:980px; align-self:center; }
+  .shot img{ display:block; width:100%; height:auto; }
+  .shot .cap{ font-family:var(--font-mono); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:var(--faint); padding:12px 16px; border-top:1px solid var(--line); }
+
+  .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border-radius:12px; overflow:hidden; margin-top:32px; }
+  .sc{ background:var(--ink-2); padding:28px 22px; }
+  .sv{ font-family:var(--font-sans); font-weight:700; font-size:40px; line-height:1; letter-spacing:-0.03em; }
+  .sl{ font-family:var(--font-mono); font-size:12px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:var(--faint); margin-top:12px; line-height:1.4; }
+  .client-row{ display:grid; grid-template-columns:repeat(5,1fr); gap:1px; background:var(--line); border-radius:10px; overflow:hidden; margin-top:18px; }
+  .client-cell{ background:var(--ink-2); padding:14px 8px; text-align:center; font-family:var(--font-mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--faint); }
+  .client-cell.more{ color:var(--yellow); }
+
+  .cta{ display:inline-flex; align-items:center; gap:10px; font-family:var(--font-sans); font-weight:700; font-size:20px; letter-spacing:0.01em; color:var(--ink); background:var(--yellow); padding:16px 34px; border-radius:8px; text-decoration:none; margin-top:30px; position:relative; z-index:2; }
+  .cta::after{ content:'→'; font-size:18px; }
+  .contact{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--faint); margin-top:26px; position:relative; z-index:2; }
+  .contact b{ color:var(--white); }
+</style>
+</head>
+<body>
+
+  <!-- ============ 01 · HOOK · 0:00–0:11 ============ -->
+  <!-- VO: «Hoy, hasta una empresa de tres personas tiene que parecer una gran marca. Web, redes, lanzamientos, deck de inversores... sin parar.» -->
+  <section class="slide" data-dur="11">
+    <div class="hero-grid"></div>
+    <div class="hero-radial"></div>
+    <div style="position:relative; z-index:2; margin-top:auto; margin-bottom:auto;">
+      <span class="eyebrow">Marca, sin parar</span>
+      <h1>Tienes que parecer<br />una gran marca.<br /><em>Aunque seáis tres.</em></h1>
+      <div class="tagsrow">
+        <span class="mtag">Web</span>
+        <span class="mtag">Redes</span>
+        <span class="mtag">Lanzamiento</span>
+        <span class="mtag">Deck de inversores</span>
+        <span class="mtag">Copy de producto</span>
+        <span class="mtag sig">Sin parar</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 02 · PROBLEMA · 0:11–0:25 ============ -->
+  <!-- VO: «Pero tu marca vive en un PDF y en la cabeza del fundador. La IA genérica no la conoce: genera, pero se sale del personaje. Y el criterio senior no escala.» -->
+  <section class="slide" data-dur="14">
+    <span class="eyebrow">El problema</span>
+    <h2>El mercado te exige una gran marca.<br /><em>Casi nadie puede producirla.</em></h2>
+    <ul class="pain">
+      <li><span class="n">01</span><div><strong>Tu marca no es un sistema.</strong><span>Vive en un PDF, en plantillas sueltas y en la cabeza del fundador. No se puede consultar ni proteger.</span></div></li>
+      <li><span class="n">02</span><div><strong>La IA genérica se sale del personaje.</strong><span>ChatGPT, Canva, Midjourney no conocen tu marca. Generan, pero producen ruido.</span></div></li>
+      <li><span class="n">03</span><div><strong>El criterio senior no escala.</strong><span>Un buen director de marca no puede tocar cada pieza. La marca se erosiona post a post.</span></div></li>
+    </ul>
+    <span class="pink-note">Una agencia cuesta €2–8K al mes. El freelance es caro e intermitente.</span>
+  </section>
+
+  <!-- ============ 03 · QUÉ ES · 0:25–0:37 ============ -->
+  <!-- VO: «CaastorOS convierte tu marca en algo vivo y certificado: una Identidad de Marca, un director de marca con IA y un estudio creativo entero. Precio de software, no de agencia.» -->
+  <section class="slide tint" data-dur="12">
+    <div class="hero-radial"></div>
+    <div style="position:relative; z-index:2;">
+      <span class="eyebrow">Qué es</span>
+      <h2 class="insight-h">Convertimos cada empresa en una marca.<br /><em>Viva. Certificada. Consultable.</em></h2>
+      <div class="chips">
+        <div class="chip-cell"><div class="ck">Identidad de Marca <span style="color:var(--mint);">✔</span></div><div class="cv">Tu marca como objeto vivo, certificado por un director senior.</div></div>
+        <div class="chip-cell"><div class="ck">Director de marca con IA</div><div class="cv">Brandolph convierte un encargo de una línea en trabajo afilado.</div></div>
+        <div class="chip-cell"><div class="ck">Estudio entero</div><div class="cv">Un equipo de especialistas que ejecuta, fiel a tu marca.</div></div>
+      </div>
+      <div class="kicker-foot"><b>Precio de software.</b> No de agencia.</div>
+    </div>
+    <svg class="brandolph" viewBox="0 0 984 1176" style="width:150px; right:70px; top:90px; opacity:0.95;" xmlns="http://www.w3.org/2000/svg"><g><path class="st3" d="M708,216c0-19.9-16.1-36-36-36s-36,16.1-36,36H276c0-19.9-16.1-36-36-36s-36,16.1-36,36c0,19.9,16.1,36,36,36v684h504V216H708z"></path><g><g><rect x="414" y="255.4" transform="matrix(0.2873 -0.9578 0.9578 0.2873 -5.2749 628.9104)" width="12" height="125.3"></rect></g><g><rect x="632.3" y="276" transform="matrix(0.9192 -0.3938 0.3938 0.9192 -56.2662 289.8156)" width="91.4" height="12"></rect></g></g><path d="M684,714c-66.4,0-90-54.9-90-102V494.5l58.2-58.2l-8.5-8.5l-56.1,56.1l-67.8-56.5l-7.7,9.2l69.8,58.2V612c0,60.1-37,102-90,102c-55.8,0-90.5-56.5-90.9-57.1l-10.3,6.2c1.5,2.6,38.5,62.9,101.1,62.9c10.6,0,20.6-1.5,30-4.3V846h120V718.2c11.9,5,25.8,7.8,42,7.8V714z M534,717.3c21-9.5,37.6-26.2,48-48.2V834h-48V717.3z M630,834h-36V670.2c7.7,16.8,19.4,31.7,36,41.8V834z"></path><g><g><rect x="420" y="360" width="24" height="36"></rect></g><g><rect x="672" y="360" width="24" height="36"></rect></g></g><g><g><path d="M456,522c-41.9,0-66-41.6-66-114s24.1-114,66-114s66,41.6,66,114S497.9,522,456,522z M456,306c-34.3,0-54,37.2-54,102s19.7,102,54,102s54-37.2,54-102S490.3,306,456,306z"></path></g><g><path d="M708,522c-41.9,0-66-41.6-66-114s24.1-114,66-114s66,41.6,66,114S749.9,522,708,522z M708,306c-34.3,0-54,37.2-54,102s19.7,102,54,102s54-37.2,54-102S742.3,306,708,306z"></path></g><g><rect x="252" y="366" width="144" height="12"></rect></g><g><path d="M645.3,377.4C645.1,377.3,622,366,588,366c-46.1,0-69.1,11.3-69.3,11.4l-5.4-10.7c1-0.5,25.8-12.6,74.7-12.6c37,0,61.7,12.1,62.7,12.6L645.3,377.4z"></path></g></g></g></svg>
+  </section>
+
+  <!-- ============ 04 · CÓMO FUNCIONA · 0:37–0:55 ============ -->
+  <!-- VO: «Subes tu empresa y en minutos tienes tu Identidad de Marca, certificada por un humano senior. Pides lo que necesitas en una frase. Brandolph monta el equipo y ejecuta: estrategia, copys, posts, landing pages, fotos de producto. Tú solo apruebas.» -->
+  <section class="slide" data-dur="18">
+    <span class="eyebrow">Cómo funciona</span>
+    <h2>De una frase a una pieza lista. <em>En minutos.</em></h2>
+    <div class="steps">
+      <div class="step"><div class="sk">01 · Subes</div><div class="st">Tu empresa</div><div class="sd">Web, redes, deck. En minutos tienes tu Identidad de Marca, certificada por un humano senior.</div></div>
+      <div class="step"><div class="sk">02 · Pides</div><div class="st">En una frase</div><div class="sd">«Campaña de lanzamiento». «Landing de producto». «Deck para la ronda».</div></div>
+      <div class="step"><div class="sk">03 · Ejecuta</div><div class="st">El estudio produce</div><div class="sd">Estrategia, copys, posts, landing pages, creatividades y fotos de producto.</div></div>
+      <div class="step"><div class="sk">04 · Apruebas</div><div class="st">Tú decides</div><div class="sd">Lo ves, lo editas y lo apruebas. Todo sale fiel a tu marca.</div></div>
+    </div>
+    <div class="brandolph-tag">L1 · <b>Brandolph</b> · dirigiendo el equipo</div>
+  </section>
+
+  <!-- ============ 05 · EL LIENZO (wow) · 0:55–1:08 ============ -->
+  <!-- VO: «Y no lo revisas en un chat. Lo ves todo a la vez en un lienzo: cada pieza, viva, que puedes tocar, reescribir o relanzar. Todo fiel a tu marca.» -->
+  <section class="slide" data-dur="13">
+    <span class="eyebrow">El lienzo</span>
+    <h2>No es un chat. <em>Es un lienzo.</em></h2>
+    <div class="shot">
+      <img src="public/caastor/assets/canvas.png" alt="El lienzo de CaastorOS — cada pieza como un nodo vivo" />
+      <div class="cap">El lienzo · ves, tocas y apruebas cada pieza a la vez</div>
+    </div>
+  </section>
+
+  <!-- ============ 06 · PRUEBA · 1:08–1:20 ============ -->
+  <!-- VO: «Ya funciona. De una cafetería de especialidad a una universidad internacional. De brief a pieza lista, en minutos, no en semanas.» -->
+  <section class="slide" data-dur="12">
+    <span class="eyebrow">Ya funciona</span>
+    <h2>Negocio vivo. <em>Probado en muchos sectores.</em></h2>
+    <div class="stats">
+      <div class="sc"><div class="sv" style="color:var(--yellow);">50+</div><div class="sl">Marcas servidas</div></div>
+      <div class="sc"><div class="sv" style="color:var(--white); font-size:30px;">Multisector</div><div class="sl">De un café de especialidad a una universidad internacional</div></div>
+      <div class="sc"><div class="sv" style="color:var(--white); font-size:34px;">Minutos</div><div class="sl">De brief a pieza lista</div></div>
+      <div class="sc"><div class="sv" style="color:var(--white); font-size:26px;">Un estudio entero</div><div class="sl">Especialistas fieles a tu marca</div></div>
+    </div>
+    <div class="client-row">
+      <div class="client-cell">Vinilo</div>
+      <div class="client-cell">Universidad internacional</div>
+      <div class="client-cell">Startups</div>
+      <div class="client-cell">PyMEs</div>
+      <div class="client-cell more">+ muchos sectores</div>
+    </div>
+  </section>
+
+  <!-- ============ 07 · CIERRE + CTA · 1:20–1:30 ============ -->
+  <!-- VO: «Convierte tu empresa en una marca con alma. Sin parar, y sin perder el alma. Reserva tu demo.» -->
+  <section class="slide center-slide" data-dur="10">
+    <div class="hero-radial"></div>
+    <img src="public/caastor/assets/logo-full-yellow.png" alt="CaastorOS" style="height:26px; margin-bottom:30px; position:relative; z-index:2;" />
+    <h1 style="font-size:62px; position:relative; z-index:2;">Convierte tu empresa<br />en una marca.<br /><em>Con alma. Sin parar.</em></h1>
+    <a class="cta" href="https://getcaastor.co">Reserva tu demo</a>
+    <div class="contact"><b>getcaastor.co</b></div>
+    <svg class="brandolph" viewBox="0 0 984 1176" style="width:96px; right:96px; bottom:70px; opacity:0.9;" xmlns="http://www.w3.org/2000/svg"><g><path class="st3" d="M708,216c0-19.9-16.1-36-36-36s-36,16.1-36,36H276c0-19.9-16.1-36-36-36s-36,16.1-36,36c0,19.9,16.1,36,36,36v684h504V216H708z"></path><g><g><rect x="414" y="255.4" transform="matrix(0.2873 -0.9578 0.9578 0.2873 -5.2749 628.9104)" width="12" height="125.3"></rect></g><g><rect x="632.3" y="276" transform="matrix(0.9192 -0.3938 0.3938 0.9192 -56.2662 289.8156)" width="91.4" height="12"></rect></g></g><path d="M684,714c-66.4,0-90-54.9-90-102V494.5l58.2-58.2l-8.5-8.5l-56.1,56.1l-67.8-56.5l-7.7,9.2l69.8,58.2V612c0,60.1-37,102-90,102c-55.8,0-90.5-56.5-90.9-57.1l-10.3,6.2c1.5,2.6,38.5,62.9,101.1,62.9c10.6,0,20.6-1.5,30-4.3V846h120V718.2c11.9,5,25.8,7.8,42,7.8V714z M534,717.3c21-9.5,37.6-26.2,48-48.2V834h-48V717.3z M630,834h-36V670.2c7.7,16.8,19.4,31.7,36,41.8V834z"></path><g><g><rect x="420" y="360" width="24" height="36"></rect></g><g><rect x="672" y="360" width="24" height="36"></rect></g></g><g><g><path d="M456,522c-41.9,0-66-41.6-66-114s24.1-114,66-114s66,41.6,66,114S497.9,522,456,522z M456,306c-34.3,0-54,37.2-54,102s19.7,102,54,102s54-37.2,54-102S490.3,306,456,306z"></path></g><g><path d="M708,522c-41.9,0-66-41.6-66-114s24.1-114,66-114s66,41.6,66,114S749.9,522,708,522z M708,306c-34.3,0-54,37.2-54,102s19.7,102,54,102s54-37.2,54-102S742.3,306,708,306z"></path></g><g><rect x="252" y="366" width="144" height="12"></rect></g><g><path d="M645.3,377.4C645.1,377.3,622,366,588,366c-46.1,0-69.1,11.3-69.3,11.4l-5.4-10.7c1-0.5,25.8-12.6,74.7-12.6c37,0,61.7,12.1,62.7,12.6L645.3,377.4z"></path></g></g></g></svg>
+  </section>
+
+</body>
+</html>
