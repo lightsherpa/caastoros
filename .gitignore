@@ -10,3 +10,13 @@ dist/
 
 # Large raw media — keep out of git (use external storage / git-lfs if needed)
 explainer-video/
+
+# Legacy project copies kept on disk for reference (not part of the app)
+OldCaastor/
+Caastor V3/
+
+# Tool scratch / local config / generated previews
+.claude/
+.impeccable/
+artifacts/
+website/local-preview/
