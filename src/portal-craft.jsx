@@ -75,7 +75,7 @@ function CraftMarketplace({ go, tier }) {
       <div style={{display:"grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 30}}>
         {[
           { title:"Hero KV finish · pricing relaunch", who:"Aitana V.", state:"in-progress", eta:"in 36h", cr:220 },
-          { title:"Honduras essay · finishing pass",   who:"Lia R.",    state:"review",      eta:"awaiting your approval", cr:120 },
+          { title:"Maker's essay · finishing pass",     who:"Lia R.",    state:"review",      eta:"awaiting your approval", cr:120 },
           { title:"Investor deck · polish",            who:"Diego M.",  state:"delivered",   eta:"delivered yesterday",     cr:300 },
         ].map((j, i) => (
           <div key={i} className="card" style={{padding: 16}}>
@@ -132,7 +132,7 @@ function CraftModal({ pack, onClose }) {
 
       <div className="eyebrow" style={{marginBottom: 8}}>Direction</div>
       <div style={{position:"relative", marginBottom: 20}}>
-        <textarea className="input" rows={4} defaultValue="Take this through to print-ready. Tone is calm conviction — see BIO voice. The image direction is craft-led, low-light interiors, no top-down latte art. Final files in PDF + EPS." />
+        <textarea className="input" rows={4} defaultValue="Take this through to print-ready. Tone is calm conviction — see BIO voice. The image direction is craft-led, low-light interiors, no top-down flat-lay clichés. Final files in PDF + EPS." />
         <div style={{position:"absolute", bottom: 10, right: 12, display:"flex", alignItems:"center", gap: 6, fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
           <BrandolphDot /> Pre-filled by Brandolph from BIO
         </div>
@@ -400,11 +400,11 @@ function SettingsView() {
           {tab === "workspace" && (
             <div style={{display:"flex", flexDirection:"column", gap: 18, maxWidth: 480}}>
               <h3 style={{margin: 0}}>Workspace</h3>
-              <div><label style={{display:"block", fontSize:12, fontWeight:500, marginBottom: 6}}>Name</label><input className="input" defaultValue="Vinilo Coffee" /></div>
+              <div><label style={{display:"block", fontSize:12, fontWeight:500, marginBottom: 6}}>Name</label><input className="input" defaultValue="Loam Studio" /></div>
               <div><label style={{display:"block", fontSize:12, fontWeight:500, marginBottom: 6}}>Time zone</label><input className="input" defaultValue="Europe/Madrid" /></div>
               <div><label style={{display:"block", fontSize:12, fontWeight:500, marginBottom: 6}}>Workspace logo</label>
                 <div style={{display:"flex", gap: 12, alignItems:"center"}}>
-                  <div style={{width:56, height:56, borderRadius: 10, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:24}}>V</div>
+                  <div style={{width:56, height:56, borderRadius: 10, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:24}}>L</div>
                   <button className="btn btn--ghost">Upload</button>
                   <button className="btn btn--link" style={{fontSize: 12, color:"var(--c-faint)"}}>Remove</button>
                 </div>
@@ -417,9 +417,9 @@ function SettingsView() {
               <h3 style={{margin: 0, marginBottom: 18}}>Members · 3</h3>
               <div style={{display:"flex", flexDirection:"column", gap: 8}}>
                 {[
-                  { name:"Marina Reyes", email:"marina@vinilo.coffee", role:"Owner", p:"caastor/assets/profile-3.jpg" },
-                  { name:"Aleix Roca",   email:"aleix@vinilo.coffee", role:"Member", p:"caastor/assets/profile-2.jpg" },
-                  { name:"Júlia Bonet",  email:"julia@vinilo.coffee", role:"Viewer", p:"caastor/assets/profile-4.jpg" },
+                  { name:"Marina Reyes", email:"marina@loam.studio", role:"Owner", p:"caastor/assets/profile-3.jpg" },
+                  { name:"Aleix Roca",   email:"aleix@loam.studio", role:"Member", p:"caastor/assets/profile-2.jpg" },
+                  { name:"Júlia Bonet",  email:"julia@loam.studio", role:"Viewer", p:"caastor/assets/profile-4.jpg" },
                 ].map((m, i) => (
                   <div key={i} style={{display:"flex", alignItems:"center", gap: 12, padding: 12, border:"1px solid var(--c-line)", borderRadius: 10}}>
                     <img src={m.p} alt="" style={{width: 36, height: 36, borderRadius:"50%", objectFit:"cover"}} />

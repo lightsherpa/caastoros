@@ -882,7 +882,7 @@ function TeamCapacity() {
 
 function TeamClients() {
   const clients = [
-    { name:"Vinilo Coffee",   bio: 91, tier:"02", active: 4, lifetime: 38, last:"2h ago",   primary:"Marina Reyes" },
+    { name:"Loam Studio",     bio: 91, tier:"02", active: 4, lifetime: 38, last:"2h ago",   primary:"Marina Reyes" },
     { name:"Plaza Hortelana", bio: 78, tier:"03", active: 2, lifetime: 22, last:"yesterday", primary:"Pere Sallés" },
     { name:"Bandera",         bio: 84, tier:"02", active: 2, lifetime: 31, last:"4h ago",    primary:"Joana Vidal" },
     { name:"Faro Lab",        bio: 66, tier:"02", active: 2, lifetime: 19, last:"yesterday", primary:"Alma Castro" },
@@ -974,7 +974,7 @@ function TeamMe() {
           <div className="eyebrow" style={{marginBottom: 14}}>Top clients · this month</div>
           <div style={{display:"flex", flexDirection:"column", gap: 12}}>
             {[
-              { name:"Vinilo Coffee", hrs: 14 },
+              { name:"Loam Studio", hrs: 14 },
               { name:"Faro Lab", hrs: 11 },
               { name:"Plaza Hortelana", hrs: 9 },
               { name:"Bandera", hrs: 4 },
@@ -997,7 +997,7 @@ function TeamMe() {
         <div className="eyebrow" style={{marginBottom: 14}}>Recent deliveries</div>
         <div style={{display:"flex", flexDirection:"column", gap: 6}}>
           {[
-            { title:"Hero KV finish · Vinilo pricing", state:"delivered", time:"38m ago", cr: 220 },
+            { title:"Hero KV finish · Loam pricing", state:"delivered", time:"38m ago", cr: 220 },
             { title:"Packaging dieline · Faro Lab",    state:"in-progress", time:"yesterday", cr: 700 },
             { title:"Brand guidelines · Olivar Real",  state:"in-progress", time:"3d ago", cr: 650 },
             { title:"Identity finalisation · Plaza",   state:"delivered",  time:"5d ago", cr: 550 },

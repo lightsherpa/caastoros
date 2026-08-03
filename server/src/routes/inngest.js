@@ -5,10 +5,11 @@
 import { serve } from "inngest/hono";
 import { inngest } from "../lib/inngest.js";
 import { compileBio } from "../inngest/functions/compile-bio.js";
+import { learnBio } from "../inngest/functions/learn-bio.js";
 import { sendNotificationEmail } from "../inngest/functions/send-notification-email.js";
 
 export const inngestHandler = serve({
   client: inngest,
-  functions: [compileBio, sendNotificationEmail],
+  functions: [compileBio, learnBio, sendNotificationEmail],
   signingKey: process.env.INNGEST_SIGNING_KEY,
 });

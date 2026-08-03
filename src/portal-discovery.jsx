@@ -448,7 +448,7 @@ function DiscoveryStep2Running({ onDone }) {
     { state: stage === "scrape" ? "running" : "ok", text: "Brandolph is reading every page of your site" },
     { state: stage === "scrape" ? "queued" : stage === "vision" ? "running" : "ok", text: "The design crew is mapping your palette and typography" },
     { state: ["scrape","vision"].includes(stage) ? "queued" : stage === "compile" ? "running" : "ok", text: "Brandolph is sharpening your brand into a BIO" },
-    { state: stage === "done" ? "ok" : "queued", text: "Filing the draft for your Brand Steward to certify" },
+    { state: stage === "done" ? "ok" : "queued", text: "Draft ready — certify to unlock your crew (a senior human can certify too)" },
   ];
 
   useDEffect(() => {
@@ -656,7 +656,7 @@ function DiscoveryStep2Results({ onConfirm }) {
             <div style={{fontSize: 14, fontWeight: 500, color:"var(--c-ink)", marginBottom: 2}}>
               {live.cert
                 ? <>Your BIO is certified by <span style={{color:"var(--green-600)"}}>{live.cert.byName}</span></>
-                : <>A senior human will certify your BIO within 24h</>}
+                : <>Get a senior human to certify your BIO — the recommended trust upgrade, anytime</>}
             </div>
             <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5}}>
               {live.cert
@@ -938,7 +938,7 @@ function payloadToFields(payload) {
       notList:   p.strategic?.notList || [],
       /* Gaps now come from the live payload's `missing` list (each
          { field, why }). The Gaps list + StringListEditor render plain
-         strings, so flatten each entry to "field — why". Old BIOs have no
+         strings, so collapse each entry to "field — why". Old BIOs have no
          `missing` → empty → UI hides it. Tolerate plain strings too. */
       gaps:      (p.missing || []).map(m =>
                    typeof m === "string" ? m
@@ -1009,6 +1009,8 @@ function BioViewer({ go, bioScore = 91 }) {
   const [saving, setSaving] = useDState(false);
   const [saveErr, setSaveErr] = useDState(null);
   const [reviewBusy, setReviewBusy] = useDState(false);
+  const [certBusy, setCertBusy] = useDState(false);
+  const [learnBusy, setLearnBusy] = useDState(false);
 
   /* Live cert state + payload — polls /api/bios/:brandId. The BIO body
      below renders from `live.bio.payload`; the cert chip from `live.cert`. */
@@ -1049,7 +1051,7 @@ function BioViewer({ go, bioScore = 91 }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      flash(`Saved · BIO v${json.bio?.version}. Steward will re-certify.`);
+      flash(`Saved · BIO v${json.bio?.version}. Certify to refresh your crew.`);
       setEditing(false);
       live.refresh();
     } catch (e) {
@@ -1076,6 +1078,45 @@ function BioViewer({ go, bioScore = 91 }) {
       flash(`Couldn't request review: ${e?.message || e}`);
     } finally {
       setReviewBusy(false);
+    }
+  };
+
+  /* Self-certification — instant, unlocks the crew. The senior-human review
+     (requestReview above) remains the recommended trust upgrade, anytime. */
+  const certifyBio = async () => {
+    if (!live.brandId || certBusy) return;
+    setCertBusy(true);
+    try {
+      const res = await apiFetch(`/api/bios/${live.brandId}/certify`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 404) { flash(json.error || "No BIO to certify yet"); return; }
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      flash("BIO certified — your crew is unlocked");
+      live.refresh();
+      /* Mirror the codebase's brand-change broadcast so the switcher, shell,
+         briefs and Brandolph all re-read the now-certified BIO. */
+      window.dispatchEvent(new CustomEvent("brand:changed", { detail: { id: live.brandId } }));
+    } catch (e) {
+      flash(`Couldn't certify: ${e?.message || e}`);
+    } finally {
+      setCertBusy(false);
+    }
+  };
+
+  /* Ask Brandolph to re-learn the BIO from recent work — enqueues a draft
+     (server responds 202 queued). The draft appears to review on next poll. */
+  const learnFromWork = async () => {
+    if (!live.brandId || learnBusy) return;
+    setLearnBusy(true);
+    try {
+      const res = await apiFetch(`/api/bios/${live.brandId}/learn`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      flash("Brandolph is learning from your recent work — a draft will appear to review.");
+    } catch (e) {
+      flash(`Couldn't start learning: ${e?.message || e}`);
+    } finally {
+      setLearnBusy(false);
     }
   };
 
@@ -1112,6 +1153,16 @@ function BioViewer({ go, bioScore = 91 }) {
     ["sources", "Sources"],
   ];
 
+  /* Cert-state badge — derived from the server BIO (live.bio), not the local
+     editable copy. cert_kind is "self" | "steward" | null. */
+  const certState = !live.bio
+    ? null
+    : !live.bio.certified
+    ? { label: "Uncertified", cls: "pill--yellow" }
+    : live.bio.cert_kind === "steward"
+    ? { label: "Certified by a senior human ✓", cls: "pill--green" }
+    : { label: "Self-certified", cls: "pill--mint" };
+
   const conf = score;
   const tone = conf >= 85
     ? { color:"var(--green-600)", word:"well sourced", hint:"Brandolph has enough evidence to trust this." }
@@ -1141,7 +1192,7 @@ function BioViewer({ go, bioScore = 91 }) {
                 ) : live.reviewPending && live.bio ? (
                   <>Your Brand Steward is reviewing this BIO</>
                 ) : live.bio ? (
-                  <>Awaiting certification by your Brand Steward</>
+                  <>Uncertified — certify to unlock your crew, or get a senior human to certify</>
                 ) : (
                   <>No BIO yet — type a URL on Discovery to extract one</>
                 )}
@@ -1165,7 +1216,7 @@ function BioViewer({ go, bioScore = 91 }) {
           </div>
           {!live.cert && live.bio && (
             <span style={{fontSize: 11.5, color:"var(--c-dim)", fontStyle:"italic", whiteSpace:"nowrap"}}>
-              {live.reviewPending ? "in review" : "within 24h"}
+              {live.reviewPending ? "in review" : "human review optional"}
             </span>
           )}
         </div>
@@ -1174,7 +1225,10 @@ function BioViewer({ go, bioScore = 91 }) {
       {/* Hero */}
       <div style={{display:"grid", gridTemplateColumns:"1fr 320px", gap: 28, marginBottom: 28, alignItems:"end"}}>
         <div>
-          <div className="eyebrow" style={{marginBottom: 6}}>Brand Intelligence Object · {live.brandName || "Brand"}</div>
+          <div style={{display:"flex", alignItems:"center", gap: 10, marginBottom: 6}}>
+            <div className="eyebrow" style={{margin: 0}}>Brand Intelligence Object · {live.brandName || "Brand"}</div>
+            {certState && <span className={"pill " + certState.cls}>{certState.label}</span>}
+          </div>
           <div style={{display:"flex", alignItems:"baseline", gap: 14}}>
             <span style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 88, lineHeight: 1, color: tone.color, fontWeight: 500}}>
               <Counter to={conf} />
@@ -1194,11 +1248,22 @@ function BioViewer({ go, bioScore = 91 }) {
           <div style={{marginTop: 14, height: 6, background:"var(--neutral-50)", borderRadius:999, overflow:"hidden", maxWidth: 600}}>
             <div style={{height:"100%", width: conf + "%", background: tone.color, borderRadius:999, transition:"width 800ms ease"}} />
           </div>
+          {live.bio && live.bio.certified === false && live.bio.version > 1 && (
+            <div style={{fontSize: 12.5, color:"var(--c-faint)", marginTop: 10, lineHeight: 1.5, maxWidth: 600}}>
+              Brandolph may have updated the BIO from your recent work — review &amp; re-certify.
+            </div>
+          )}
         </div>
         <div style={{display:"flex", flexDirection:"column", gap: 10, alignItems:"flex-end"}}>
           <button className="btn btn--primary" onClick={() => setTab("sources")} disabled={!live.brandId}>
             <Icon name="plus" size={14} /> Feed Brandolph
           </button>
+          {live.bio && !live.bio.certified && (
+            <button className="btn btn--primary" onClick={certifyBio} disabled={certBusy}
+              title="Certify this BIO yourself — instant, unlocks your crew">
+              <Icon name="check" size={14} /> {certBusy ? "Certifying…" : "Certify BIO"}
+            </button>
+          )}
           {!editing ? (
             <button className="btn btn--ghost btn--sm" onClick={() => setEditing(true)} disabled={!bio}>
               <Icon name="edit" size={14} /> Edit BIO
@@ -1218,10 +1283,16 @@ function BioViewer({ go, bioScore = 91 }) {
             <Icon name="refresh" size={14} /> Re-run discovery
           </button>
           {live.bio && (
+            <button className="btn btn--ghost btn--sm" onClick={learnFromWork} disabled={learnBusy}
+              title="Ask Brandolph to update the BIO from your recent work — a draft appears to review">
+              <Icon name="sparkles" size={14} /> {learnBusy ? "Starting…" : "Refresh BIO from work"}
+            </button>
+          )}
+          {live.bio && (
             <button className="btn btn--ghost btn--sm" onClick={requestReview}
               disabled={reviewBusy || live.reviewPending}
-              title={live.reviewPending ? "A human review is already in progress" : "Send this BIO to your Brand Steward for a human review — no edit required"}>
-              <Icon name="mail" size={14} /> {live.reviewPending ? "In review…" : reviewBusy ? "Sending…" : "Request human review"}
+              title={live.reviewPending ? "A human review is already in progress" : "The trust upgrade — a senior human reads, refines and certifies your BIO. Recommended, available anytime."}>
+              <Icon name="mail" size={14} /> {live.reviewPending ? "In review…" : reviewBusy ? "Sending…" : "Get a senior human to certify ✓ (recommended)"}
             </button>
           )}
         </div>
@@ -1230,7 +1301,7 @@ function BioViewer({ go, bioScore = 91 }) {
       {editing && (
         <div className="card" style={{padding:"10px 16px", marginBottom:14, borderLeft:"3px solid var(--brand, var(--yellow-500))", display:"flex", alignItems:"center", gap:10}}>
           <Icon name="edit" size={15} />
-          <span style={{fontSize:13, color:"var(--c-ink)"}}>Editing the BIO — saving creates a new version your Brand Steward will re-certify.</span>
+          <span style={{fontSize:13, color:"var(--c-ink)"}}>Editing the BIO — saving creates a new version you can re-certify (self-cert is instant; a senior human can certify too).</span>
         </div>
       )}
       {saveErr && (
@@ -1247,7 +1318,7 @@ function BioViewer({ go, bioScore = 91 }) {
             No canon yet.
           </h2>
           <p style={{margin:"0 0 22px", fontSize: 14, color:"var(--c-dim)", lineHeight: 1.6}}>
-            The BIO is the source of truth every output is judged against. Point Discovery at your URL or paste what you have — Brandolph will compile the first draft in about thirty seconds. A senior Steward signs it before it becomes canon.
+            The BIO is the source of truth every output is judged against. Point Discovery at your URL or paste what you have — Brandolph will compile the first draft in about thirty seconds. Certify it to unlock your crew — or get a senior human to certify (recommended).
           </p>
           <div style={{display:"flex", gap: 10, justifyContent:"center"}}>
             <button className="btn btn--primary" onClick={() => go("discovery")}>
@@ -1561,7 +1632,7 @@ function BioStrategic({ strat, patchStrategic, editing }) {
             </ul>}
       </div>
       <div className="card" style={{padding: 18, borderLeft:"3px solid var(--pink-500)", gridColumn: "1 / -1"}}>
-        <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>What Vinilo is NOT</div>
+        <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>What Loam is NOT</div>
         {editing
           ? <StringListEditor items={strat.notList} onChange={(v) => patchStrategic("notList", v)} marker="✕" color="var(--pink-500)" />
           : <ul style={{margin: 0, paddingLeft: 0, listStyle:"none", display:"grid", gridTemplateColumns: "1fr 1fr", gap: 10}}>

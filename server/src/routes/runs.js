@@ -548,6 +548,7 @@ app.post("/stream", requireAuth, async (c) => {
             name: brandBio.brand.name,
             bioVersion: brandBio.bio.version,
             certifiedBy: brandBio.bio.certified_by || null,
+            certKind: brandBio.bio.cert_kind || null,
           },
           spec: {
             id: spec.specialist_id,

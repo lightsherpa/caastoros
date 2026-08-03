@@ -153,7 +153,7 @@ function useHomeWorkspaceSnapshot() {
           ? "no-bio"
           : bio.certified
             ? "ready"
-            : "review";
+            : "uncertified";  // BIO exists → briefs reachable; crew gated in handleRun
 
         if (!cancelled) {
           setState({
@@ -196,18 +196,20 @@ function FirstRunOnboarding({ snapshot, go }) {
   const hasBio = !!snapshot.bio;
   const reviewCopy = snapshot.reviewPending
     ? "A Steward review is already queued. You can inspect the draft BIO while the review is in motion."
-    : "The BIO exists, but it is not certified yet. Client outputs stay locked until a Steward approves the canon.";
+    : "The BIO exists, so briefs are ready — crew outputs stay locked until the BIO is certified (self-cert is instant; a senior human review is recommended).";
   const title = snapshot.stage === "review"
     ? `${brand?.name || "Your brand"} is waiting for certification.`
     : "Build the brand canon before you brief.";
   const intro = snapshot.stage === "review"
     ? reviewCopy
-    : "Caastor needs a Brand Intelligence Object: one source of truth for audience, voice, strategy, visual rules, and refusals. Briefs unlock when that foundation is reviewed.";
+    : "Caastor needs a Brand Intelligence Object: one source of truth for audience, voice, strategy, visual rules, and refusals. Briefs unlock as soon as that foundation exists.";
+  const certified = !!snapshot.bio?.certified;
   const steps = [
     { label: "Brand", text: brand ? (snapshot.placeholderBrand ? "Name still needs cleanup" : brand.name) : "Create the first brand", done: !!brand && !snapshot.placeholderBrand },
     { label: "Discovery", text: hasBio ? `BIO v${snapshot.bio.version} compiled` : "Read the site and source files", done: hasBio },
-    { label: "Steward", text: snapshot.bio?.certified ? "Certified" : snapshot.reviewPending ? "Review queued" : "Needs review", done: !!snapshot.bio?.certified },
-    { label: "Create", text: snapshot.bio?.certified ? "Briefs unlocked" : "Locked until certification", done: !!snapshot.bio?.certified },
+    { label: "Steward", text: certified ? "Certified" : snapshot.reviewPending ? "Review queued" : "Needs review", done: certified },
+    { label: "Create", text: hasBio ? "Briefs ready" : "Locked until a BIO exists", done: hasBio },
+    { label: "Crew", text: certified ? "Crew unlocked" : "Certify the BIO to run the crew", done: certified },
   ];
 
   return (
@@ -327,7 +329,7 @@ function HomeDashboard({ go, snapshot }) {
         ) : (
           <div className="home-dashboard__empty">
             <Icon name="brief" size={24} />
-            <div><strong>Your certified BIO is ready.</strong><span>Describe the business change above to create the first brief.</span></div>
+            <div><strong>Your BIO is ready.</strong><span>Describe the business change above to create the first brief.</span></div>
           </div>
         )}
 
@@ -355,7 +357,7 @@ function HomeDashboard({ go, snapshot }) {
         <div className="home-dashboard__status">
           <div className="home-dashboard__status-head"><span className="home-dashboard__status-icon home-dashboard__status-icon--bio"><Icon name="bio" size={18} /></span><span className="eyebrow">Brand canon</span></div>
           <h3>{snapshot.brand?.name || "Brand"} BIO</h3>
-          <p>Version {snapshot.bio?.version || "-"} is certified and used for every new brief.</p>
+          <p>Version {snapshot.bio?.version || "-"} is certified — it powers every brief and unlocks the crew.</p>
           <div className="home-dashboard__status-line"><span>Confidence</span><strong>{snapshot.bio?.score != null ? `${snapshot.bio.score}/100` : "Reviewed"}</strong></div>
           <button className="btn btn--ghost" onClick={() => go("bio")}>Open BIO <Icon name="arrow" size={13} /></button>
         </div>
@@ -397,7 +399,10 @@ function HomeCreate({ tweaks, go }) {
     );
   }
 
-  if (snapshot.stage !== "ready") {
+  /* Briefs are reachable once a BIO EXISTS (certified or not) — the crew run is
+     separately gated on certification inside handleRun. Only no-bio/error/loading
+     fall back to onboarding. */
+  if (snapshot.stage !== "ready" && snapshot.stage !== "uncertified") {
     return <FirstRunOnboarding snapshot={snapshot} go={go} />;
   }
 
@@ -593,6 +598,12 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
      drives the dot-state animation in the existing UI. */
   const handleRun = async () => {
     if (!input.trim() || !realAssembly.agents.length) return;
+    /* Crew gate: the crew only runs on a CERTIFIED BIO. Briefs/sharpen are
+       allowed pre-cert; running the crew is not (server also 409s). */
+    if (!snapshot.bio?.certified) {
+      setRunErr("Certify your BIO to run the crew — self-cert is instant, or get a senior human to certify (recommended).");
+      return;
+    }
     setPhase("running");
     setRunErr(null);
     const initialStates = {};
@@ -671,7 +682,7 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
               fontSize: 16, color:"var(--c-dim)", lineHeight: 1.55,
               margin: "16px auto 0", maxWidth: 520,
             }}>
-              Describe the business outcome. Brandolph reads the certified BIO, sharpens the brief, and shows you the smallest useful crew before anything runs.
+              Describe the business outcome. Brandolph reads your BIO, sharpens the brief, and shows you the smallest useful crew before anything runs.
             </p>
 
             {/* Composer */}
@@ -988,6 +999,10 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
                     const done   = data?.done;
                     const accent = window.CI_DEPT_COLORS[a.dept] || "var(--neutral-300)";
                     const passed = qa?.passed ?? null;
+                    /* Two-tier cert: steward = senior human ✓, self = self-certified.
+                       Fall back to plain "certified" when certKind is absent. */
+                    const certKind  = done?.brand?.certKind;
+                    const certLabel = certKind === "steward" ? "certified ✓" : certKind === "self" ? "self-certified" : "certified";
                     return (
                       <div key={a.id} style={{
                         background: "var(--c-card)", border: "1px solid var(--c-line)",
@@ -1012,8 +1027,8 @@ function HomeCreateReady({ tweaks, go, snapshot }) {
                             <span>
                               Composed by <span style={{color:"var(--c-ink)"}}>{done.spec?.name || a.name}</span> ·
                               BIO v{done.brand?.bioVersion}
-                              {done.brand?.certifiedBy
-                                ? <> · <span style={{color:"var(--green-600)"}}>certified</span></>
+                              {done.brand?.certKind || done.brand?.certifiedBy
+                                ? <> · <span style={{color:"var(--green-600)"}}>{certLabel}</span></>
                                 : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
                             </span>
                             <span>{a.cr ?? "?"} cr</span>

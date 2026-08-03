@@ -9,7 +9,25 @@
 // Returns { brand, bio, refusals } shaped for prompt.js consumption.
 
 import { supabaseAdmin } from "./supabase.js";
-import { VINILO_BIO, VINILO_REFUSALS, VINILO_BRAND } from "../data/vinilo.js";
+
+// Pure gate: given the fetched BIO row (or null) + whether cert is required,
+// return the error code to throw, or null to proceed. Extracted so it's unit-
+// testable without mocking Supabase. NEVER returns a seed/fallback BIO — a
+// brand's outputs must only ever read that brand's own BIO (or fail loudly).
+export function bioGateCode(bioRow, requireCertified) {
+  if (bioRow) return null;
+  // requireCertified queries filter to certified rows, so a null row there means
+  // "no certified BIO" (there may be an uncertified draft). Lenient callers get
+  // BIO_NOT_READY = "no BIO at all yet; run Discovery."
+  return requireCertified ? "BIO_NOT_CERTIFIED" : "BIO_NOT_READY";
+}
+
+// Brand refusals or empty — NEVER a fallback brand's refusals. Injecting a seed
+// brand's refusals when a brand had none is what leaked a seed brand's DNA into every
+// brand's prompt; empty is correct (prompt.js tolerates an empty array).
+export function resolveRefusals(brandRefusals) {
+  return Array.isArray(brandRefusals) && brandRefusals.length ? brandRefusals : [];
+}
 
 /**
  * @param {object} opts
@@ -55,21 +73,28 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
     .maybeSingle();
   if (bioErr) throw new Error(`BIO lookup failed: ${bioErr.message}`);
 
-  // Fallback: no BIO yet (brand was auto-created on signup, never ran Discovery).
-  // Return the Vinilo seed so the Ask Brandolph endpoint still works during P0
-  // before P1 Discovery ships. Logged so we can spot this in dev.
-  if (!bioRow) {
-    if (requireCertified) {
-      const err = new Error(`BIO_NOT_CERTIFIED for brand ${brandRow.id}`);
-      err.code = "BIO_NOT_CERTIFIED";
-      throw err;
+  // No BIO to serve → fail loudly. We do NOT fall back to a seed brand: doing so
+  // leaked a seed brand's content into unrelated brands' results.
+  const gateCode = bioGateCode(bioRow, requireCertified);
+  if (gateCode) {
+    const err = new Error(`${gateCode} for brand ${brandRow.id}`);
+    err.code = gateCode;
+    throw err;
+  }
+
+  /* Attribution: DB `certified_by` is a team_members FK set only on the senior
+     (Steward) path; self-cert leaves it null. DB `cert_kind` is the Steward JOB
+     reason, NOT a certifier type — derive the client-facing self/steward kind
+     here and resolve the Steward's display name for output attribution. */
+  let certifierName = null;
+  let certKind = null;
+  if (bioRow.certified) {
+    certKind = bioRow.certified_by ? "steward" : "self";
+    if (bioRow.certified_by) {
+      const { data: cm } = await supabaseAdmin
+        .from("team_members").select("name, first_name").eq("id", bioRow.certified_by).maybeSingle();
+      certifierName = cm?.name || cm?.first_name || null;
     }
-    console.warn(`[load-brand-bio] No BIO for brand ${brandRow.id} (${brandRow.name}); using Vinilo seed fallback. Run Discovery (P1) to create a real BIO.`);
-    return {
-      brand:    { ...VINILO_BRAND, id: brandRow.id, name: brandRow.name || VINILO_BRAND.name },
-      bio:      VINILO_BIO,
-      refusals: brandRow.refusals?.length ? brandRow.refusals : VINILO_REFUSALS,
-    };
   }
 
   return {
@@ -80,11 +105,11 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
       version:      bioRow.version,
       score:        bioRow.score,
       certified:    bioRow.certified,
-      certified_by: bioRow.certified_by,
+      certified_by: certifierName,   // resolved Steward name (senior) or null (self)
       certified_at: bioRow.certified_at,
-      cert_kind:    bioRow.cert_kind,
+      cert_kind:    certKind,         // client-facing: "self" | "steward" | null
     },
-    refusals: brandRow.refusals?.length ? brandRow.refusals : VINILO_REFUSALS,
+    refusals: resolveRefusals(brandRow.refusals),
   };
 }
 

@@ -4,6 +4,7 @@ import { supabaseAdmin } from "../lib/supabase.js";
 import { assignSteward } from "../lib/assign-steward.js";
 import { scoreBio } from "../lib/score-bio.js";
 import { computeFocus } from "../lib/bio-focus.js";
+import { inngest } from "../lib/inngest.js";
 
 const app = new Hono();
 
@@ -219,6 +220,12 @@ app.get("/:brandId", requireAuth, async (c) => {
      served by the Steward route, not here. */
   const focusCount = bio?.payload ? computeFocus(bio.payload).length : 0;
 
+  /* Client-facing cert kind is DERIVED, not the DB `cert_kind` (which is the
+     Steward job reason). self = certified with no team_members certifier;
+     steward = certified by a team member. */
+  if (bio) bio.cert_kind = bio.certified ? (bio.certified_by ? "steward" : "self") : null;
+
+  // BIO payload is view-only — never a download/export (this is the moat). Do not add attachment/content-disposition here.
   return c.json({ brand, bio, reviewPending, focusCount });
 });
 
@@ -257,6 +264,74 @@ app.post("/:brandId/request-review", requireAuth, async (c) => {
   try { await assignSteward(job.id); } catch (e) { console.warn("[request-review] assignSteward failed:", e?.message || e); }
 
   return c.json({ ok: true, jobId: job.id, status: "queued", reused: false });
+});
+
+/* POST /api/bios/:brandId/certify
+   Phase 2 "simple certification" — owner SELF-cert (the instant path).
+   Flips the latest BIO to certified with cert_kind='self'. Unlike the
+   senior-human path (request-review → Steward job), this does NOT enqueue
+   any Steward work — it's the immediate, owner-attested certification.
+   The senior-human path stays POST /:brandId/request-review (untouched). */
+app.post("/:brandId/certify", requireAuth, async (c) => {
+  const { workspaceId } = c.get("auth");
+  const brandId = c.req.param("brandId");
+
+  // Ownership check (mirrors the existing pattern in this file).
+  const { data: brand } = await supabaseAdmin
+    .from("brands").select("id, workspace_id").eq("id", brandId).maybeSingle();
+  if (!brand || brand.workspace_id !== workspaceId) return c.json({ error: "Brand not in workspace" }, 403);
+
+  // Latest (highest-version) BIO for this brand.
+  const { data: bio } = await supabaseAdmin
+    .from("bios").select("id, version").eq("brand_id", brandId)
+    .order("version", { ascending: false }).limit(1).maybeSingle();
+  if (!bio) return c.json({ error: "No BIO to certify yet" }, 404);
+
+  /* Self-cert writes to the REAL schema: `certified_by` is a team_members FK
+     (the senior/Steward path only) — an owner self-certifying is NOT a team
+     member, so we leave it NULL and leave `cert_kind` untouched (its CHECK only
+     permits Steward job kinds). "Self vs senior" is DERIVED downstream from
+     whether certified_by is set — see load-brand-bio.js and GET /:brandId. */
+  const certifiedAt = new Date().toISOString();
+  const { error: updateErr } = await supabaseAdmin
+    .from("bios")
+    .update({ certified: true, certified_by: null, certified_at: certifiedAt })
+    .eq("id", bio.id);
+  if (updateErr) return c.json({ error: updateErr.message }, 500);
+
+  return c.json({
+    ok: true,
+    certifiedVersion: bio.version,
+    cert_kind: "self",            // client-facing derived kind (not the DB column)
+    certified_at: certifiedAt,
+  });
+});
+
+/* POST /api/bios/:brandId/learn
+   Manual "learn from work" trigger — emits a bio/learn.requested event so the
+   async learner can fold recent work back into the BIO. Fire-and-forget: a
+   queue hiccup must never fail the request (same client + .send shape as
+   compile-bio.js / discovery.js). */
+app.post("/:brandId/learn", requireAuth, async (c) => {
+  const { workspaceId } = c.get("auth");
+  const brandId = c.req.param("brandId");
+
+  const { data: brand } = await supabaseAdmin
+    .from("brands").select("id, workspace_id").eq("id", brandId).maybeSingle();
+  if (!brand || brand.workspace_id !== workspaceId) return c.json({ error: "Brand not in workspace" }, 403);
+
+  const { data: bio } = await supabaseAdmin
+    .from("bios").select("id").eq("brand_id", brandId)
+    .order("version", { ascending: false }).limit(1).maybeSingle();
+  if (!bio) return c.json({ error: "No BIO to learn into yet" }, 400);
+
+  try {
+    await inngest.send({ name: "bio/learn.requested", data: { brandId, workspaceId } });
+  } catch (e) {
+    console.warn("[bios learn] inngest.send failed:", e?.message || e);
+  }
+
+  return c.json({ ok: true, queued: true }, 202);
 });
 
 export default app;

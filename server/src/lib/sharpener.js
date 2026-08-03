@@ -71,7 +71,7 @@ OUTPUT — STRICT JSON ONLY, no preamble, no fences:
 {
   "title": "4–6 words. The brief named like a magazine spread, not a JIRA ticket. No verbs like 'unlock', 'drive', 'leverage'. No 'How to', no 'The ultimate', no colons-as-subtitles. Sounds written by a human editor.",
   "tension": "one-sentence diagnosis of the strategic tension. Plain prose. No 'The tension is:' framing.",
-  "sharpenedBrief": "2–3 sentences a CMO would say out loud over coffee. No bullet lists. No 'Here's what we need to do:'. Start with the work, not a meta-comment about it.",
+  "sharpenedBrief": "2–3 sentences a CMO would actually say out loud. No bullet lists. No 'Here's what we need to do:'. Start with the work, not a meta-comment about it.",
   "questions": [
     { "q": "the question, posed directly", "solvingFor": "one plain sentence naming what this question RESOLVES for the brief — the fork it settles and what changes depending on the answer. Strategic framing, NOT a restatement of the question or the BIO citation.", "why": "the BIO field this connects to, quoted or paraphrased" }
   ],
@@ -98,14 +98,14 @@ DELIVERY PLAN RULES:
 - Pick the smallest set of TYPES that fully earns the brief. A "week of social content" is usually one social_post group with count 5–7. A launch may need social_post + hero_kv. A blog brief is blog_article (which already includes its hero image).
 - Every group's \`parts\` + \`crew\` should match the type's natural shape (caption+image for social, body+hero_image for blog, etc.). If a part needs a visual, the crew id MUST be a visual specialist (a19–a46).
 - If the brief implies ANY visual output (social, ad, launch, hero, carousel, mood, deck, blog hero), the plan MUST include the matching visual part/specialist. A social plan with no image specialist is wrong.
-- Every group must have a non-generic \`why\` rooted in the BIO and brief. Bad: "to create content." Good: "Vinilo needs the Tuesday ritual to feel earned, so the caption/image pair turns footfall into a slow-afternoon habit rather than a discount mechanic."
+- Every group must have a non-generic \`why\` rooted in the BIO and brief. Bad: "to create content." Good: "The brand needs its core ritual to feel earned, so the caption/image pair turns a routine moment into a habit rather than a discount mechanic."
 - Every group must have a \`successSignal\` that a human can recognize after shipping. Never mention raw API cost.
 - Do NOT include a02 (you), a18 Voice QA (auto on text), or a24 Brand Consistency QA (auto on images).
 
 TITLE EXAMPLES (calibrate yourself against these):
 - BAD:  "Pricing Announcement Email Brief"  · "Q2 Email Marketing Push"  · "Hero Visual for Spring Drop"
-- GOOD: "The annual price letter"           · "Spring drop, hero frame"  · "Notes on the Madrid pour-over"
-- GOOD: "Café, candlelit"                   · "Buyers, on a Tuesday"     · "What June sounds like"
+- GOOD: "The annual price letter"           · "Spring drop, hero frame"  · "Notes on the Madrid launch"
+- GOOD: "Candlelit, close"                  · "Buyers, mid-decision"     · "What June sounds like"
 Editorial. Specific. Restrained.
 
 Available specialists — assemble the SMALLEST crew that earns the brief. If the brief implies visuals, include image specialists; if it implies copy, include copy specialists. Pair them.

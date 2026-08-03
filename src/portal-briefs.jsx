@@ -740,7 +740,7 @@ function SpecialistsDirectory({ go }) {
       {/* Most used for this brand */}
       {mostUsed.length > 0 && !q && (
         <section style={{marginBottom: 26}}>
-          <div className="eyebrow" style={{marginBottom: 10}}>Most used for Vinilo</div>
+          <div className="eyebrow" style={{marginBottom: 10}}>Most used for Loam</div>
           <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap: 10}}>
             {mostUsed.map(a => (
               <button key={a.id} onClick={() => setOpenId(a.id)} className="card"
@@ -988,9 +988,13 @@ function TryPanel({ agent, onClose }) {
               <span>
                 Composed by <span style={{color:"var(--c-ink)"}}>{done.spec?.name || agent.name}</span> ·
                 BIO v{done.brand?.bioVersion}
-                {done.brand?.certifiedBy
-                  ? <> · <span style={{color:"var(--green-600)"}}>certified</span></>
-                  : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+                {done.brand?.certKind === "steward"
+                  ? <> · certified by <span style={{color:"var(--green-600)"}}>{done.brand.certifiedBy || "a senior reviewer"}</span> · senior review ✓</>
+                  : done.brand?.certKind === "self"
+                    ? <> · <span style={{color:"var(--green-600)"}}>self-certified</span></>
+                    : done.brand?.certifiedBy
+                      ? <> · certified by <span style={{color:"var(--green-600)"}}>{done.brand.certifiedBy}</span></>
+                      : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
               </span>
               <span>{agent.cr ?? "?"} cr</span>
             </div>
@@ -1140,7 +1144,7 @@ function SpecialistDrawer({ open, agent, onClose }) {
         ))}
       </div>
 
-      <div className="eyebrow" style={{marginBottom: 8}}>Example outputs · for Vinilo</div>
+      <div className="eyebrow" style={{marginBottom: 8}}>Example outputs · for Loam</div>
       <div style={{display:"flex", flexDirection:"column", gap: 12}}>
         {window.CI_OUTPUTS.filter(o => o.agentId === agent.id).slice(0,2).map(o => <OutputCard key={o.id} output={o} />)}
         {window.CI_OUTPUTS.filter(o => o.agentId === agent.id).length === 0 && (
@@ -1160,7 +1164,7 @@ function SpecialistDrawer({ open, agent, onClose }) {
 const CANVAS_NODES = [
   { id:"bio",      x:40,   y:60,  w:260, kind:"bio",       title:"Brand Intelligence Object",        sub:"BIO · 91%" },
   { id:"brief",    x:360,  y:50,  w:260, kind:"brief",     title:"Pricing relaunch · brief",         sub:"L1 · Brandolph" },
-  { id:"t1",       x:680,  y:20,  w:240, kind:"territory", title:"Territory · 'It costs the Tuesday'", sub:"L2-06 · Territory Mapper" },
+  { id:"t1",       x:680,  y:20,  w:240, kind:"territory", title:"Territory · 'It costs the daily ritual'", sub:"L2-06 · Territory Mapper" },
   { id:"t2",       x:680,  y:130, w:240, kind:"territory", title:"Territory · '1-in-12'",            sub:"L2-06 · Territory Mapper" },
   { id:"t3",       x:680,  y:240, w:240, kind:"territory", title:"Territory · 'Don't unsubscribe'",  sub:"L2-06 · Territory Mapper" },
   { id:"copy1",    x:960,  y:50,  w:260, kind:"copy",      title:"Pricing page hero",                sub:"L2-12 · Conversion Copy" },
@@ -2420,7 +2424,7 @@ function DeliverableDrawer({ node, onClose, onSendToHuman }) {
             value={polishNotes}
             onChange={(e) => setPolishNotes(e.target.value)}
             autoFocus
-            placeholder="Specific requests, points to add or edit — e.g. 'tighten the opening', 'make the CTA softer', 'add a line about the Madrid pour-over'."
+            placeholder="Specific requests, points to add or edit — e.g. 'tighten the opening', 'make the CTA softer', 'add a line about the Madrid kiln'."
             rows={4}
             style={{ width:"100%", padding:"10px 12px", borderRadius: 8, border:"1px solid var(--c-line)", background:"var(--c-card)", fontFamily:"inherit", fontSize: 13.5, lineHeight: 1.55, resize:"vertical", outline:"none", boxSizing:"border-box" }}
           />
@@ -2677,7 +2681,7 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
                 onChange={(e) => setReviseText(e.target.value)}
                 onKeyDown={(e) => e.stopPropagation()}
                 rows={3}
-                placeholder="What's not landing? e.g. 'too clinical — push toward editorial' or 'change the hero from coffee to a single ceramic vessel'"
+                placeholder="What's not landing? e.g. 'too clinical — push toward editorial' or 'change the hero from the styled table to a single ceramic vessel'"
                 style={{
                   width:"100%", padding: 10, borderRadius: 8,
                   border: "1px solid var(--c-line)", background: "var(--c-bg)",
@@ -2870,7 +2874,7 @@ function CanvasView({ go }) {
   if (ctx && Array.isArray(ctx.specialistIds) && ctx.specialistIds.length > 0) {
     return <BriefRunCanvas context={ctx} onClear={clearCtx} go={go} />;
   }
-  return <InteractiveCanvas nodeData={CANVAS_NODES} edges={CANVAS_EDGES} exportName="vinilo-canvas" />;
+  return <InteractiveCanvas nodeData={CANVAS_NODES} edges={CANVAS_EDGES} exportName="brand-canvas" />;
 }
 
 /* ── BriefViewCanvas — loads an existing brief's runs/outputs from DB

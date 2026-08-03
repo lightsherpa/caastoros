@@ -3,7 +3,7 @@ import { streamSSE } from "hono/streaming";
 
 import { buildBrandolphSystem } from "../prompt.js";
 import { streamCompletion, BRANDOLPH_SYNTHETIC_SPEC, isRouteAvailable } from "../lib/models/router.js";
-import { loadBioForRun } from "../lib/load-brand-bio.js";
+import { loadBrandBio } from "../lib/load-brand-bio.js";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 
@@ -35,10 +35,10 @@ app.post("/ask", requireAuth, async (c) => {
 
   let brandBio;
   try {
-    brandBio = await loadBioForRun({ workspaceId, brandId });
+    brandBio = await loadBrandBio({ workspaceId, brandId });
   } catch (err) {
-    if (err.code === "BIO_NOT_CERTIFIED") {
-      return c.json({ error: "Your BIO is awaiting Brand Steward certification.", code: err.code }, 409);
+    if (err.code === "BIO_NOT_READY") {
+      return c.json({ error: "Run Discovery to build your brand's BIO first.", code: err.code }, 409);
     }
     return c.json({ error: err.message || String(err) }, 400);
   }

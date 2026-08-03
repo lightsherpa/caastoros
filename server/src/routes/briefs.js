@@ -13,7 +13,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
-import { loadBioForRun } from "../lib/load-brand-bio.js";
+import { loadBrandBio } from "../lib/load-brand-bio.js";
 import { sharpenBrief } from "../lib/sharpener.js";
 import { loadBrandMemorySummary } from "../lib/brandolph-memory.js";
 import { estimateCrewCredits } from "../lib/pricing.js";
@@ -29,10 +29,10 @@ app.post("/sharpen", requireAuth, async (c) => {
 
   let brandBio;
   try {
-    brandBio = await loadBioForRun({ workspaceId, brandId });
+    brandBio = await loadBrandBio({ workspaceId, brandId });
   } catch (err) {
-    if (err.code === "BIO_NOT_CERTIFIED") {
-      return c.json({ error: "BIO is awaiting Brand Steward certification.", code: err.code }, 409);
+    if (err.code === "BIO_NOT_READY") {
+      return c.json({ error: "Run Discovery to build your brand's BIO first.", code: err.code }, 409);
     }
     return c.json({ error: err.message || String(err) }, 400);
   }

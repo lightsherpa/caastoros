@@ -7,8 +7,8 @@
 //   2. Synthesize BIO JSON via Anthropic Opus on the scraped markdown
 //   3. Write new bios row with certified=false (Steward cert lands in P1.5)
 //
-// The BIO shape mirrors server/src/data/vinilo.js so prompt.js
-// renderBioLayer can consume the result with no changes.
+// The BIO shape matches what prompt.js renderBioLayer / sharpener.js /
+// compose-specialist-prompt.js expect, so they consume it with no changes.
 // Visual fields (palette/type/imagery) are placeholder defaults — a
 // vision pass on screenshots fills those in P5 (image specialists).
 // ─────────────────────────────────────────────────────────────────────
@@ -396,7 +396,7 @@ export const compileBio = inngest.createFunction(
 
     // ── Step 3b · Seed brand refusals (only if none yet) ─────────
     // Write the model-generated refusals to brands.refusals so load-brand-bio
-    // serves them instead of the Vinilo fallback. Guard: only when the brand's
+    // serves them to the prompt. Guard: only when the brand's
     // current refusals are empty/null — never clobber Steward edits.
     await step.run("write-brand-refusals", async () => {
       const refusals = Array.isArray(verifiedBioPayload.refusals)

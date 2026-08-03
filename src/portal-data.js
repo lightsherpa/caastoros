@@ -2,10 +2,10 @@
 /* Loaded as a regular script so all globals attach to window.       */
 
 window.CI_BRAND = {
-  id: "vinilo",
-  name: "Vinilo",
-  tagline: "Specialty coffee for slow Tuesdays.",
-  website: "vinilo.coffee",
+  id: "loam",
+  name: "Loam",
+  tagline: "Handmade tableware for the slow table.",
+  website: "loam.studio",
   bioCompleteness: 91,
   bioVersion: 7,                                      /* rev-2 §5.5 — surfaces on OutputCard footer */
   bioLastUpdated: "Updated 14 May — 09:42",
@@ -20,7 +20,7 @@ window.CI_BRAND = {
 window.CI_USER = {
   name: "Marina Reyes",
   role: "Founder",
-  email: "marina@vinilo.coffee",
+  email: "marina@loam.studio",
   avatar: "caastor/assets/profile-3.jpg",
 };
 
@@ -185,7 +185,7 @@ window.CI_PINS = {
 window.CI_BRAND_REFUSALS = [
   "Never use the words “unlock”, “limited”, or “exclusive” — they cheapen the brand.",
   "Respect the 11.4× annual pricing formula; never invent a discount.",
-  "Reference provenance (origin, grower) only where the BIO marks it mandatory — once, never as decoration.",
+  "Reference provenance (the maker, the workshop) only where the BIO marks it mandatory — once, never as decoration.",
   "Refuse anything that contradicts the BIO; flag the conflict instead of complying.",
   "Keep voice-drift ≤ 0.20 against the brand voice — no hype, no manufactured urgency.",
 ];
@@ -301,7 +301,7 @@ window.CI_SPECIALIST_SPECS = {
   },
   a04: {
     role: "a strategic tension-finder who locates the productive contradiction between what the brand promises, what people feel, and what the category normalizes",
-    objective: "Surface the one tension with enough truth and consequence to generate strategy or creative work, then show how to use it without flattening it into a slogan.",
+    objective: "Surface the one tension with enough truth and consequence to generate strategy or creative work, then show how to use it without collapsing it into a slogan.",
     method: ["Compare BIO positioning with audience jobs, category conventions, and strategic watchouts", "Generate candidate contradictions as paired truths", "Reject tensions that are merely problems, trends, or wordplay", "Pressure-test the strongest tension for specificity, stakes, and creative fertility", "Translate it into a strategic implication and a question for concept development"],
     outputContract: "Return {tension:{truthA,truthB,stakes}, evidence[], whyNow, strategicImplication, conceptQuestion, falseTensions[]}. Maximum 220 words.",
     structuredOutput: "One primary tension object, two to four evidence strings, and up to two rejected falseTensions with reasons.",
@@ -650,7 +650,7 @@ window.CI_SPECIALIST_SPECS = {
     method: ["Read BIO imagery direction + avoid list", "Specify lens, light direction, set styling, depth of field", "Render with the brand's visual register", "Avoid 'mood photography' clichés"],
     outputContract: "Image(s) at the brief's spec. Lifestyle or product, owned visual identity.",
     voice: "Editorial. Specific. The light feels like it could only be this brand's.",
-    refusals: ["Won't render generic 'happy people drinking coffee' if the brand's imagery direction is editorial-restrained."],
+    refusals: ["Won't render generic 'happy people at a dinner table' if the brand's imagery direction is editorial-restrained."],
     bioSlices: ["positioning", "audience", "palette", "type", "imagery", "voice"],
   },
 
@@ -857,19 +857,19 @@ window.CI_SPECIALIST_SPECS = {
 window.CI_BRIEFS = [
   {
     id: "b-pricing-relaunch",
-    title: "Pricing relaunch — Tuesday",
+    title: "Pricing relaunch — the slow table",
     type: "Conversion",
-    smp: "We are the coffee for the Tuesday you decide to slow down on purpose.",
-    background: "Quarterly pricing relaunch. Subscription tier consolidation plus a new annual option.",
+    smp: "We are the table for the day you decide to slow down on purpose.",
+    background: "Quarterly pricing relaunch. Collection tier consolidation plus a new annual option.",
     objective: "Lift annual conversion +25% over Q1 baseline. Hold churn below 2.4%.",
     audience: "Existing subscribers (warm), trial-ending cohort (lukewarm), wholesale leads (cold).",
-    strategy: "Reframe price as cost-of-pause. The objection isn't dollars; it's the implicit promise to commit to a slower Tuesday.",
+    strategy: "Reframe price as cost-of-pause. The objection isn't dollars; it's the implicit promise to commit to the slow table.",
     tone: "Calm conviction. No urgency manipulation. A little funny, never cute.",
     direction: "Pricing page lead with editorial pull quote. Email sequence three-part. Subjects under 40 chars.",
-    mandatories: "Mention provenance once (Honduras). Avoid 'unlock' / 'limited'. Lead with annual option.",
+    mandatories: "Mention provenance once (Talavera). Avoid 'unlock' / 'limited'. Lead with annual option.",
     deliverables: ["Pricing page hero (web)","Email 1: announce","Email 2: case for annual","Email 3: last call","Subjects ×6","Brand consistency QA"],
     metrics: "Annual conversion %, time-on-page, sequence open + click, churn delta.",
-    notDoing: "Not 'limited-time' urgency. Not a discount. Not a referral push. Not bundling with the brewing kit.",
+    notDoing: "Not 'limited-time' urgency. Not a discount. Not a referral push. Not bundling with the care kit.",
     watchouts: ["Annual price ≠ 12× monthly. Apply the 11.4× formula consistently.","Trial-ending cohort opens twice as much; don't waste subject line position 1 on subscribers."],
     assumptions: ["Klaviyo flow is the channel. No paid social spend this push.","Wholesale audience receives sequence variant B only."],
     status: "in-production",
@@ -883,21 +883,21 @@ window.CI_BRIEFS = [
   },
   {
     id: "b-honduras-microlot",
-    title: "Honduras single-origin launch",
+    title: "Talavera single-maker launch",
     type: "Story",
-    smp: "Sometimes a coffee deserves to be named after the person who grew it.",
-    background: "Quarterly microlot launch. Producer relationship is the story, not the tasting notes.",
-    objective: "Sell through 480kg in 21 days. Establish microlot cadence as a brand pillar.",
-    audience: "Existing subscribers + specialty subscribers on third-party platforms.",
-    strategy: "Lead with the producer, not the coffee. Long-form story sets up the buy.",
+    smp: "Sometimes a piece deserves to be named after the person who made it.",
+    background: "Quarterly small-batch launch. The maker relationship is the story, not the glaze notes.",
+    objective: "Sell through 480 pieces in 21 days. Establish small-batch cadence as a brand pillar.",
+    audience: "Existing subscribers + design stockists on third-party platforms.",
+    strategy: "Lead with the maker, not the piece. Long-form story sets up the buy.",
     tone: "Editorial. Slightly elevated. Patient.",
     direction: "Long-form web piece, single product page, accompanying email + IG.",
-    mandatories: "Producer's name on hero. No 'exotic' / 'rare' / 'limited' (we'll do limited differently).",
+    mandatories: "Maker's name on hero. No 'exotic' / 'rare' / 'limited' (we'll do limited differently).",
     deliverables: ["Long-form essay (web)","Product page hero","Email announce","IG caption series (5)","Hero image direction"],
     metrics: "Sell-through rate, average order value, scroll depth on essay.",
-    notDoing: "Not a 'limited release' frame. Not flavor-note led. Not bundled with the equipment store.",
-    watchouts: ["Producer profile photos need licensing review before publication.","Avoid 'fair trade' phrasing — we're not the right certifier."],
-    assumptions: ["Roasting schedule aligns to ship-by-week-3."],
+    notDoing: "Not a 'limited release' frame. Not glaze-spec led. Not bundled with the tool store.",
+    watchouts: ["Maker profile photos need licensing review before publication.","Avoid 'certified artisan' phrasing — we're not the right certifier."],
+    assumptions: ["Kiln schedule aligns to ship-by-week-3."],
     status: "approved",
     credits: 52,
     agents: ["a02","a04","a15","a13","a20","a18"],
@@ -905,21 +905,21 @@ window.CI_BRIEFS = [
   },
   {
     id: "b-summer-tuesdays",
-    title: "Summer Tuesdays — seasonal campaign",
+    title: "Summer at the table — seasonal campaign",
     type: "Campaign",
-    smp: "Summer is when we earn the slow Tuesday back.",
-    background: "Seasonal campaign covering June–August. Café footfall + subscription lifts.",
-    objective: "Build mid-week visit cadence. Lift Tuesday DAU at café by 18%.",
-    audience: "Locals within 2.5km of the two cafés. Subscribers as halo.",
+    smp: "Summer is when we earn the slow table back.",
+    background: "Seasonal campaign covering June–August. Studio visits + collection lifts.",
+    objective: "Build a mid-week visit cadence. Lift studio visits by 18%.",
+    audience: "Locals within 2.5km of the two studios. Subscribers as halo.",
     strategy: "Reframe summer as the season the routine stretches, not breaks.",
     tone: "Warm. Less editorial than the launch — more conversational.",
-    direction: "Café posters, IG, two pieces of merch, an email.",
-    mandatories: "Café address + opening hours on every printed surface.",
+    direction: "Studio posters, IG, two pieces of merch, an email.",
+    mandatories: "Studio address + opening hours on every printed surface.",
     deliverables: ["Poster set (A2)","IG carousel (3)","Email","Merch sketch — tote + ceramic"],
-    metrics: "Café Tuesday footfall, subscription net adds, IG saves.",
-    notDoing: "Not a discount summer. Not a 'free coffee with X'. Not influencer-led.",
+    metrics: "Studio visits, subscription net adds, IG saves.",
+    notDoing: "Not a discount summer. Not a 'free piece with X'. Not influencer-led.",
     watchouts: ["Print proof needed by 28 May."],
-    assumptions: ["Both cafés agree the Tuesday slot. Confirm with operations."],
+    assumptions: ["Both studios agree the Tuesday slot. Confirm with operations."],
     status: "draft",
     credits: 0,
     agents: ["a02","a06","a09","a20","a16"],
@@ -929,18 +929,18 @@ window.CI_BRIEFS = [
     id: "b-investor-deck",
     title: "Investor deck — pre-seed close",
     type: "Internal",
-    smp: "The platform is the rail; the cafés are the cathedral.",
-    background: "Closing pre-seed. Need a deck that doesn't apologise for the café revenue.",
+    smp: "The platform is the rail; the studios are the cathedral.",
+    background: "Closing pre-seed. Need a deck that doesn't apologise for the studio revenue.",
     objective: "Get to YES on the remaining €420k.",
     audience: "Three angels + one micro-VC. Pre-read materials matter more than the deck itself.",
-    strategy: "Lead with the rail. Cafés are operational proof, not the thesis.",
+    strategy: "Lead with the rail. Studios are operational proof, not the thesis.",
     tone: "Direct. No founder-myth. Numbers in front.",
     direction: "12 slides. One-pager appendix.",
     mandatories: "Founder bios on slide 11. Use of funds explicit on slide 9.",
     deliverables: ["12-slide deck","One-pager (PDF)","Speaker notes"],
     metrics: "Close rate. Not a marketing brief.",
-    notDoing: "Not a customer narrative. Not a hockey stick. Not 'we are the Substack for coffee'.",
-    watchouts: ["Specialist café operator (TL) signoff on operations slide."],
+    notDoing: "Not a customer narrative. Not a hockey stick. Not 'we are the Substack for ceramics'.",
+    watchouts: ["Specialist studio operator (TL) signoff on operations slide."],
     assumptions: ["Pre-read is sent 48h before."],
     status: "shipped",
     credits: 64,
@@ -968,56 +968,56 @@ window.CI_OUTPUTS = [
   {
     id:"o1", briefId:"b-pricing-relaunch", kind:"page",
     type:"PRICING PAGE · HERO", agentId:"a12", status:"approved",
-    body:"Stay for the year, and the coffee stays the price. Annual takes 1 in 12 off the bill — but the point isn't the dollar; the point is the decision to commit to a slower Tuesday on purpose.",
+    body:"Stay for the year, and the collection stays the price. Annual takes 1 in 12 off the bill — but the point isn't the dollar; the point is the decision to commit to the slow table on purpose.",
     meta:"38 words · est. 9.4 readability",
     rationale:"Led with the commitment, not the discount — the BIO forbids urgency and frames price as cost-of-pause, so the hero sells the decision and lets the 1-in-12 sit as a quiet proof, never the headline."
   },
   {
     id:"o2", briefId:"b-pricing-relaunch", kind:"email",
     type:"EMAIL 1 · ANNOUNCE", agentId:"a13", status:"in-production",
-    body:"Annual is now an option. It isn't cheaper because we ran the numbers and got generous; it's cheaper because we asked you to commit to something. Annual subscribers told us they don't want flexibility — they want the bag on the kitchen counter on the same day each month.",
+    body:"Annual is now an option. It isn't cheaper because we ran the numbers and got generous; it's cheaper because we asked you to commit to something. Annual subscribers told us they don't want flexibility — they want the new piece on the shelf on the same day each month.",
     meta:"247 words · 3-part sequence",
     rationale:"Opened by naming the objection out loud (“it isn't cheaper because we got generous”) — the audience is warm and skeptical of pricing emails, so disarming the cynicism earns the read before the case for annual is even made."
   },
   {
     id:"o3", briefId:"b-pricing-relaunch", kind:"copy",
     type:"SUBJECT LINES · ×6", agentId:"a14", status:"approved",
-    body:"01 · There's a slower Tuesday in here  ·  02 · Annual is now an option  ·  03 · A small case for committing  ·  04 · One-in-twelve, on us  ·  05 · The Tuesday plan  ·  06 · Re: that subscription",
+    body:"01 · There's a slower table in here  ·  02 · Annual is now an option  ·  03 · A small case for committing  ·  04 · One-in-twelve, on us  ·  05 · The slow-table plan  ·  06 · Re: that subscription",
     meta:"6 variants · A/B intent split",
     rationale:"Kept every subject under 40 characters and split them by intent — the trial-ending cohort opens twice as much, so the watchout said don't waste position 1 on subscribers; variants 1 and 4 are aimed at the cohort that actually opens."
   },
   {
     id:"o4", briefId:"b-pricing-relaunch", kind:"qa",
     type:"BRAND CONSISTENCY QA", agentId:"a24", status:"approved",
-    body:"Pass. No use of 'unlock' or 'limited'. Annual price respects 11.4× formula. Provenance (Honduras) referenced once in Email 1 paragraph 3, in line with mandatory. Voice drift index 0.14 (target ≤0.20).",
+    body:"Pass. No use of 'unlock' or 'limited'. Annual price respects 11.4× formula. Provenance (Talavera) referenced once in Email 1 paragraph 3, in line with mandatory. Voice drift index 0.14 (target ≤0.20).",
     meta:"1 page · QA gate green"
   },
   {
     id:"o6", briefId:"b-pricing-relaunch", kind:"image",
     type:"PRICING HERO · KEY VISUAL", agentId:"a18", status:"in-production",
-    body:"A single bag on a sunlit kitchen counter, Tuesday-morning light. Annual band wraps the lower third in warm amber. No price on the visual — the price lives in the copy.",
+    body:"A single bowl on a sunlit kitchen counter, Tuesday-morning light. Annual band wraps the lower third in warm amber. No price on the visual — the price lives in the copy.",
     meta:"1600×900 · 3 crops · Flux 2",
     rationale:"No price on the visual — the BIO keeps price in copy, not image. Chose Tuesday-morning kitchen light over studio product shots so the frame says “ritual” not “sale”, matching the cost-of-pause strategy."
   },
 
-  /* ── Honduras single-origin ── */
+  /* ── Talavera single-maker ── */
   {
     id:"o5", briefId:"b-honduras-microlot", kind:"longform",
     type:"LONG-FORM · ESSAY OPENER", agentId:"a15", status:"review",
-    body:"Don José grew this. He has 1.4 hectares and the inheritance of a name that, in his town, you don't introduce because everyone knows it already. We don't need to tell you the elevation or the variety. We need to tell you that the coffee is named after the person, and that's where you'll start.",
+    body:"Don José made this. He has a workshop the size of a single room and the inheritance of a name that, in his town, you don't introduce because everyone knows it already. We don't need to tell you the clay body or the glaze. We need to tell you that the piece is named after the person, and that's where you'll start.",
     meta:"1,840 words · editorial register",
-    rationale:"Started on the grower's name, not the elevation or varietal — the BIO marks provenance as mandatory but warns against decoration, so the essay leads with the person and earns the spec details later instead of front-loading them."
+    rationale:"Started on the maker's name, not the clay or glaze — the BIO marks provenance as mandatory but warns against decoration, so the essay leads with the person and earns the spec details later instead of front-loading them."
   },
   {
     id:"o7", briefId:"b-honduras-microlot", kind:"image",
-    type:"BAG LABEL · FRONT", agentId:"a20", status:"draft",
-    body:"Hand-set serial number, Don José's signature reproduced under the lot code. Kraft stock, single-colour amber. The label is the provenance — nothing decorative.",
-    meta:"label dieline · print-ready"
+    type:"BASE STAMP · MAKER'S MARK", agentId:"a20", status:"draft",
+    body:"Hand-pressed serial number, Don José's signature stamped under the lot code. Impressed into the unglazed base, one amber glaze in the recess. The mark is the provenance — nothing decorative.",
+    meta:"stamp die · production-ready"
   },
   {
     id:"o8", briefId:"b-honduras-microlot", kind:"social",
     type:"INSTAGRAM · CAROUSEL ×4", agentId:"a14", status:"draft",
-    body:"Slide 1: the name. Slide 2: the hectares. Slide 3: the cup. Slide 4: where to get it. No 'link in bio' energy — it reads like a short letter.",
+    body:"Slide 1: the name. Slide 2: the workshop. Slide 3: the piece. Slide 4: where to get it. No 'link in bio' energy — it reads like a short letter.",
     meta:"4 frames · caption + alt text"
   },
 
@@ -1025,19 +1025,19 @@ window.CI_OUTPUTS = [
   {
     id:"o9", briefId:"b-summer-tuesdays", kind:"copy",
     type:"TERRITORY · ×3 CONCEPTS", agentId:"a06", status:"draft",
-    body:"01 · 'The slow afternoon, on purpose.'  02 · 'Iced, but make it a ritual.'  03 · 'Summer is when we earn the slow Tuesday back.' — recommend 03, it ladders to the BIO positioning.",
+    body:"01 · 'The slow afternoon, on purpose.'  02 · 'Set the summer table, slowly.'  03 · 'Summer is when we earn the slow table back.' — recommend 03, it ladders to the BIO positioning.",
     meta:"3 territories · 1 recommended"
   },
   {
     id:"o10", briefId:"b-summer-tuesdays", kind:"image",
     type:"CAMPAIGN HERO · KV", agentId:"a18", status:"draft",
-    body:"Cold brew sweating on a shaded balcony table, afternoon shadow long across the wood. Editorial, not stocky. Amber type lockup bottom-left.",
+    body:"A glazed pitcher, beaded with cold-water condensation, on a shaded balcony table; afternoon shadow long across the wood. Editorial, not stocky. Amber type lockup bottom-left.",
     meta:"1920×1080 · 2 ratios"
   },
   {
     id:"o11", briefId:"b-summer-tuesdays", kind:"email",
     type:"TEASER · PRE-LAUNCH", agentId:"a13", status:"draft",
-    body:"Something slower is coming for the warm months. Not a sale. A reason to keep the Tuesday even when the city speeds up. Watch this space — or don't, and we'll tell you when it lands.",
+    body:"Something slower is coming for the warm months. Not a sale. A reason to keep the table set even when the city speeds up. Watch this space — or don't, and we'll tell you when it lands.",
     meta:"96 words · single send"
   },
 
@@ -1045,42 +1045,42 @@ window.CI_OUTPUTS = [
   {
     id:"o12", briefId:"b-investor-deck", kind:"deck",
     type:"DECK · 12-SLIDE OUTLINE", agentId:"a09", status:"shipped",
-    body:"Cold open on the retention curve, not the team slide. Problem framed as 'subscription coffee churns because it's a commodity relationship.' The bet: provenance + ritual = a brand, not a SKU.",
+    body:"Cold open on the retention curve, not the team slide. Problem framed as 'a tableware subscription churns because it's a commodity relationship.' The bet: provenance + ritual = a brand, not a SKU.",
     meta:"12 slides · narrative spine"
   },
   {
     id:"o13", briefId:"b-investor-deck", kind:"copy",
     type:"ONE-LINER · ×5", agentId:"a02", status:"shipped",
-    body:"'We sell the Tuesday, not the bag.' · 'Coffee with a name attached.' · 'The anti-commodity subscription.' · 'Provenance you can taste, ritual you can keep.' · 'A brand, not a SKU.'",
+    body:"'We sell the table, not the piece.' · 'Tableware with a name attached.' · 'The anti-commodity subscription.' · 'Provenance you can hold, ritual you can keep.' · 'A brand, not a SKU.'",
     meta:"5 lines · for cover + cold email"
   },
   {
     id:"o14", briefId:"b-investor-deck", kind:"image",
     type:"MARKET MAP · DIAGRAM", agentId:"a18", status:"review",
-    body:"2×2 with 'commodity ↔ provenance' on x and 'transactional ↔ ritual' on y. Competitors clustered bottom-left; Vinilo alone top-right. Clean, no gradient soup.",
+    body:"2×2 with 'commodity ↔ provenance' on x and 'transactional ↔ ritual' on y. Competitors clustered bottom-left; Loam alone top-right. Clean, no gradient soup.",
     meta:"vector · light + dark variants"
   },
 
   /* ── Client uploads (reference material the brand brought in) ── */
   {
     id:"u1", briefId:"b-honduras-microlot", kind:"upload", source:"upload",
-    type:"UPLOAD · FARM PHOTOS", agentId:null, status:"draft",
-    body:"12 photos from Don José's farm — harvest, drying beds, the signature on the lot ledger. Source material for the bag label and the essay.",
+    type:"UPLOAD · WORKSHOP PHOTOS", agentId:null, status:"draft",
+    body:"12 photos from Don José's workshop — the wheel, the glaze shelves, the signature on the lot ledger. Source material for the base stamp and the essay.",
     meta:"12 images · 48 MB · client upload"
   },
   {
     id:"u2", briefId:"b-pricing-relaunch", kind:"upload", source:"upload",
     type:"UPLOAD · BRAND GUIDELINES", agentId:null, status:"draft",
-    body:"Vinilo brand book v2 (PDF). Type, colour, the 11.4× pricing formula, the forbidden-words list Brandolph QAs against.",
+    body:"Loam brand book v2 (PDF). Type, colour, the 11.4× pricing formula, the forbidden-words list Brandolph QAs against.",
     meta:"PDF · 18 pp · client upload"
   },
 ];
 
 /* Team queue (jobs) ----------------------------------------------- */
 window.CI_JOBS = [
-  { id:"j-9f2a1c", client:"Vinilo Coffee",   type:"Hero KV finish",      cr:220, submitted:"2h ago",  sla:"48h",     status:"unassigned", assignee:null },
-  { id:"j-d4e8b7", client:"Vinilo Coffee",   type:"Email build polish",  cr:120, submitted:"5h ago",  sla:"32h",     status:"in-progress", assignee:"Aitana V." },
-  { id:"j-3b6c2a", client:"Vinilo Coffee",   type:"Pricing page review", cr:80,  submitted:"yesterday", sla:"18h overdue", status:"review",  assignee:"Marc P." },
+  { id:"j-9f2a1c", client:"Loam Studio",   type:"Hero KV finish",      cr:220, submitted:"2h ago",  sla:"48h",     status:"unassigned", assignee:null },
+  { id:"j-d4e8b7", client:"Loam Studio",   type:"Email build polish",  cr:120, submitted:"5h ago",  sla:"32h",     status:"in-progress", assignee:"Aitana V." },
+  { id:"j-3b6c2a", client:"Loam Studio",   type:"Pricing page review", cr:80,  submitted:"yesterday", sla:"18h overdue", status:"review",  assignee:"Marc P." },
   { id:"j-77a9d1", client:"Plaza Hortelana", type:"Identity finalisation",cr:550,submitted:"3d ago", sla:"8h",      status:"delivered",  assignee:"Aitana V." },
   { id:"j-22e6f5", client:"Plaza Hortelana", type:"Deck polish",         cr:300, submitted:"4d ago", sla:"24h",      status:"in-progress", assignee:"Diego M." },
   { id:"j-55c0a3", client:"Bandera",         type:"Minor polish",        cr:80,  submitted:"1h ago", sla:"40h",      status:"unassigned",  assignee:null },
@@ -1121,10 +1121,10 @@ window.CI_LEDGER = [
   { date:"14 May · 11:42", desc:"Pricing relaunch — Email sequence",  who:"Email Sequence · L2-13",  cr:-12, layer:"L2" },
   { date:"14 May · 11:42", desc:"Pricing relaunch — Subject lines",   who:"Subject Lines · L2-14",   cr:-2,  layer:"L2" },
   { date:"14 May · 11:43", desc:"Pricing relaunch — Brand QA",        who:"Brand Consistency QA · L2-24", cr:-2,  layer:"L2" },
-  { date:"13 May · 17:08", desc:"Hero KV finish — Vinilo",            who:"Aitana V. · Senior designer", cr:-220, layer:"L3" },
-  { date:"12 May · 09:31", desc:"Discovery compile — Vinilo",         who:"BIO Compiler · L2-30",    cr:-10, layer:"L2" },
+  { date:"13 May · 17:08", desc:"Hero KV finish — Loam",              who:"Aitana V. · Senior designer", cr:-220, layer:"L3" },
+  { date:"12 May · 09:31", desc:"Discovery compile — Loam",           who:"BIO Compiler · L2-30",    cr:-10, layer:"L2" },
   { date:"11 May · 14:55", desc:"Brandolph turn — assembly proposal", who:"Brandolph",   cr:-3,  layer:"L1" },
   { date:"08 May · 10:12", desc:"Investor deck — Build",              who:"Deck Build · L2-27",       cr:-12, layer:"L2" },
-  { date:"06 May · 16:40", desc:"Honduras essay — Long-form",         who:"Long-form Editor · L2-15",cr:-14, layer:"L2" },
+  { date:"06 May · 16:40", desc:"Talavera essay — Long-form",         who:"Long-form Editor · L2-15",cr:-14, layer:"L2" },
   { date:"05 May · 09:00", desc:"Cycle credit refresh",                who:"—",          cr:900, layer:"—" },
 ];
