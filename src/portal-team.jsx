@@ -1,6 +1,6 @@
 import React from "react";
 import { apiFetch } from "./lib/supabase-browser.js";
-const { BrandolphDot, Confidence, Counter, Icon, ModelChip, PageHeader, SlaHeat, StatusPill } = window;
+const { BrandolphDot, Confidence, Counter, Icon, ModelChip, PageHeader, StatusPill } = window;
 /* Team portal — queue, job workspace, capacity, clients, earnings. */
 
 const { useState: useTState, useEffect: useTEffect } = React;
@@ -42,6 +42,35 @@ function useStewardJob(jobId) {
   };
   useTEffect(() => { reload(); }, [jobId]);
   return { ...data, reload };
+}
+
+/* Cross-workspace roster / capacity / my-desk data. Browser queries can't
+   see past workspace RLS, so this comes from /api/team/overview. */
+function useTeamOverview() {
+  const [data, setData] = useTState({ overview: null, error: null, loading: true });
+  useTEffect(() => {
+    (async () => {
+      try {
+        const res = await apiFetch("/api/team/overview");
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) { setData({ overview: null, error: json.error || `HTTP ${res.status}`, loading: false }); return; }
+        setData({ overview: json, error: null, loading: false });
+      } catch (e) {
+        setData({ overview: null, error: e?.message || String(e), loading: false });
+      }
+    })();
+  }, []);
+  return data;
+}
+
+/* A failed load must never read as "there is nothing here". */
+function LoadNote({ loading, error, empty }) {
+  if (!loading && !error && !empty) return null;
+  return (
+    <div style={{padding: 16, fontSize: 12.5, color: error ? "var(--pink-500)" : "var(--c-faint)"}}>
+      {error ? `Couldn't load — ${error}` : loading ? "Loading…" : empty}
+    </div>
+  );
 }
 
 function relativeTime(iso) {
@@ -204,7 +233,7 @@ function TeamQueue({ go }) {
           <div className="eyebrow" style={{marginBottom: 12}}>About these jobs</div>
           <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.55}}>
             Each row is a brand awaiting BIO certification — a senior human review before any specialist run reads from it.
-            The moat: every output ships <em>"certified by {you?.first_name || "Marina"}"</em>.
+            The moat: every output ships <em>"certified by {you?.first_name || "a named senior human"}"</em>.
             <div style={{marginTop: 12, fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>rev-2 §5 · P1.5</div>
           </div>
         </div>
@@ -788,86 +817,74 @@ function TeamJob({ id, go }) {
 /* CAPACITY & SLA DASHBOARD                                          */
 
 function TeamCapacity() {
-  const days = ["Mon","Tue","Wed","Thu","Fri"];
+  const { overview, error, loading } = useTeamOverview();
+  const members = overview?.members || [];
+  const backlog = overview?.backlog || [];
+  const throughput = overview?.throughput || [];
+  const peak = Math.max(1, ...throughput);
+  const ready = !loading && !error;
+
   return (
     <div style={{padding:"24px 36px 60px"}}>
-      <PageHeader eyebrow="Team lead" title="Capacity & SLA" sub="Where the team is loaded, where SLA is at risk, where the next job should land." />
+      <PageHeader eyebrow="Team lead" title="Capacity" sub="Who is carrying open certification jobs, what is unassigned, what the bench actually shipped." />
 
       <div style={{display:"grid", gridTemplateColumns:"2fr 1fr", gap: 22, marginBottom: 30}}>
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 16}}>Team load · this week</div>
-          <div style={{display:"grid", gridTemplateColumns:"180px repeat(5, 1fr)", gap: 6}}>
-            <div></div>
-            {days.map(d => <div key={d} className="eyebrow" style={{textAlign:"center"}}>{d}</div>)}
-            {window.CI_TEAM.map(t => (
-              <React.Fragment key={t.id}>
-                <div style={{display:"flex", alignItems:"center", gap: 8, padding: 8}}>
-                  <img src={t.photo} alt="" style={{width: 28, height: 28, borderRadius:"50%", objectFit:"cover"}} />
+          <div className="eyebrow" style={{marginBottom: 16}}>Open jobs per team member</div>
+          <LoadNote loading={loading} error={error} empty={ready && members.length === 0 ? "No active team members." : null} />
+          <div style={{display:"flex", flexDirection:"column", gap: 6}}>
+            {members.map(m => (
+              <div key={m.id} style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap: 10, padding:"10px 12px", border:"1px solid var(--c-line)", borderRadius: 8}}>
+                <div style={{display:"flex", alignItems:"center", gap: 10}}>
+                  <div style={{width: 28, height: 28, borderRadius:"50%", background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontSize: 12, fontWeight: 600}}>{(m.name || "?")[0]}</div>
                   <div>
-                    <div style={{fontSize: 13, fontWeight: 500}}>{t.name}</div>
-                    <div style={{fontSize: 11, color:"var(--c-faint)"}}>{t.role}</div>
+                    <div style={{fontSize: 13, fontWeight: 500}}>{m.name}</div>
+                    <div style={{fontSize: 11, color:"var(--c-faint)"}}>{(m.roles || []).join(" · ") || "no roles"}</div>
                   </div>
                 </div>
-                {days.map((d, i) => {
-                  const load = Math.max(0.1, Math.min(1, t.load + (i - 2) * 0.08 + Math.random() * 0.1));
-                  const color = load > 0.85 ? "#FCDDDD" : load > 0.65 ? "#FFE9C0" : load > 0.35 ? "#FFF4D5" : "#E8FBF2";
-                  const textColor = load > 0.85 ? "var(--pink-700)" : load > 0.65 ? "var(--orange-600)" : load > 0.35 ? "var(--yellow-800)" : "var(--green-700)";
-                  return (
-                    <div key={i} style={{
-                      background: color, borderRadius: 6, padding:"10px 8px",
-                      textAlign:"center", color: textColor,
-                      fontFamily:"var(--font-mono)", fontSize: 11, letterSpacing:"0.04em", fontWeight: 500,
-                    }}>{Math.round(load * 100)}%</div>
-                  );
-                })}
-              </React.Fragment>
+                <span className="pill" style={{height: 22, padding:"0 10px", fontSize: 11}}>{m.openJobs} open</span>
+              </div>
             ))}
           </div>
         </div>
 
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14, color:"var(--pink-500)"}}>SLA risk · 3 jobs</div>
-          <div style={{display:"flex", flexDirection:"column", gap: 10}}>
-            {window.CI_JOBS.filter(j => /overdue/.test(j.sla) || (/^\d+h/.test(j.sla) && parseInt(j.sla) <= 8)).map(j => (
-              <div key={j.id} style={{padding: 12, border:"1px solid var(--c-line)", borderRadius: 8, borderLeft:"3px solid var(--pink-500)"}}>
-                <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                  <div>
-                    <div style={{fontSize: 13, fontWeight: 500}}>{j.client}</div>
-                    <div style={{fontSize: 12, color:"var(--c-dim)"}}>{j.type}</div>
-                  </div>
-                  <SlaHeat text={j.sla} />
-                </div>
-                <button className="btn btn--ghost btn--sm" style={{marginTop: 10, fontSize: 11}}>Reassign</button>
-              </div>
-            ))}
+          <div className="eyebrow" style={{marginBottom: 14}}>SLA risk</div>
+          <div style={{fontSize: 12.5, color:"var(--c-faint)", lineHeight: 1.55}}>
+            Not wired. Jobs carry no due date and the team logs no hours, so anything shown here would be invented. Queue age is on the Steward queue.
           </div>
         </div>
       </div>
 
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 22}}>
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14}}>Daily throughput · last 14 days</div>
-          <div style={{display:"flex", alignItems:"flex-end", gap: 6, height: 140}}>
-            {[6,8,5,9,11,4,7,9,12,8,10,9,11,14].map((n, i) => (
-              <div key={i} style={{flex:1, height: `${(n/14)*100}%`, background: i >= 12 ? "var(--yellow-500)" : "var(--purple-200)", borderRadius:"3px 3px 0 0"}} title={`${n} jobs`} />
-            ))}
-          </div>
-          <div style={{display:"flex", justifyContent:"space-between", marginTop: 8, fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>
-            <span>2 weeks ago</span>
-            <span>today</span>
-          </div>
+          <div className="eyebrow" style={{marginBottom: 14}}>Certifications completed · last 14 days</div>
+          <LoadNote loading={loading} error={error} />
+          {ready && (
+            <>
+              <div style={{display:"flex", alignItems:"flex-end", gap: 6, height: 140}}>
+                {throughput.map((n, i) => (
+                  <div key={i} title={`${n} certified`} style={{flex:1, height: `${(n/peak)*100}%`, minHeight: 2, background: i === throughput.length - 1 ? "var(--yellow-500)" : "var(--purple-200)", borderRadius:"3px 3px 0 0"}} />
+                ))}
+              </div>
+              <div style={{display:"flex", justifyContent:"space-between", marginTop: 8, fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>
+                <span>2 weeks ago</span>
+                <span>today</span>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14}}>Backlog · oldest unstarted</div>
+          <div className="eyebrow" style={{marginBottom: 14}}>Backlog · unassigned</div>
+          <LoadNote loading={loading} error={error} empty={ready && backlog.length === 0 ? "Nothing unassigned." : null} />
           <div style={{display:"flex", flexDirection:"column", gap: 8}}>
-            {window.CI_JOBS.filter(j => j.status === "unassigned").map(j => (
+            {backlog.map(j => (
               <div key={j.id} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", border:"1px solid var(--c-line)", borderRadius: 8}}>
                 <div>
-                  <div style={{fontSize: 13, fontWeight: 500}}>{j.client}</div>
-                  <div style={{fontSize: 12, color:"var(--c-dim)"}}>{j.type} · submitted {j.submitted}</div>
+                  <div style={{fontSize: 13, fontWeight: 500}}>{j.brand || "(brand)"}</div>
+                  <div style={{fontSize: 12, color:"var(--c-dim)"}}>{j.kind} · queued {relativeTime(j.queued_at)}</div>
                 </div>
-                <button className="btn btn--primary btn--sm">Assign</button>
               </div>
             ))}
           </div>
@@ -881,41 +898,38 @@ function TeamCapacity() {
 /* CLIENT ROSTER                                                     */
 
 function TeamClients() {
-  const clients = [
-    { name:"Vinilo Coffee",   bio: 91, tier:"02", active: 4, lifetime: 38, last:"2h ago",   primary:"Marina Reyes" },
-    { name:"Plaza Hortelana", bio: 78, tier:"03", active: 2, lifetime: 22, last:"yesterday", primary:"Pere Sallés" },
-    { name:"Bandera",         bio: 84, tier:"02", active: 2, lifetime: 31, last:"4h ago",    primary:"Joana Vidal" },
-    { name:"Faro Lab",        bio: 66, tier:"02", active: 2, lifetime: 19, last:"yesterday", primary:"Alma Castro" },
-    { name:"Olivar Real",     bio: 92, tier:"03", active: 2, lifetime: 44, last:"6h ago",    primary:"Iván Mestres" },
-    { name:"Maizal",          bio: 58, tier:"01", active: 1, lifetime: 4,  last:"3h ago",    primary:"Sofía Romero" },
-  ];
+  const { overview, error, loading } = useTeamOverview();
+  const clients = overview?.clients || [];
+  const ready = !loading && !error;
   return (
     <div style={{padding:"24px 36px 60px"}}>
-      <PageHeader eyebrow="Team portal" title="Clients · 6" sub="The workspaces the team serves. Useful when you're picking up multiple jobs from the same brand." />
+      <PageHeader eyebrow="Team portal" title={`Clients${ready ? " · " + clients.length : ""}`} sub="The brands the team serves. Useful when you're picking up multiple jobs from the same brand." />
       <div className="card" style={{padding: 0, overflow:"hidden"}}>
+        <LoadNote loading={loading} error={error} empty={ready && clients.length === 0 ? "No brands yet." : null} />
         <table style={{width:"100%", borderCollapse:"collapse", fontSize: 13}}>
           <thead>
             <tr style={{background:"var(--c-bg)", borderBottom:"1px solid var(--c-line)"}}>
-              {["Brand","BIO","Tier","Active jobs","Lifetime","Last activity","Primary contact"].map(h => (
+              {["Brand","BIO","Tier","Open jobs","Certified","Last activity"].map(h => (
                 <th key={h} style={{textAlign:"left", padding:"12px 18px", fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight: 500}}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="stagger">
             {clients.map((c, i) => (
-              <tr key={c.name} style={{borderBottom: i < clients.length - 1 ? "1px solid var(--c-line)" : "none"}}>
+              <tr key={c.id} style={{borderBottom: i < clients.length - 1 ? "1px solid var(--c-line)" : "none"}}>
                 <td style={{padding:"14px 18px"}}>
                   <div style={{display:"flex", alignItems:"center", gap: 10}}>
-                    <div style={{width: 28, height: 28, borderRadius: 6, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize: 12}}>{c.name[0]}</div>
+                    <div style={{width: 28, height: 28, borderRadius: 6, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize: 12}}>{(c.name || "?")[0]}</div>
                     <span style={{fontWeight: 500, color:"var(--c-ink)"}}>{c.name}</span>
                   </div>
                 </td>
-                <td style={{padding:"14px 18px"}}><Confidence value={c.bio} /></td>
-                <td style={{padding:"14px 18px"}}><span className="pill pill--yellow">Tier {c.tier}</span></td>
-                <td style={{padding:"14px 18px", fontFamily:"var(--font-mono)"}}>{c.active}</td>
-                <td style={{padding:"14px 18px", fontFamily:"var(--font-mono)", color:"var(--c-dim)"}}>{c.lifetime}</td>
-                <td style={{padding:"14px 18px", color:"var(--c-faint)"}}>{c.last}</td>
-                <td style={{padding:"14px 18px"}}>{c.primary}</td>
+                <td style={{padding:"14px 18px"}}>{typeof c.bioScore === "number" ? <Confidence value={c.bioScore} /> : <span style={{color:"var(--c-faint)"}}>—</span>}</td>
+                <td style={{padding:"14px 18px"}}>{c.tier ? <span className="pill pill--yellow">Tier {c.tier}</span> : <span style={{color:"var(--c-faint)"}}>—</span>}</td>
+                <td style={{padding:"14px 18px", fontFamily:"var(--font-mono)"}}>{c.openJobs}</td>
+                <td style={{padding:"14px 18px", color: c.certifiedBy ? "var(--c-ink)" : "var(--c-faint)"}}>
+                  {c.certifiedBy ? `v${c.bioVersion} · ${c.certifiedBy}` : "Not certified"}
+                </td>
+                <td style={{padding:"14px 18px", color:"var(--c-faint)"}}>{relativeTime(c.lastActivity)}</td>
               </tr>
             ))}
           </tbody>
@@ -929,89 +943,60 @@ function TeamClients() {
 /* MY EARNINGS                                                       */
 
 function TeamMe() {
-  const [scope, setScope] = useTState("month");
+  const { overview, error, loading } = useTeamOverview();
+  const you = overview?.you;
+  const deliveries = overview?.myDeliveries || [];
+  const ready = !loading && !error;
+
+  /* Only certifications are tracked per team member today — no time entries,
+     no client ratings, no member payout rail. Those tiles stay honest. */
+  const untracked = "Not tracked yet";
+
   return (
     <div style={{padding:"24px 36px 60px"}}>
       <PageHeader
         eyebrow="My desk"
-        title="Aitana V. · Senior designer"
-        sub="Hours, jobs, satisfaction. La Mesa pays on a separate rail — this is the visibility, not the pay slip."
-        right={
-          <div style={{display:"flex", gap: 6}}>
-            {[["month","Month"],["quarter","Quarter"],["lifetime","Lifetime"]].map(([k, l]) => (
-              <button key={k} onClick={() => setScope(k)} className={"pill" + (scope === k ? " pill--dark" : "")} style={{cursor:"pointer", height:28, padding:"0 12px"}}>{l}</button>
-            ))}
-          </div>
-        }
+        title={you?.name || "My desk"}
+        sub={you ? `${(you.roles || []).join(" · ") || "no roles"} — what you've certified. Pay runs on a separate rail; this is the visibility, not the pay slip.` : "Your certification record."}
       />
+
+      <LoadNote loading={loading} error={error} empty={ready && !you ? "You have no team_members row — nothing to show for your desk." : null} />
 
       <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap: 14, marginBottom: 28}}>
         {[
-          { label:"Jobs delivered", v: 14 },
-          { label:"Hours logged",   v: 38 },
-          { label:"Avg satisfaction", v:"4.7" },
-          { label:"Credits earned", v:"€1,847" },
+          { label:"Certifications completed", v: ready ? overview.myCompleted : null },
+          { label:"Hours logged",   v: null },
+          { label:"Avg satisfaction", v: null },
+          { label:"Credits earned", v: null },
         ].map((s, i) => (
           <div key={i} className="card" style={{padding: 20}}>
             <div className="eyebrow" style={{marginBottom: 6}}>{s.label}</div>
             <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 36, color:"var(--c-ink)", letterSpacing:"-0.01em", fontWeight: 500, lineHeight: 1}}>
-              {typeof s.v === "number" ? <Counter to={s.v} /> : s.v}
+              {typeof s.v === "number" ? <Counter to={s.v} /> : "—"}
             </div>
+            {s.v === null && <div style={{marginTop: 8, fontSize: 11, color:"var(--c-faint)"}}>{untracked}</div>}
           </div>
         ))}
       </div>
 
-      <div style={{display:"grid", gridTemplateColumns:"2fr 1fr", gap: 22, marginBottom: 28}}>
-        <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14}}>Hours logged · this month</div>
-          <div style={{display:"flex", alignItems:"flex-end", gap: 4, height: 160}}>
-            {Array.from({length: 28}, (_, i) => 2 + Math.sin(i * 0.4) * 1.5 + Math.random() * 3).map((h, i) => (
-              <div key={i} style={{flex:1, height: `${(h/8)*100}%`, background:"var(--yellow-500)", opacity: 0.3 + (i / 28) * 0.7, borderRadius:"2px 2px 0 0"}} />
-            ))}
-          </div>
-        </div>
-        <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14}}>Top clients · this month</div>
-          <div style={{display:"flex", flexDirection:"column", gap: 12}}>
-            {[
-              { name:"Vinilo Coffee", hrs: 14 },
-              { name:"Faro Lab", hrs: 11 },
-              { name:"Plaza Hortelana", hrs: 9 },
-              { name:"Bandera", hrs: 4 },
-            ].map((c, i) => (
-              <div key={i}>
-                <div style={{display:"flex", justifyContent:"space-between", fontSize: 13, marginBottom: 4}}>
-                  <span>{c.name}</span>
-                  <span style={{fontFamily:"var(--font-mono)", color:"var(--c-faint)"}}>{c.hrs}h</span>
-                </div>
-                <div style={{height: 4, background:"var(--neutral-50)", borderRadius: 999, overflow:"hidden"}}>
-                  <div style={{height:"100%", width: `${(c.hrs/14)*100}%`, background:"var(--yellow-500)", borderRadius:999}} />
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="card" style={{padding: 22, marginBottom: 28}}>
+        <div className="eyebrow" style={{marginBottom: 14}}>Hours & client mix</div>
+        <div style={{fontSize: 12.5, color:"var(--c-faint)", lineHeight: 1.55}}>
+          Not wired. There is no time-tracking table, so hours per day and hours per client would be invented numbers.
         </div>
       </div>
 
       <div className="card" style={{padding: 22}}>
-        <div className="eyebrow" style={{marginBottom: 14}}>Recent deliveries</div>
+        <div className="eyebrow" style={{marginBottom: 14}}>Recent certifications</div>
+        <LoadNote loading={loading} error={error} empty={ready && you && deliveries.length === 0 ? "Nothing certified yet." : null} />
         <div style={{display:"flex", flexDirection:"column", gap: 6}}>
-          {[
-            { title:"Hero KV finish · Vinilo pricing", state:"delivered", time:"38m ago", cr: 220 },
-            { title:"Packaging dieline · Faro Lab",    state:"in-progress", time:"yesterday", cr: 700 },
-            { title:"Brand guidelines · Olivar Real",  state:"in-progress", time:"3d ago", cr: 650 },
-            { title:"Identity finalisation · Plaza",   state:"delivered",  time:"5d ago", cr: 550 },
-            { title:"Deck polish · Bandera",            state:"delivered", time:"6d ago", cr: 300 },
-          ].map((d, i) => (
-            <div key={i} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", borderRadius: 8, border:"1px solid var(--c-line)"}}>
+          {deliveries.map(d => (
+            <div key={d.id} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 14px", borderRadius: 8, border:"1px solid var(--c-line)"}}>
               <div style={{display:"flex", alignItems:"center", gap: 10}}>
-                <span className={"dot-state dot-state--" + (d.state === "delivered" ? "ok" : "running")} />
-                <span style={{fontSize: 13.5}}>{d.title}</span>
+                <span className="dot-state dot-state--ok" />
+                <span style={{fontSize: 13.5}}>{d.kind} · {d.brand || "(brand)"}</span>
               </div>
-              <div style={{display:"flex", alignItems:"center", gap: 14}}>
-                <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>{d.time}</span>
-                <span className="credit credit--earned">+{d.cr} cr</span>
-              </div>
+              <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>{relativeTime(d.completed_at)}</span>
             </div>
           ))}
         </div>

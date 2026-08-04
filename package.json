@@ -15,6 +15,7 @@
     "dev:inngest": "npx inngest-cli@latest dev -u http://localhost:8787/api/inngest",
     "dev:all": "concurrently -k -n web,api,inngest -c yellow,cyan,magenta \"npm run dev\" \"npm run dev:server\" \"npm run dev:inngest\"",
     "seed:specs": "node --env-file=server/.env scripts/seed-specs.mjs",
+    "smoke": "node --env-file=server/.env scripts/smoke-local.mjs",
     "test:router": "node --env-file=server/.env scripts/test-router.mjs",
     "test:discovery": "node --env-file=server/.env scripts/test-discovery.mjs",
     "grant:steward": "node --env-file=server/.env scripts/grant-steward.mjs",
@@ -22,9 +23,13 @@
     "reset:pilot-content": "node --env-file=server/.env scripts/reset-pilot-content.mjs",
     "test:recovery": "node --env-file=server/.env scripts/test-recovery-link.mjs",
     "test:run": "node --env-file=server/.env scripts/test-run.mjs",
+    "test:e2e": "node --env-file=server/.env scripts/test-e2e-flow.mjs",
     "test:plan": "node --env-file=server/.env scripts/test-delivery-plan.mjs",
-    "test:units": "node --test server/src/lib/platforms.test.mjs server/src/lib/taxonomy.test.mjs server/src/lib/delivery-plan.test.mjs server/src/lib/deliverables.test.mjs server/src/lib/credits.test.mjs server/src/lib/compose-specialist-prompt.test.mjs server/src/lib/compose-image-prompt.test.mjs server/src/lib/models/fal-image.test.mjs server/src/lib/score-bio.test.mjs server/src/lib/bio-focus.test.mjs server/src/lib/bio-evidence.test.mjs server/src/lib/extract-visual-deterministic.test.mjs server/src/lib/plan-limits.test.mjs",
+    "test:units": "node --test server/src/lib/platforms.test.mjs server/src/lib/taxonomy.test.mjs server/src/lib/delivery-plan.test.mjs server/src/lib/deliverables.test.mjs server/src/lib/credits.test.mjs server/src/lib/compose-specialist-prompt.test.mjs server/src/lib/compose-image-prompt.test.mjs server/src/lib/models/fal-image.test.mjs server/src/lib/score-bio.test.mjs server/src/lib/bio-focus.test.mjs server/src/lib/bio-evidence.test.mjs server/src/lib/extract-visual-deterministic.test.mjs server/src/lib/plan-limits.test.mjs src/lib/home-stats.test.mjs",
     "test:deliverables": "node --env-file=server/.env scripts/test-deliverables.mjs",
+    "test:seed-leak": "node scripts/test-no-seed-leak.mjs",
+    "backfill:self-cert": "node --env-file=server/.env scripts/backfill-self-cert.mjs",
+    "backfill:credit-grant": "node --env-file=server/.env scripts/backfill-credit-grant.mjs",
     "bench:image": "node --env-file=server/.env scripts/bench-image.mjs"
   },
   "dependencies": {

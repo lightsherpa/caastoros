@@ -5,10 +5,10 @@
 // Steps (each retried independently by Inngest on failure):
 //   1. Scrape the primary URL via Firecrawl → store as bio_sources row
 //   2. Synthesize BIO JSON via Anthropic Opus on the scraped markdown
-//   3. Write new bios row with certified=false (Steward cert lands in P1.5)
+//   3. Write new bios row, self-certified (tier 1) + queue a Steward for
+//      senior re-certification (tier 2)
 //
-// The BIO shape mirrors server/src/data/vinilo.js so prompt.js
-// renderBioLayer can consume the result with no changes.
+// The BIO shape mirrors the shape prompt.js renderBioLayer consumes.
 // Visual fields (palette/type/imagery) are placeholder defaults — a
 // vision pass on screenshots fills those in P5 (image specialists).
 // ─────────────────────────────────────────────────────────────────────
@@ -366,7 +366,7 @@ export const compileBio = inngest.createFunction(
     }
     // When NOT V2, visual stays as the model emitted it (empty arrays) — as today.
 
-    // ── Step 3 · Write bios row (uncertified) ────────────────────
+    // ── Step 3 · Write bios row (self-certified) ─────────────────
     const bioRow = await step.run("write-bio-row", async () => {
       // Find current max version for this brand → +1
       const { data: latest } = await supabaseAdmin
@@ -385,7 +385,13 @@ export const compileBio = inngest.createFunction(
           version: nextVersion,
           payload: verifiedBioPayload,
           score: scoreBio(verifiedBioPayload), // deterministic score from coverage/conf/diversity
-          certified: false,                // Steward cert (P1.5) flips this later
+          // Tier 1 — self-certification. Discovery ran, so the BIO is this
+          // brand's own and briefs may run against it immediately. certified_by
+          // stays NULL: nobody senior signed it, so no human attribution is
+          // claimed anywhere in the product. The Steward job queued below is
+          // tier 2 — it sets certified_by and earns the "certified by {name}".
+          certified: true,
+          certified_at: new Date().toISOString(),
         })
         .select("id, version")
         .single();
@@ -396,7 +402,8 @@ export const compileBio = inngest.createFunction(
 
     // ── Step 3b · Seed brand refusals (only if none yet) ─────────
     // Write the model-generated refusals to brands.refusals so load-brand-bio
-    // serves them instead of the Vinilo fallback. Guard: only when the brand's
+    // has this brand's own hard don'ts (there is no fallback list any more —
+    // an empty column means no refusals). Guard: only when the brand's
     // current refusals are empty/null — never clobber Steward edits.
     await step.run("write-brand-refusals", async () => {
       const refusals = Array.isArray(verifiedBioPayload.refusals)

@@ -48,10 +48,12 @@ function useLiveBriefs() {
         .order("version", { ascending: false }).limit(1).maybeSingle();
       let cert = null;
       if (bio) {
-        let byName = "your Brand Steward";
+        /* byName stays null for a self-certified BIO (certified_by NULL) —
+           the old default put a human's title on work nobody signed. */
+        let byName = null;
         if (bio.certified_by) {
           const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
-          byName = tm?.first_name || byName;
+          byName = tm?.first_name || "your Brand Steward";
         }
         cert = { version: bio.version, byName, at: bio.certified_at };
       }
@@ -79,6 +81,65 @@ function shortDate(iso) {
 function specialistName(id) {
   const a = window.CI_AGENTS?.find((x) => x.id === id);
   return a?.name || id;
+}
+
+/* ── Provenance ───────────────────────────────────────────────────
+   Every artifact carries its receipt: which BIO produced it, who signed
+   that BIO, and how long the run took.
+
+   Certification is TWO-TIER (see server/src/lib/load-brand-bio.js):
+   Discovery self-certifies its own compile (certified = true,
+   certified_by NULL) so briefs are never blocked, and a senior Steward
+   can re-certify later to attach their name. Self-certified work must
+   NEVER borrow a human's signature — and a signature only covers the
+   exact BIO version that human signed, so a name on v3 must not rub off
+   on an output produced from v2. Returns null when we can't tell. */
+function certLabel(cert, bioVersion) {
+  if (!cert) return "uncertified";
+  if (bioVersion != null && cert.version != null && cert.version !== bioVersion) return null;
+  return cert.byName ? `certified by ${cert.byName}` : "self-certified";
+}
+
+/* "45s" under a minute, "12 min" above. Null for runs with no timing on
+   record (rows predating latency_ms) — callers drop the segment rather
+   than printing "null min". */
+function elapsedLabel(ms) {
+  const n = Number(ms);
+  if (!n || n <= 0) return null;
+  const s = Math.round(n / 1000);
+  return s < 60 ? `${s}s` : `${Math.round(s / 60)} min`;
+}
+
+/* Colored cert tier for drawer/viewer footers. Yellow covers both
+   "uncertified" and "self-certified" — neither carries a human sign-off. */
+function CertChip({ cert, bioVersion }) {
+  const label = certLabel(cert, bioVersion);
+  if (!label) return null;
+  return <> · <span style={{color: cert?.byName ? "var(--green-600)" : "var(--yellow-700)"}}>{label}</span></>;
+}
+
+/* The footer line on every artifact card: "🧠 BIO v7 · certified by
+   Marina · 12 min". Segments the data can't back are dropped, never faked.
+   Pinned to the bottom of the card via marginTop:auto (parent is flex). */
+function NodeProvenance({ bioVersion, cert, latencyMs }) {
+  const line = [
+    "🧠 BIO" + (bioVersion != null ? ` v${bioVersion}` : ""),
+    certLabel(cert, bioVersion),
+    elapsedLabel(latencyMs),
+  ].filter(Boolean).join(" · ");
+  return (
+    <div style={{
+      marginTop: "auto", paddingTop: 6, borderTop: "1px dashed var(--c-line-2)",
+      fontFamily: "var(--font-mono)", fontSize: 9.5, color: "var(--c-faint)",
+      letterSpacing: "0.03em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      /* Never shrink: the card is a fixed-height flex column with overflow
+         hidden, and the image variant's content lands within ~2px of the
+         cap. Without this the provenance line is the thing that gets
+         clipped — the one line on the card that must always be readable.
+         Any deficit comes off the thumbnail instead, where it's invisible. */
+      flexShrink: 0,
+    }}>{line}</div>
+  );
 }
 
 /* Strip generic-AI artifacts from a body of text for human-readable
@@ -495,141 +556,6 @@ function BriefsLibrary({ go }) {
 }
 
 /* ════════════════════════════════════════════════════════════════ */
-/* BRIEF DETAIL                                                      */
-
-function BriefDetail({ id, go }) {
-  const brief = window.CI_BRIEFS.find(b => b.id === id) || window.CI_BRIEFS[0];
-  const outputs = window.CI_OUTPUTS.filter(o => o.briefId === brief.id);
-  const [win, setWin] = useBrState(null);   // "overview" | "recommendation" | null — open as floating windows
-  const depts = [...new Set(brief.agents.map(aid => window.CI_AGENTS.find(a => a.id === aid)?.dept))].filter(Boolean).length;
-
-  const TABS = [["overview","Overview"],["recommendation","Recommendation"],["delivery","Delivery"]];
-  React.useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") setWin(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  return (
-    <div style={{padding:"22px 36px 60px", maxWidth: 1100, margin: "0 auto"}}>
-      <button onClick={() => go("briefs")} className="btn btn--link" style={{fontSize: 12, marginBottom: 14}}>
-        <Icon name="arrowLeft" size={13} /> All briefs
-      </button>
-
-      {/* Persistent header */}
-      <div style={{display:"grid", gridTemplateColumns:"1fr auto", gap: 24, alignItems:"start", marginBottom: 18}}>
-        <div>
-          <div className="eyebrow" style={{marginBottom: 8}}>{brief.type} · {brief.createdAt} · {brief.credits} cr · {brief.agents.length} specialists</div>
-          <h1 style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 36, letterSpacing:"-0.015em", lineHeight: 1.1, margin: 0, color:"var(--c-ink)", fontWeight: 500}}>{brief.title}</h1>
-        </div>
-        <div style={{display:"flex", flexDirection:"column", gap: 10, alignItems:"flex-end"}}>
-          <StatusPill status={brief.status} />
-          <div style={{display:"flex", gap: 8}}>
-            {brief.status === "draft" && <button className="btn btn--primary btn--sm">Approve <Icon name="check" size={13} /></button>}
-            <button className="btn btn--ghost btn--sm">Revise with Brandolph</button>
-            <button className="btn btn--ghost btn--icon" aria-label="Export PDF"><Icon name="download" size={14} /></button>
-          </div>
-        </div>
-      </div>
-
-      {/* Deck tabs — Overview/Recommendation open as floating windows; Delivery opens the board */}
-      <div style={{display:"flex", gap: 2, borderBottom:"1px solid var(--c-line)", marginBottom: 26}}>
-        {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => k === "delivery" ? go("board/" + brief.id) : setWin(w => w === k ? null : k)} style={{
-            border:"none", background:"transparent", cursor:"pointer", padding:"10px 16px",
-            fontFamily:"var(--font-sans)", fontSize: 14, fontWeight: win === k ? 600 : 500,
-            color: win === k ? "var(--c-ink)" : "var(--c-faint)",
-            borderBottom: win === k ? "2px solid var(--yellow-500)" : "2px solid transparent", marginBottom: -1,
-            display:"inline-flex", alignItems:"center", gap:6,
-          }}>{l}{k === "delivery" && <Icon name="canvas" size={13} />}</button>
-        ))}
-      </div>
-
-      {/* Base — calm proposition summary; the detail lives in the windows / board */}
-      <div style={{maxWidth: 900}}>
-        <div style={{background:"var(--yellow-500)", borderRadius: 14, padding:"30px 36px", marginBottom: 22, position:"relative", overflow:"hidden"}}>
-          <div style={{position:"absolute", top: 16, right: 20, fontFamily:"var(--font-mono)", fontSize: 10, letterSpacing:"0.18em", color:"rgba(48,48,48,0.6)", textTransform:"uppercase", fontWeight:500}}>Single-minded proposition</div>
-          <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 28, letterSpacing:"-0.005em", lineHeight: 1.25, margin: 0, color:"#1a1f36", fontWeight: 500, maxWidth: 820}}>"{brief.smp}"</p>
-        </div>
-        <div style={{display:"flex", gap:12, flexWrap:"wrap", alignItems:"center"}}>
-          <button className="btn btn--primary" onClick={() => go("board/" + brief.id)}><Icon name="canvas" size={14} /> Open the board</button>
-          <button className="btn btn--ghost btn--sm" onClick={() => setWin("overview")}>Overview</button>
-          <button className="btn btn--ghost btn--sm" onClick={() => setWin("recommendation")}>Recommendation</button>
-          <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.06em"}}>{outputs.length} outputs · {depts} departments · {brief.credits} cr</span>
-        </div>
-      </div>
-
-      {/* Small floating window — opens on the same page, no full-screen modal */}
-      {win && (
-        <>
-          <div onClick={() => setWin(null)} style={{position:"fixed", inset:0, zIndex:60}} />
-          <div className="card" style={{position:"fixed", top:170, left:284, width:440, maxHeight:"calc(100vh - 200px)", overflowY:"auto", zIndex:61, boxShadow:"var(--shadow-xl)", animation:"cvPopIn 180ms cubic-bezier(.2,.8,.2,1)"}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:"1px solid var(--c-line)", position:"sticky", top:0, background:"var(--c-card)"}}>
-              <h3 style={{margin:0, fontSize:17}}>{win === "overview" ? "Overview" : "Recommendation"}</h3>
-              <button onClick={() => setWin(null)} className="btn btn--icon btn--ghost" aria-label="Close"><Icon name="close" size={15} /></button>
-            </div>
-            <div style={{padding:"20px 22px"}}>
-              {win === "overview" ? (
-                <>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14, marginBottom: 18}}>
-                    <BriefSection title="Background"          body={brief.background} />
-                    <BriefSection title="Objective"           body={brief.objective} />
-                    <BriefSection title="Audience"            body={brief.audience} />
-                    <BriefSection title="Metrics that matter" body={brief.metrics} />
-                  </div>
-                  <div className="card card--inset" style={{padding: 18}}>
-                    <div className="eyebrow" style={{marginBottom: 12}}>Deliverables · {brief.deliverables.length}</div>
-                    <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
-                      {brief.deliverables.map((d, i) => <span key={i} className="pill" style={{height: 28, padding:"0 14px", fontSize:11.5}}>{d}</span>)}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14, marginBottom: 18}}>
-                    <BriefSection title="Creative strategy" body={brief.strategy} />
-                    <BriefSection title="Tone"              body={brief.tone} />
-                    <BriefSection title="Direction"         body={brief.direction} />
-                    <BriefSection title="Mandatories"       body={brief.mandatories} />
-                  </div>
-                  <div style={{background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius: 12, padding: 18, marginBottom: 18}}>
-                    <div className="eyebrow eyebrow--pink" style={{marginBottom: 12}}>What this brief is NOT doing</div>
-                    <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 16, lineHeight: 1.55, color:"var(--c-ink)", margin: 0}}>"{brief.notDoing}"</p>
-                  </div>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14}}>
-                    <div className="card card--inset" style={{padding: 18, borderLeft: "3px solid var(--yellow-500)"}}>
-                      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Strategic assumptions</div>
-                      <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-                        {brief.assumptions.map((a, i) => <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}</li>)}
-                      </ul>
-                    </div>
-                    <div className="card card--inset" style={{padding: 18, borderLeft: "3px solid var(--orange-500)"}}>
-                      <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom: 12}}>Production watchouts</div>
-                      <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-                        {brief.watchouts.map((w, i) => <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}</li>)}
-                      </ul>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function BriefSection({ title, body }) {
-  return (
-    <div className="card" style={{padding: 20}}>
-      <div className="eyebrow" style={{marginBottom: 10}}>{title}</div>
-      <p style={{fontSize: 14, lineHeight: 1.55, color:"var(--c-ink)", margin: 0}}>{body}</p>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════ */
 /* SPECIALISTS DIRECTORY (L2)                                        */
 
 function SpecialistsDirectory({ go }) {
@@ -718,7 +644,7 @@ function SpecialistsDirectory({ go }) {
       {/* Most used for this brand */}
       {mostUsed.length > 0 && !q && (
         <section style={{marginBottom: 26}}>
-          <div className="eyebrow" style={{marginBottom: 10}}>Most used for Vinilo</div>
+          <div className="eyebrow" style={{marginBottom: 10}}>Most used for this brand</div>
           <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap: 10}}>
             {mostUsed.map(a => (
               <button key={a.id} onClick={() => setOpenId(a.id)} className="card"
@@ -1118,7 +1044,7 @@ function SpecialistDrawer({ open, agent, onClose }) {
         ))}
       </div>
 
-      <div className="eyebrow" style={{marginBottom: 8}}>Example outputs · for Vinilo</div>
+      <div className="eyebrow" style={{marginBottom: 8}}>Example outputs</div>
       <div style={{display:"flex", flexDirection:"column", gap: 12}}>
         {window.CI_OUTPUTS.filter(o => o.agentId === agent.id).slice(0,2).map(o => <OutputCard key={o.id} output={o} />)}
         {window.CI_OUTPUTS.filter(o => o.agentId === agent.id).length === 0 && (
@@ -1630,9 +1556,16 @@ function BriefRunCanvas({ context, onClear, go }) {
         if (!brandId) return;
         const { data: bio } = await supabase.from("bios").select("certified_by, certified_at, version")
           .eq("brand_id", brandId).eq("certified", true).order("version", { ascending: false }).limit(1).maybeSingle();
-        if (bio?.certified_by) {
-          const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
-          setCert({ byName: tm?.first_name || "your Steward", at: bio.certified_at });
+        /* Keep self-certified BIOs (certified_by NULL) — byName null is how
+           the footer tells tier 1 apart from a senior sign-off. version is
+           what stops a v3 signature attaching itself to a v2 output. */
+        if (bio) {
+          let byName = null;
+          if (bio.certified_by) {
+            const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
+            byName = tm?.first_name || "your Steward";
+          }
+          setCert({ byName, at: bio.certified_at, version: bio.version });
         }
       } catch (e) { /* non-fatal */ }
     })();
@@ -1743,8 +1676,11 @@ function BriefRunCanvas({ context, onClear, go }) {
         borderLeft: `3px solid ${stateColor}`,
         borderRadius: 10, padding: "12px 14px",
         boxShadow: "var(--shadow-md)",
-        height: isSpecialist ? 116 : 104,                  /* fixed height — no stacking */
+        /* fixed height — no stacking. 152 fits the tallest variant (image
+           thumbnail + provenance footer) so the footer is never clipped. */
+        height: isSpecialist ? 152 : 104,
         boxSizing: "border-box", overflow: "hidden",
+        display: "flex", flexDirection: "column",          /* footer pins to the bottom */
         animation: state === "running" ? "runPulse 1.6s ease-in-out infinite" : undefined,
         cursor: clickable ? "pointer" : "default",
       }}
@@ -1792,6 +1728,11 @@ function BriefRunCanvas({ context, onClear, go }) {
                 ? <span style={{color:"var(--c-dim)"}}>open ↗</span>
                 : <span>{state === "queued" ? `${node.cr || "?"} cr` : ""}</span>}
             </div>
+            {/* Provenance only once the run has reported — a queued node has
+                no BIO version and no elapsed time to stand behind. */}
+            {node.done?.brand && (
+              <NodeProvenance bioVersion={node.done.brand.bioVersion} cert={cert} latencyMs={node.latencyMs} />
+            )}
           </>
         )}
         {!isSpecialist && node.sub && (
@@ -1884,6 +1825,9 @@ function BriefRunCanvas({ context, onClear, go }) {
       };
       const dspec = deliverableSpecForAgent(agent.id, context.deliveryPlan);
       const hasVisual = !!copyHasVisual.get(agent.id);
+      /* The SSE done event carries no latency_ms, so time the stream here —
+         wall-clock is what the footer claims and what the user waited. */
+      const startedAt = Date.now();
       await streamSpecialistRun({
         specialistId: agent.id,
         briefText:    context.composedBrief,
@@ -1932,6 +1876,7 @@ function BriefRunCanvas({ context, onClear, go }) {
             assetUrl,
             qa,
             done,
+            latencyMs: Date.now() - startedAt,
             sub: assetUrl
               ? `${qa?.brand_match ?? "?"}/100 · ${passed ? "approved" : "flagged"}`
               : `${qa?.voice_match ?? "?"}/100 · ${passed ? "approved" : "flagged"}`,
@@ -2597,9 +2542,7 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
         <span>
           Composed by <span style={{color:"var(--c-ink)"}}>{agent.name}</span> ·
           BIO v{node.done?.brand?.bioVersion ?? "?"}
-          {cert
-            ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span></>
-            : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+          <CertChip cert={cert} bioVersion={node.done?.brand?.bioVersion} />
         </span>
         <span>{agent.cr ?? "?"} cr</span>
       </div>
@@ -2662,12 +2605,12 @@ function buildDeliverableCluster(specNode, deliverables, laneTop, outputId) {
 }
 
 /* Initial node layout: BIO (left) → Brief (middle) → Specialists (right
-   column). Specialist nodes are FIXED-HEIGHT (116px) and laid out 140px
+   column). Specialist nodes are FIXED-HEIGHT (152px) and laid out 176px
    apart so they can never stack or overlap regardless of streaming
    output length. Full output lives in the notepad drawer (click to open). */
 function buildInitialRunNodes(ctx) {
   const specs = (ctx.specialistIds || []).map((id) => window.CI_AGENTS.find((a) => a.id === id)).filter(Boolean);
-  const rowH  = 140;                           /* fixed 116px node + 24px gap */
+  const rowH  = 176;                           /* fixed 152px node + 24px gap */
   const cols  = { bio: 40, brief: 360, spec: 760 };
   const totalSpecH = Math.max(specs.length, 1) * rowH;
   const midY = totalSpecH / 2 + 40;
@@ -2732,7 +2675,9 @@ function CanvasView({ go }) {
   if (ctx && Array.isArray(ctx.specialistIds) && ctx.specialistIds.length > 0) {
     return <BriefRunCanvas context={ctx} onClear={clearCtx} go={go} />;
   }
-  return <InteractiveCanvas nodeData={CANVAS_NODES} edges={CANVAS_EDGES} exportName="vinilo-canvas" />;
+  /* No brand in scope on the placeholder canvas — the default exportName
+     ("canvas") keeps another brand's name out of the user's downloads. */
+  return <InteractiveCanvas nodeData={CANVAS_NODES} edges={CANVAS_EDGES} />;
 }
 
 /* ── BriefViewCanvas — loads an existing brief's runs/outputs from DB
@@ -2754,17 +2699,24 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         if (bErr || !brief) { setState({ loading: false, brief: null, runs: [], cert: null, error: bErr?.message || "Brief not found" }); return; }
 
         const { data: runs } = await supabase
-          .from("runs").select("id, specialist_id, bio_version, status, outputs ( id, kind, body, status, rationale )")
+          .from("runs").select("id, specialist_id, bio_version, status, latency_ms, started_at, ended_at, outputs ( id, kind, body, status, rationale )")
           .eq("brief_id", briefId).order("started_at", { ascending: true });
 
         const { data: bio } = await supabase
           .from("bios").select("certified_by, certified_at, version")
           .eq("brand_id", brief.brand_id).eq("certified", true)
           .order("version", { ascending: false }).limit(1).maybeSingle();
+        /* Two-tier: a self-certified BIO (certified_by NULL) is still a
+           certified BIO — keep it with byName null so the footer says
+           "self-certified" instead of borrowing a Steward's name. */
         let cert = null;
-        if (bio?.certified_by) {
-          const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
-          cert = { byName: tm?.first_name || "your Steward", at: bio.certified_at, version: bio.version };
+        if (bio) {
+          let byName = null;
+          if (bio.certified_by) {
+            const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
+            byName = tm?.first_name || "your Steward";
+          }
+          cert = { byName, at: bio.certified_at, version: bio.version };
         }
 
         setState({ loading: false, brief, runs: runs || [], cert, error: null });
@@ -2797,19 +2749,24 @@ function BriefViewCanvas({ briefId, onClear, go }) {
     e.runs.push(r);
     (r.outputs || []).forEach((o) => e.outputs.push(o));
   }
+  /* Elapsed per run: latency_ms when it was recorded, else the run's own
+     timestamps (rows written before latency_ms was populated), else null. */
+  const runMs = (r) => r.latency_ms ?? (r.started_at && r.ended_at ? Date.parse(r.ended_at) - Date.parse(r.started_at) : null);
   const specs = [...bySpec.values()].map((e) => {
     const primary = e.outputs[0] || null;
     const body = primary?.body || {};
     const text = body.edited_text || body.text || (typeof primary?.body === "string" ? primary.body : "");
     const passed = e.outputs.length === 0 || e.outputs.every((o) => o.status !== "flagged");
-    return { ...e, output: primary, passed, text };
+    /* Sum: a specialist can run many times on one brief (one per image slot). */
+    const latencyMs = e.runs.reduce((sum, r) => sum + (runMs(r) || 0), 0) || null;
+    return { ...e, output: primary, passed, text, latencyMs };
   });
 
   /* Saved image asset_urls across the brief, in order — paired one per card. */
   const imageUrls = state.runs.flatMap((r) => (r.outputs || []).map((o) => o.body?.asset_url).filter(Boolean));
   let imgIdx = 0;
 
-  const rowH = 140;
+  const rowH = 176;                            /* fixed 152px node + 24px gap */
   const specNodes = specs.map((s, i) => {
     const assetUrl = s.output?.body?.asset_url || null;
     const imgCount = s.outputs.filter((o) => o.body?.asset_url).length;
@@ -2822,7 +2779,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
            : `${s.passed ? "approved" : "flagged"}${s.output?.kind ? " · " + s.output.kind : ""}`,
       cr: s.agent?.cr || 0,
       state: s.passed ? "done" : "flagged",
-      outputText: s.text, assetUrl, tokenCount: 1000, qa: null,
+      outputText: s.text, assetUrl, tokenCount: 1000, qa: null, latencyMs: s.latencyMs,
       done: { brand: { bioVersion: s.firstRun.bio_version }, output: assetUrl ? { asset_url: assetUrl } : null },
     };
   });
@@ -2854,7 +2811,10 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   const briefY = 40 + (Math.max(specs.length, 1) - 1) * rowH / 2;
   const nodes = [
     { id: "bio",   x: 40,  y: briefY, w: 260, kind: "bio",   eyebrow: "BIO",
-      title: "Brand Intelligence Object", sub: state.cert ? `Certified by ${state.cert.byName}` : "Certified canon" },
+      title: "Brand Intelligence Object",
+      sub: state.cert
+        ? (state.cert.byName ? `Certified by ${state.cert.byName}` : "Self-certified · Discovery compile")
+        : "Certified canon" },
     { id: "brief", x: 360, y: briefY, w: 280, kind: "brief", eyebrow: "BRIEF",
       title: briefTitle(state.brief),
       sub: `${state.runs.length} runs · ${shortDate(state.brief.created_at)}` },
@@ -2897,7 +2857,9 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         background:"var(--c-card)", border:"1px solid var(--c-line)",
         borderLeft:`3px solid ${stColor}`, borderRadius: 10, padding:"12px 14px",
         boxShadow:"var(--shadow-md)",
-        height: isSpec ? 116 : 104, boxSizing:"border-box", overflow:"hidden",
+        /* 152 fits the tallest variant (thumbnail + provenance footer). */
+        height: isSpec ? 152 : 104, boxSizing:"border-box", overflow:"hidden",
+        display:"flex", flexDirection:"column",            /* footer pins to the bottom */
         cursor: isSpec ? "pointer" : "default",
       }}
       onClick={(e) => { if (isSpec) { e.stopPropagation(); setOpenId(node.specId); } }}>
@@ -2925,6 +2887,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
             <span>{node.sub}</span>
             <span style={{color:"var(--c-dim)"}}>open ↗</span>
           </div>
+          <NodeProvenance bioVersion={node.done?.brand?.bioVersion} cert={state.cert} latencyMs={node.latencyMs} />
         </>)}
         {!isSpec && node.sub && (
           <div style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.04em", lineHeight: 1.45, marginTop: 4}}>
@@ -3043,450 +3006,6 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         />
       )}
     </>
-  );
-}
-
-/* Build a brief's logic graph: BIO → brief → specialist → output(s). */
-function buildBriefGraph(brief, outputs) {
-  const brand = window.CI_BRAND;
-  const rowH = 104, gapBlock = 26;
-  const specIds = [...new Set(outputs.map(o => o.agentId).filter(Boolean))];
-  const useSpecs = specIds.length ? specIds : (brief.agents || []);
-  const kindFor = (o) => o.kind === "upload" ? "upload" : o.kind === "qa" ? "qa" : (o.kind === "image" ? "asset" : "copy");
-
-  const nodes = [], edges = [];
-  let y = 40;
-  useSpecs.forEach((sid) => {
-    const a = window.CI_AGENTS.find(x => x.id === sid);
-    const outs = outputs.filter(o => o.agentId === sid);
-    const blockStart = y;
-    const n = Math.max(1, outs.length);
-    nodes.push({ id:"spec-"+sid, x:700, y: blockStart + (n * rowH) / 2 - rowH / 2, w:240, kind:"specialist",
-      title: a ? a.name : sid, sub: `${a ? a.code : ""}${a ? " · " + a.dept : ""}`, ref:{ type:"specialist", id:sid } });
-    edges.push({ from:"brief", to:"spec-"+sid, fromSide:"right", toSide:"left" });
-    outs.forEach((o, j) => {
-      const oy = blockStart + j * rowH;
-      nodes.push({ id:"out-"+o.id, x:1040, y: oy, w:260, kind: kindFor(o), title:o.type, sub:o.meta, ref:{ type:"output", id:o.id } });
-      edges.push({ from:"spec-"+sid, to:"out-"+o.id, fromSide:"right", toSide:"left" });
-    });
-    y = blockStart + n * rowH + gapBlock;
-  });
-
-  const ys = nodes.map(n => n.y);
-  const midY = ys.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : 120;
-  nodes.unshift({ id:"brief", x:360, y:midY, w:260, kind:"brief", title:brief.title, sub:"L1 · Brandolph", ref:{ type:"brief" } });
-  nodes.unshift({ id:"bio", x:40, y:midY, w:260, kind:"bio", title:"Brand Intelligence Object", sub:`BIO · ${brand.bioCompleteness}%`, ref:{ type:"bio" } });
-  edges.unshift({ from:"bio", to:"brief", fromSide:"right", toSide:"left" });
-  return { nodes, edges };
-}
-
-/* Why a specialist made its creative choice — explicit field or derived. */
-function outputRationale(o, specialist) {
-  if (o && o.rationale) return o.rationale;
-  const spec = specialist ? specialistSpec(specialist) : {};
-  const who = specialist ? specialist.name : "The specialist";
-  if (spec.voice) return `${who} wrote to the brand voice — ${spec.voice.toLowerCase()} — and shaped it to: ${spec.outputContract || "the brief"}.`;
-  return `${who} read the BIO first, then ${spec.objective ? spec.objective.toLowerCase() : "produced the deliverable to the brief"}`;
-}
-
-/* Per-brief Delivery view: the canvas + a node-detail drawer. */
-function BriefDelivery({ brief, outputs }) {
-  const [sel, setSel] = useBrState(null);
-  const graph = React.useMemo(() => buildBriefGraph(brief, outputs), [brief.id]);
-
-  const open = (node) => { if (node && node.ref) setSel(node.ref); };
-  const ref = sel || {};
-  const output = ref.type === "output" ? outputs.find(o => o.id === ref.id) : null;
-  const specialist =
-    ref.type === "specialist" ? window.CI_AGENTS.find(a => a.id === ref.id)
-    : output ? window.CI_AGENTS.find(a => a.id === output.agentId) : null;
-
-  let title = "", eyebrow = "", body = null;
-  if (ref.type === "bio") {
-    eyebrow = "Source · the canon"; title = "Brand Intelligence Object";
-    body = <p style={{fontSize:14.5, color:"var(--c-ink)", lineHeight:1.55}}>Everything downstream is judged against the BIO. <em className="b-voice">{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p>;
-  } else if (ref.type === "brief") {
-    eyebrow = "L1 · Brandolph"; title = brief.title;
-    body = <><p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:17, lineHeight:1.5, color:"var(--c-ink)", marginBottom:12}}>"{brief.smp}"</p><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{brief.objective}</p></>;
-  } else if (ref.type === "specialist" && specialist) {
-    const spec = specialistSpec(specialist);
-    eyebrow = `${specialist.code} · ${specialist.dept}`; title = specialist.name;
-    body = <>
-      <p style={{fontSize:14, color:"var(--c-ink)", lineHeight:1.5, marginBottom:14}}>{specialist.job}</p>
-      <div className="eyebrow" style={{marginBottom:6}}>Why Brandolph routed this here</div>
-      <p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{spec.objective || "Best fit for this part of the brief."}</p>
-    </>;
-  } else if (output) {
-    eyebrow = `${output.type}${specialist ? " · " + specialist.name : ""}`; title = "Output";
-    body = <>
-      {output.status && <div style={{marginBottom:12}}><StatusPill status={output.status} /></div>}
-      <p style={{fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic", fontSize:16, lineHeight:1.55, color:"var(--c-ink)", marginBottom:14}}>"{output.body}"</p>
-      <div style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)", marginBottom:18}}>{output.meta}</div>
-      <div className="card card--inset" style={{padding:"14px 16px", borderLeft:"3px solid var(--yellow-500)"}}>
-        <div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>Why this creative choice</div>
-        <p style={{fontSize:13.5, color:"var(--c-ink)", lineHeight:1.5, margin:0}}>{outputRationale(output, specialist)}</p>
-      </div>
-    </>;
-  }
-
-  return (
-    <div>
-      <InteractiveCanvas
-        key={brief.id}
-        nodeData={graph.nodes}
-        edges={graph.edges}
-        onNodeClick={open}
-        height="calc(100vh - 250px)"
-        exportName={brief.id}
-      />
-      <Drawer open={!!sel} onClose={() => setSel(null)} title={title} eyebrow={eyebrow} width={440}>
-        {body}
-      </Drawer>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════ */
-/* BRIEF BOARD — the whole brief as a Miro-style canvas workspace.    */
-/* Floating launcher + toolbar; Ask-Brandolph, specialists, results   */
-/* as draggable nodes; +Add to drop another ask or specialist.        */
-
-const BOARD_LAUNCH = [
-  { id:"home",        icon:"sparkles", label:"Create" },
-  { id:"briefs",      icon:"brief",    label:"Briefs" },
-  { id:"library",     icon:"files",    label:"Library" },
-  { id:"specialists", icon:"team",     label:"Specialists" },
-  { id:"credits",     icon:"credit",   label:"Credits" },
-  { id:"settings",    icon:"settings", label:"Settings" },
-];
-
-function boardReply(text) {
-  const m = text.toLowerCase();
-  if (/why|reason|rational/.test(m)) return "Because the BIO frames price as cost-of-pause — the work leans on the decision to slow down, not the discount.";
-  if (/change|revise|tweak|edit/.test(m)) return "On it. I'll route that back to the specialist and hold the QA gate until it clears the brand rules.";
-  if (/who|specialist|which/.test(m)) return "For this I'd add Conversion Copy and Brand Consistency QA — smallest crew that earns the change.";
-  return "Heard. I'll sharpen that into a sub-brief and assemble the right specialist — give me a beat.";
-}
-
-function BriefBoard({ id, go }) {
-  const brief = window.CI_BRIEFS.find(b => b.id === id) || window.CI_BRIEFS[0];
-  const outputs = window.CI_OUTPUTS.filter(o => o.briefId === brief.id);
-  const base = React.useMemo(() => buildBriefGraph(brief, outputs), [brief.id]);
-
-  const [extraNodes, setExtraNodes] = useBrState([]);
-  const [extraEdges, setExtraEdges] = useBrState([]);
-  const [pop, setPop] = useBrState(null);   // { ref, rect } — floating detail near the node
-  const [addOpen, setAddOpen] = useBrState(false);
-  const [connectFrom, setConnectFrom] = useBrState(null);
-  const [win, setWin] = useBrState(null);   // "overview" | "recommendation" | null — small windows
-  React.useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") { setWin(null); setPop(null); } };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-  const [panel, setPanel] = useBrState(null);   // "brief" | "ask" | null
-  const [ask, setAsk] = useBrState("");
-  const seq = React.useRef(0);
-
-  const allNodes = React.useMemo(() => [...base.nodes, ...extraNodes], [base, extraNodes]);
-  const allEdges = React.useMemo(() => [...base.edges, ...extraEdges], [base, extraEdges]);
-  const nodeName = (nid) => { const n = allNodes.find(x => x.id === nid); return n ? n.title : nid; };
-
-  const addSpecialist = (a) => {
-    const nid = "specx-" + a.id + "-" + (++seq.current);
-    setExtraNodes(ns => [...ns, { id:nid, x:700, y: 480 + ns.length * 44, w:240, kind:"specialist", title:a.name, sub:`${a.code} · ${a.dept}`, ref:{ type:"specialist", id:a.id } }]);
-    setAddOpen(false);
-    setConnectFrom(nid);
-  };
-  const sendAsk = () => {
-    const text = ask.trim(); if (!text) return;
-    const rid = "ans-" + (++seq.current);
-    setExtraNodes(ns => [...ns, { id:rid, x: 380, y: 480 + ns.length * 44, w:300, kind:"note", title:"Brandolph", body: boardReply(text), ref:{ type:"note" } }]);
-    setExtraEdges(es => [...es, { from:"brief", to:rid, fromSide:"bottom", toSide:"top", dashed:true }]);
-    setAsk(""); setPanel(null);
-  };
-
-  const onNodeClick = (node, rect) => {
-    if (!node) return;
-    if (connectFrom && connectFrom !== node.id) {
-      setExtraEdges(es => [...es, { from: connectFrom, to: node.id, fromSide:"right", toSide:"left" }]);
-      setConnectFrom(null);
-      return;
-    }
-    if (node.ref && node.ref.type !== "note") setPop({ ref: node.ref, rect });
-  };
-
-  React.useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") { setConnectFrom(null); setAddOpen(false); setPanel(null); setPop(null); } };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const ConnectHandle = ({ nid }) => (
-    <button onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setConnectFrom(nid); }}
-      title="Connect to another node"
-      style={{position:"absolute", right:-9, top:"calc(50% - 9px)", width:18, height:18, borderRadius:"50%",
-        border:"1px solid var(--c-line)", background:"var(--c-card)", color:"var(--c-faint)", cursor:"crosshair",
-        display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"var(--shadow-sm)", zIndex:4}}>
-      <Icon name="plus" size={11} />
-    </button>
-  );
-
-  const renderNode = (n, { active }) => {
-    const accent = CANVAS_COLORS[n.kind] || CANVAS_COLORS.copy;
-    const edge = (connectFrom === n.id) ? "var(--accent)" : (active ? "var(--yellow-500)" : "var(--c-line)");
-    const card = (extra) => ({
-      position:"relative", background:"var(--c-card)", borderRadius:12,
-      borderTop:`1px solid ${edge}`, borderRight:`1px solid ${edge}`, borderBottom:`1px solid ${edge}`,
-      borderLeft:`3px solid ${accent}`,
-      boxShadow: active ? "0 14px 32px rgba(0,0,0,0.16)" : "var(--shadow-sm)",
-      transform: active ? "translateY(-2px)" : "none",
-      transition: "transform 180ms cubic-bezier(.34,1.56,.64,1), box-shadow 180ms ease, border-color 140ms ease",
-      ...extra,
-    });
-    const handle = n.kind !== "note" ? <ConnectHandle nid={n.id} /> : null;
-
-    if (n.kind === "brief") {
-      return (
-        <div style={card({ padding:0, overflow:"hidden" })}>
-          <div style={{padding:"12px 14px", background:"var(--yellow-50)", borderBottom:"1px solid var(--c-line)"}}>
-            <div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>The brief · L1 Brandolph</div>
-            <p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:14.5, lineHeight:1.4, color:"var(--c-ink)", margin:0}}>"{brief.smp}"</p>
-          </div>
-          {brief.clarifications && (
-            <div style={{padding:"12px 14px"}}>
-              <div className="eyebrow" style={{marginBottom:8}}>Brandolph asked first</div>
-              <div style={{display:"flex", flexDirection:"column", gap:10}}>
-                {brief.clarifications.map((c, i) => (
-                  <div key={i}>
-                    <div style={{display:"flex", gap:7, fontSize:12.5, fontWeight:600, color:"var(--c-ink)", lineHeight:1.35}}>
-                      <span style={{fontFamily:"var(--font-mono)", color:"var(--yellow-700)"}}>{String(i+1).padStart(2,"0")}</span>{c.q}
-                    </div>
-                    <div style={{fontSize:11.5, color:"var(--c-dim)", lineHeight:1.4, marginTop:3, paddingLeft:18}}>{c.why}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {handle}
-        </div>
-      );
-    }
-    if (n.kind === "note") {
-      return (
-        <div style={card({ padding:14 })}>
-          <div style={{display:"flex", alignItems:"center", gap:6, marginBottom:8}}><BrandolphDot /><span className="eyebrow eyebrow--yellow">Brandolph</span></div>
-          <p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:14, lineHeight:1.5, color:"var(--c-ink)", margin:0}}>{n.body}</p>
-        </div>
-      );
-    }
-    if (n.kind === "bio") {
-      return <div style={card({ padding:13 })}><div className="eyebrow" style={{marginBottom:4, fontSize:9}}>Source · canon</div><div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{n.title}</div><div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", marginTop:2}}>{n.sub}</div>{handle}</div>;
-    }
-    if (n.kind === "specialist") {
-      return <div style={card({ padding:13 })}><div className="eyebrow" style={{marginBottom:4, fontSize:9}}>Specialist · {n.sub}</div><div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{n.title}</div>{handle}</div>;
-    }
-    const o = window.CI_OUTPUTS.find(x => "out-" + x.id === n.id);
-    return (
-      <div style={card({ padding:13 })}>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6, marginBottom:5}}>
-          <span className="eyebrow eyebrow--yellow" style={{fontSize:9, maxWidth:"70%"}}>{n.title}</span>
-          {o && o.status && <StatusPill status={o.status} />}
-        </div>
-        {o && <p style={{fontSize:12, color:"var(--c-dim)", lineHeight:1.4, margin:"0 0 5px", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden"}}>{o.body}</p>}
-        <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)"}}>{n.sub}</div>
-        {handle}
-      </div>
-    );
-  };
-
-  // Floating detail content — derived from the clicked node
-  const ref = (pop && pop.ref) || {};
-  const output = ref.type === "output" ? outputs.find(o => o.id === ref.id) : null;
-  const specialist = ref.type === "specialist" ? window.CI_AGENTS.find(a => a.id === ref.id)
-    : output ? window.CI_AGENTS.find(a => a.id === output.agentId) : null;
-  let dEye = "", dBody = null;
-  if (ref.type === "bio") { dEye = "Source · the canon"; dBody = <><h3 style={{margin:"0 0 10px", fontSize:18}}>Brand Intelligence Object</h3><p style={{fontSize:14, lineHeight:1.55, color:"var(--c-dim)"}}><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p></>; }
-  else if (ref.type === "brief") { dEye = "L1 · Brandolph"; dBody = <><p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:19, lineHeight:1.45, color:"var(--c-ink)", margin:"0 0 12px"}}>"{brief.smp}"</p><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5, margin:0}}>{brief.objective}</p></>; }
-  else if (ref.type === "specialist" && specialist) { const sp = specialistSpec(specialist); dEye = `${specialist.code} · ${specialist.dept}`; dBody = <><h3 style={{margin:"0 0 8px", fontSize:18}}>{specialist.name}</h3><p style={{fontSize:14, lineHeight:1.5, color:"var(--c-ink)", margin:"0 0 16px"}}>{specialist.job}</p><div style={{height:1, background:"var(--c-line)", margin:"0 -16px 12px"}} /><div className="eyebrow" style={{marginBottom:6, color:"var(--c-faint)"}}>Why Brandolph routes here</div><p style={{fontSize:12.5, color:"var(--c-dim)", lineHeight:1.5, margin:0}}>{sp.objective}</p></>; }
-  else if (output) {
-    dEye = `${output.type}${specialist ? " · " + specialist.name : ""}`;
-    dBody = (
-      <>
-        {output.status && <div style={{marginBottom:14}}><StatusPill status={output.status} /></div>}
-        {/* THE OUTPUT — the hero of the card: big, italic, roomy */}
-        <div className="eyebrow" style={{marginBottom:10}}>The output</div>
-        <p style={{
-          fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic",
-          fontSize:21, lineHeight:1.5, letterSpacing:"-0.005em", color:"var(--c-ink)", margin:"0 0 12px",
-        }}>"{output.body}"</p>
-        <div style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.04em"}}>{output.meta}</div>
-        {/* divider — clearly separates output from rationale */}
-        <div style={{height:1, background:"var(--c-line)", margin:"16px -16px 14px"}} />
-        {/* THE RATIONALE — clearly secondary */}
-        <div className="eyebrow" style={{marginBottom:6, color:"var(--c-faint)"}}>Why this choice</div>
-        <p style={{fontSize:12.5, lineHeight:1.5, color:"var(--c-dim)", margin:0}}>{outputRationale(output, specialist)}</p>
-      </>
-    );
-  }
-
-  const addMenu = (
-    <div style={{position:"relative"}}>
-      <button className="btn btn--primary btn--sm" onClick={() => setAddOpen(o => !o)}><Icon name="plus" size={13} /> Add specialist</button>
-      {addOpen && (
-        <>
-          <div onClick={() => setAddOpen(false)} style={{position:"fixed", inset:0, zIndex:40}} />
-          <div style={{position:"absolute", top:"calc(100% + 6px)", right:0, zIndex:41, width:240, background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:12, boxShadow:"var(--shadow-lg)", padding:6}}>
-            <div className="eyebrow" style={{padding:"6px 10px 4px"}}>Drop a specialist, then connect it</div>
-            <div style={{maxHeight:240, overflowY:"auto"}}>
-              {window.CI_AGENTS.filter(a => a.status === "live").slice(0, 10).map(a => (
-                <button key={a.id} onClick={() => addSpecialist(a)} style={{display:"block", width:"100%", textAlign:"left", border:"none", background:"transparent", padding:"7px 10px", borderRadius:8, cursor:"pointer", fontSize:12.5, color:"var(--c-ink)"}}
-                  onMouseEnter={e => e.currentTarget.style.background="var(--neutral-50)"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
-                  {a.name} <span style={{color:"var(--c-faint)", fontFamily:"var(--font-mono)", fontSize:10}}>· {a.dept}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  const tabActive = (k) => k === "delivery" ? !win : win === k;
-  return (
-    <div style={{display:"flex", flexDirection:"column", height:"calc(100vh - 56px)", minHeight:0}}>
-      {/* Brief header — integrated into the flow page (one page) */}
-      <div style={{padding:"18px 32px 0", flexShrink:0}}>
-        <button onClick={() => go("briefs")} className="btn btn--link" style={{fontSize:12, marginBottom:10}}><Icon name="arrowLeft" size={13} /> All briefs</button>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:24, marginBottom:12}}>
-          <div>
-            <div className="eyebrow" style={{marginBottom:6}}>{brief.type} · {brief.createdAt} · {brief.credits} cr · {brief.agents.length} specialists</div>
-            <h1 style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:30, letterSpacing:"-0.015em", lineHeight:1.05, margin:0, color:"var(--c-ink)", fontWeight:500}}>{brief.title}</h1>
-          </div>
-          <div style={{display:"flex", flexDirection:"column", gap:8, alignItems:"flex-end"}}>
-            <StatusPill status={brief.status} />
-            <div style={{display:"flex", gap:8}}>
-              <button className="btn btn--ghost btn--sm">Revise with Brandolph</button>
-              <button className="btn btn--ghost btn--icon" aria-label="Export"><Icon name="download" size={14} /></button>
-            </div>
-          </div>
-        </div>
-        <div style={{display:"flex", gap:2, borderBottom:"1px solid var(--c-line)"}}>
-          {[["overview","Overview"],["recommendation","Recommendation"],["delivery","Delivery"]].map(([k, l]) => (
-            <button key={k} onClick={() => k === "delivery" ? setWin(null) : setWin(w => w === k ? null : k)} style={{
-              border:"none", background:"transparent", cursor:"pointer", padding:"10px 16px",
-              fontFamily:"var(--font-sans)", fontSize:14, fontWeight: tabActive(k) ? 600 : 500,
-              color: tabActive(k) ? "var(--c-ink)" : "var(--c-faint)",
-              borderBottom: tabActive(k) ? "2px solid var(--yellow-500)" : "2px solid transparent", marginBottom:-1,
-              display:"inline-flex", alignItems:"center", gap:6,
-            }}>{l}{k === "delivery" && <Icon name="canvas" size={13} />}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Delivery — the flow canvas, filling the page */}
-      <div style={{flex:1, position:"relative", minHeight:0}}>
-        {connectFrom && (
-          <div style={{position:"absolute", bottom:64, left:"50%", transform:"translateX(-50%)", zIndex:20}}>
-            <div className="card" style={{padding:"9px 14px", display:"flex", alignItems:"center", gap:12, border:"1px solid var(--accent)"}}>
-              <span style={{fontSize:13, color:"var(--c-ink)"}}>Connecting from <strong>{nodeName(connectFrom)}</strong> — click a node to link.</span>
-              <button className="btn btn--ghost btn--sm" onClick={() => setConnectFrom(null)}>Cancel</button>
-            </div>
-          </div>
-        )}
-        <InteractiveCanvas
-          key={brief.id}
-          nodeData={allNodes}
-          edges={allEdges}
-          renderNode={renderNode}
-          onNodeClick={onNodeClick}
-          height="100%"
-          exportName={brief.id + "-board"}
-          toolbarExtra={addMenu}
-          helper={connectFrom ? <>Click a node to connect · Esc to cancel.</> : <>Drag to pan · scroll to zoom · <strong style={{color:"var(--c-ink)", fontWeight:600}}>+</strong> on a node to connect it · click a result for the rationale.</>}
-        />
-      </div>
-
-      {/* Overview / Recommendation — small windows on the same page */}
-      {win && (
-        <>
-          <div onClick={() => setWin(null)} style={{position:"fixed", inset:0, zIndex:55}} />
-          <div className="card" style={{position:"fixed", top:120, right:36, width:440, maxHeight:"calc(100vh - 160px)", overflowY:"auto", zIndex:56, boxShadow:"var(--shadow-xl)", animation:"cvPopIn 180ms cubic-bezier(.2,.8,.2,1)"}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:"1px solid var(--c-line)", position:"sticky", top:0, background:"var(--c-card)"}}>
-              <h3 style={{margin:0, fontSize:17}}>{win === "overview" ? "Overview" : "Recommendation"}</h3>
-              <button onClick={() => setWin(null)} className="btn btn--icon btn--ghost" aria-label="Close"><Icon name="close" size={15} /></button>
-            </div>
-            <div style={{padding:"18px"}}>
-              {win === "overview" ? (
-                <div style={{display:"flex", flexDirection:"column", gap:14}}>
-                  <div style={{background:"var(--yellow-500)", borderRadius:12, padding:"18px 20px"}}>
-                    <div className="eyebrow" style={{marginBottom:8, color:"rgba(48,48,48,0.6)"}}>Single-minded proposition</div>
-                    <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:18, lineHeight:1.35, margin:0, color:"#1a1f36", fontWeight:500}}>"{brief.smp}"</p>
-                  </div>
-                  <BriefSection title="Background"          body={brief.background} />
-                  <BriefSection title="Objective"           body={brief.objective} />
-                  <BriefSection title="Audience"            body={brief.audience} />
-                  <BriefSection title="Metrics that matter" body={brief.metrics} />
-                  <div className="card card--inset" style={{padding:16}}>
-                    <div className="eyebrow" style={{marginBottom:10}}>Deliverables · {brief.deliverables.length}</div>
-                    <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>{brief.deliverables.map((d, i) => <span key={i} className="pill" style={{height:28, padding:"0 14px", fontSize:11.5}}>{d}</span>)}</div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{display:"flex", flexDirection:"column", gap:14}}>
-                  <BriefSection title="Creative strategy" body={brief.strategy} />
-                  <BriefSection title="Tone"              body={brief.tone} />
-                  <BriefSection title="Direction"         body={brief.direction} />
-                  <BriefSection title="Mandatories"       body={brief.mandatories} />
-                  <div style={{background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius:12, padding:16}}>
-                    <div className="eyebrow eyebrow--pink" style={{marginBottom:10}}>What this brief is NOT doing</div>
-                    <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:15, lineHeight:1.5, color:"var(--c-ink)", margin:0}}>"{brief.notDoing}"</p>
-                  </div>
-                  <div className="card card--inset" style={{padding:16, borderLeft:"3px solid var(--yellow-500)"}}>
-                    <div className="eyebrow eyebrow--yellow" style={{marginBottom:10}}>Strategic assumptions</div>
-                    <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8}}>
-                      {brief.assumptions.map((a, i) => <li key={i} style={{fontSize:13, color:"var(--c-ink)", display:"flex", gap:8, lineHeight:1.5}}><span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}</li>)}
-                    </ul>
-                  </div>
-                  <div className="card card--inset" style={{padding:16, borderLeft:"3px solid var(--orange-500)"}}>
-                    <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom:10}}>Production watchouts</div>
-                    <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8}}>
-                      {brief.watchouts.map((w, i) => <li key={i} style={{fontSize:13, color:"var(--c-ink)", display:"flex", gap:8, lineHeight:1.5}}><span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}</li>)}
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Floating detail — opens next to the clicked node, not on the side */}
-      {pop && (() => {
-        const r = pop.rect, W = 384, gap = 14;
-        const vw = window.innerWidth, vh = window.innerHeight;
-        let left = r ? r.right + gap : vw / 2 - W / 2;
-        if (r && left + W > vw - 12) left = r.left - gap - W;
-        if (left < 12) left = 12;
-        const top = r ? Math.max(12, Math.min(r.top, vh - 360)) : 90;
-        return (
-          <>
-            <div onClick={() => setPop(null)} style={{position:"fixed", inset:0, zIndex:49}} />
-            <div className="card" style={{position:"fixed", top, left, width:W, zIndex:50, maxHeight:"calc(100vh - 24px)", overflowY:"auto", boxShadow:"var(--shadow-xl)", animation:"cvPopIn 160ms cubic-bezier(.2,.8,.2,1)"}}>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8, padding:"14px 16px 0"}}>
-                <span className="eyebrow eyebrow--yellow" style={{paddingTop:3}}>{dEye}</span>
-                <div style={{display:"flex", alignItems:"center", gap:2, flexShrink:0}}>
-                  {ref.type === "output" && <PinButton kind="outputs" id={ref.id} size={16} />}
-                  {ref.type === "specialist" && <PinButton kind="specialists" id={ref.id} size={16} />}
-                  <button onClick={() => setPop(null)} className="btn btn--icon btn--ghost" aria-label="Close" style={{height:26, width:26}}><Icon name="close" size={14} /></button>
-                </div>
-              </div>
-              <div style={{padding:"6px 16px 16px"}}>{dBody}</div>
-            </div>
-          </>
-        );
-      })()}
-    </div>
   );
 }
 
@@ -4028,9 +3547,7 @@ function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
           }}>
             <span>
               Composed by <span style={{color:"var(--c-ink)"}}>{specialistName(o.run.specialist_id)}</span> · BIO v{o.run.bio_version}
-              {cert
-                ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span></>
-                : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+              <CertChip cert={cert} bioVersion={o.run.bio_version} />
             </span>
             <span>{agent?.cr ?? "?"} cr</span>
           </div>
@@ -4334,4 +3851,4 @@ function SpecialistAuthor({ go }) {
   );
 }
 
-Object.assign(window, { BriefsLibrary, BriefDetail, SpecialistsDirectory, CanvasView, Library, SpecialistAuthor, BriefBoard });
+Object.assign(window, { BriefsLibrary, SpecialistsDirectory, CanvasView, Library, SpecialistAuthor, BriefViewCanvas });
