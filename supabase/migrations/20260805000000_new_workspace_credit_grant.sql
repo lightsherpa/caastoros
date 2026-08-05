@@ -32,11 +32,11 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $fn$
 declare
   new_workspace_id uuid;
   new_brand_id uuid;
-  starting_credits int := 300;  -- MONTHLY_POOL['00']
+  starting_credits int := 300;  -- MONTHLY_POOL tier 00
 begin
   -- Create a default workspace named from the email's local part
   insert into workspaces (name, tier)
@@ -58,4 +58,4 @@ begin
 
   return new;
 end;
-$$;
+$fn$;
