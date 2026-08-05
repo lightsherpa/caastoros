@@ -38,10 +38,15 @@ function useLiveBio({ pollMs = 6000 } = {}) {
       const { bio, reviewPending, focusCount } = await res.json();
       let certInfo = null;
       if (bio?.certified) {
-        let certName = "your Brand Steward";
+        /* Two-tier cert. Discovery self-certifies its own compile
+           (certified = true, certified_by NULL). byName MUST stay null in
+           that case — the old default put "your Brand Steward" on work no
+           human ever read, which is a fabricated human endorsement. Only a
+           real certified_by may produce a name. */
+        let certName = null;
         if (bio.certified_by) {
           const { data: tm } = await supabase.from("team_members").select("first_name, name").eq("id", bio.certified_by).maybeSingle();
-          certName = tm?.first_name || tm?.name || certName;
+          certName = tm?.first_name || tm?.name || "your Brand Steward";
         }
         certInfo = { byName: certName, at: bio.certified_at, notes: bio.steward_notes || null };
       }
@@ -622,13 +627,17 @@ function DiscoveryStep2Results({ onConfirm }) {
           }}>{live.cert ? "✓" : (live.cert?.byName?.[0] || "S")}</div>
           <div style={{flex: 1}}>
             <div style={{fontSize: 14, fontWeight: 500, color:"var(--c-ink)", marginBottom: 2}}>
-              {live.cert
+              {live.cert?.byName
                 ? <>Your BIO is certified by <span style={{color:"var(--green-600)"}}>{live.cert.byName}</span></>
+                : live.cert
+                ? <>Your BIO is self-certified and ready to use</>
                 : <>A senior human will certify your BIO within 24h</>}
             </div>
             <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5}}>
-              {live.cert
+              {live.cert?.byName
                 ? <>Every output your Specialists produce will ship <em>"certified by {live.cert.byName}"</em>. <button onClick={() => onConfirm && onConfirm()} className="btn btn--link" style={{fontSize: 12.5, padding: 0}}>Continue to your workspace →</button></>
+                : live.cert
+                ? <>Brandolph compiled it, so briefs can run against it now — but no senior human has read it yet. Your Brand Steward signs it next; only then do outputs ship <em>"certified by [their name]"</em>. <button onClick={() => onConfirm && onConfirm()} className="btn btn--link" style={{fontSize: 12.5, padding: 0}}>Continue to your workspace →</button></>
                 : <>Your Brand Steward — a senior La&nbsp;Mesa designer — reads what Brandolph extracted, refines anything that's not quite right, and signs the BIO. From that moment, every output your Specialists produce ships <em>"certified by [their name]"</em>.</>}
             </div>
           </div>
@@ -1104,8 +1113,11 @@ function BioViewer({ go, bioScore = 91 }) {
             }} />
             <div>
               <div style={{fontSize: 13.5, color:"var(--c-ink)", fontWeight: 500}}>
-                {live.cert ? (
+                {live.cert?.byName ? (
                   <>Certified by <span style={{color:"var(--green-600)"}}>{live.cert.byName}</span> · {formatCertDate(live.cert.at)}</>
+                ) : live.cert ? (
+                  /* Self-certified: certified = true, certified_by NULL. Name nobody. */
+                  <>Self-certified · {formatCertDate(live.cert.at)} — awaiting your Brand Steward</>
                 ) : live.reviewPending && live.bio ? (
                   <>Your Brand Steward is reviewing this BIO</>
                 ) : live.bio ? (
@@ -1119,19 +1131,23 @@ function BioViewer({ go, bioScore = 91 }) {
                   {live.brandName} · BIO v{live.bio.version} · score {live.bio.score ?? "—"}/100
                 </div>
               )}
-              {!live.cert && live.focusCount > 0 && (
+              {/* Still keyed on "no senior signature yet" — self-certification
+                  made live.cert permanently truthy, which silently hid this. */}
+              {!live.cert?.byName && live.focusCount > 0 && (
                 <div style={{fontSize: 12, color:"var(--c-dim)", marginTop: 6, lineHeight: 1.5}}>
                   Brandolph flagged {live.focusCount} area{live.focusCount === 1 ? "" : "s"} for your Steward to confirm.
                 </div>
               )}
-              {live.cert?.notes && (
+              {/* Steward notes are attributed, so only render them when a
+                  real Steward is named — never signed "— null". */}
+              {live.cert?.notes && live.cert.byName && (
                 <div style={{fontSize: 12.5, color:"var(--c-dim)", marginTop: 6, lineHeight: 1.5, fontStyle:"italic", borderLeft:"2px solid var(--green-300, rgba(127,163,122,0.4))", paddingLeft: 10}}>
                   “{live.cert.notes}” <span style={{fontStyle:"normal", color:"var(--c-faint)"}}>— {live.cert.byName}</span>
                 </div>
               )}
             </div>
           </div>
-          {!live.cert && live.bio && (
+          {!live.cert?.byName && live.bio && (
             <span style={{fontSize: 11.5, color:"var(--c-dim)", fontStyle:"italic", whiteSpace:"nowrap"}}>
               {live.reviewPending ? "in review" : "within 24h"}
             </span>
@@ -1254,7 +1270,7 @@ function BioViewer({ go, bioScore = 91 }) {
             {tab === "voice"       && <BioFieldList items={bio.voice}       editing={editing} onChange={v => patch("voice", v)} />}
             {tab === "visual"      && <BioVisual bio={bio} patch={patch} editing={editing} />}
             {tab === "goals"       && <BioFieldList items={bio.goals}       editing={editing} onChange={v => patch("goals", v)} />}
-            {tab === "strategic"   && <BioStrategic strat={bio.strategic} patchStrategic={patchStrategic} editing={editing} />}
+            {tab === "strategic"   && <BioStrategic strat={bio.strategic} patchStrategic={patchStrategic} editing={editing} brand={live.brandName || "this brand"} />}
             {tab === "sources"     && <BioSources sources={sources} setSources={setSources} feed={feed} setFeed={setFeed} reading={reading} addReference={addReference} editing={editing} go={go} />}
           </div>
         </div>
@@ -1446,7 +1462,7 @@ function BioVisual({ bio, patch, editing }) {
                     : <span className="pill" style={{height:18, padding:"0 8px", fontSize:9.5}}>{t.license}</span>}
                 </div>
                 <div style={{fontFamily:ff, fontSize:52, lineHeight:1, color:"var(--c-ink)", fontWeight:600, letterSpacing:"-0.02em"}}>Aa Gg</div>
-                <div style={{fontFamily:ff, fontSize:15, color:"var(--c-dim)", marginTop:8, lineHeight:1.4}}>The decision to slow down, on purpose.</div>
+                <div style={{fontFamily:ff, fontSize:15, color:"var(--c-dim)", marginTop:8, lineHeight:1.4}}>The quick brown fox jumps over the lazy dog.</div>
                 <div style={{marginTop:14, paddingTop:12, borderTop:"1px dashed var(--c-line-2)"}}>
                   {editing
                     ? <div style={{display:"flex", flexDirection:"column", gap:6}}>
@@ -1509,7 +1525,7 @@ function BioVisual({ bio, patch, editing }) {
   );
 }
 
-function BioStrategic({ strat, patchStrategic, editing }) {
+function BioStrategic({ strat, patchStrategic, editing, brand = "this brand" }) {
   return (
     <div style={{display:"grid", gridTemplateColumns: "1fr 1fr", gap: 18}}>
       <div className="card" style={{padding: 18, borderLeft: "3px solid var(--yellow-500)"}}>
@@ -1529,7 +1545,7 @@ function BioStrategic({ strat, patchStrategic, editing }) {
             </ul>}
       </div>
       <div className="card" style={{padding: 18, borderLeft:"3px solid var(--pink-500)", gridColumn: "1 / -1"}}>
-        <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>What Vinilo is NOT</div>
+        <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>What {brand} is NOT</div>
         {editing
           ? <StringListEditor items={strat.notList} onChange={(v) => patchStrategic("notList", v)} marker="✕" color="var(--pink-500)" />
           : <ul style={{margin: 0, paddingLeft: 0, listStyle:"none", display:"grid", gridTemplateColumns: "1fr 1fr", gap: 10}}>

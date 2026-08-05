@@ -178,6 +178,17 @@ function AgentCard({ agentId, compact = false, onClick, showCaps = false }) {
   );
 }
 
+/* Certification attribution. A named human appears only when a senior
+   Steward actually signed; self-certified work says so plainly, and work
+   with no certification at all says nothing. */
+function CertNote({ steward, selfCertified }) {
+  if (steward) {
+    return <> · certified by <span style={{color:"var(--c-ink)"}}>{steward.firstName}</span>{steward.certifiedAt ? <> · {steward.certifiedAt}</> : null}</>;
+  }
+  if (selfCertified) return <> · self-certified</>;
+  return null;
+}
+
 /* Output card — used in /briefs/[id] and canvas drawers.
    Footer renders the rev-2 §5.5 / §9 attribution. Two render modes:
    - Client (default, public): leads with the Steward chip; NO model name.
@@ -186,15 +197,22 @@ function AgentCard({ agentId, compact = false, onClick, showCaps = false }) {
    - Team / debug: adds `routed via {model}` and `run {short_id}` for
      ops debugging. Surfaces by default on team portal; hover-reveal on
      client portal so debugging is always one mouse-hover away.
-   Data sources (mocked here; real wiring at P3 reads from `runs` row +
-   `bios.certified_by/at`): CI_BRAND.steward, CI_BRAND.bioVersion,
-   output.meta (date), CI_AGENTS[].model (key into CI_MODELS for label),
-   output.id (truncated to 7 chars as the run short_id). */
+   Attribution comes in on `output` — never from ambient seed data. This
+   footer used to read CI_BRAND.steward, which meant every card claimed a
+   named human had certified it ("certified by Marina · 14 May") on brands
+   that person has never seen. A fabricated professional endorsement is the
+   one thing this footer must never render, so an output with no cert data
+   now says nothing rather than borrowing someone's signature.
+
+   Certification is two-tier: `certified_by` set = a senior Steward signed
+   it; certified with `certified_by` NULL = self-certified by Discovery.
+   Only the first may name a person. */
 function OutputCard({ output }) {
   const agent = window.CI_AGENTS.find(a => a.id === output.agentId);
   const isTeam = useIsTeam();
-  const brand = window.CI_BRAND;
-  const steward = brand && brand.steward;
+  const bioVersion = output.bioVersion ?? null;
+  const steward = output.certifiedBy || null;   // { firstName, certifiedAt } — senior cert only
+  const selfCertified = !steward && output.certified === true;
   const modelLabel = agent && window.CI_MODELS && window.CI_MODELS[agent.model] ? window.CI_MODELS[agent.model].label : null;
   const shortRunId = output.id ? String(output.id).replace(/[^a-z0-9]/gi, "").slice(0, 7) : "";
 
@@ -208,8 +226,8 @@ function OutputCard({ output }) {
   const ClientFooter = (
     <div style={footerBase}>
       Composed by <span style={{color:"var(--c-ink)"}}>{agent ? agent.name : "Specialist"}</span>
-      {brand && brand.bioVersion ? <> · BIO v{brand.bioVersion}</> : null}
-      {steward ? <> · certified by <span style={{color:"var(--c-ink)"}}>{steward.firstName}</span> · {steward.certifiedAt}</> : null}
+      {bioVersion ? <> · BIO v{bioVersion}</> : null}
+      <CertNote steward={steward} selfCertified={selfCertified} />
     </div>
   );
 
@@ -217,8 +235,8 @@ function OutputCard({ output }) {
     <div style={{...footerBase, color:"var(--c-dim)"}}>
       Composed by <span style={{color:"var(--c-ink)"}}>{agent ? agent.name : "Specialist"}</span>
       {modelLabel ? <> · routed via {modelLabel}</> : null}
-      {brand && brand.bioVersion ? <> · BIO v{brand.bioVersion}</> : null}
-      {steward ? <> · certified by <span style={{color:"var(--c-ink)"}}>{steward.firstName}</span> · {steward.certifiedAt}</> : null}
+      {bioVersion ? <> · BIO v{bioVersion}</> : null}
+      <CertNote steward={steward} selfCertified={selfCertified} />
       {shortRunId ? <> · run {shortRunId}</> : null}
     </div>
   );

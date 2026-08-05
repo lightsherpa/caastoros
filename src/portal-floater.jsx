@@ -134,7 +134,7 @@ function getContextLine(routeId) {
     case "home":         return "*Briefing a new flow lives in the launchpad above.* Use this for status, advice, or anything you'd ask a CMO mid-week.";
     case "discovery":    return "*You're mid-extraction.* I'm reading the site in another tab. Ask me anything while we wait — including 'what should I check first when it lands'.";
     case "bio":          return "*The BIO is the canon.* I'll quote it back if you ask me about a field. Ask me what's weak.";
-    case "briefs":       return "*Three briefs in flight, four shipped.* Ask me about any one of them, or ask me which one I'd push first this week.";
+    case "briefs":       return "*Every brief you've run lives here.* Ask me about any one of them, or ask me which one I'd push first this week.";
     case "brief-detail": return "*You're inside a brief.* I can take you through the SMP, the refusals, or what I'd do differently if we were writing it tomorrow.";
     case "specialists":  return "*That's your department.* Ask me who I'd assemble for a specific job, and I'll show you the pick + why.";
     case "canvas":       return "*This is the workspace.* The map gets denser as you ship. Ask me about any node, or ask me what's downstream of the BIO.";
@@ -189,25 +189,28 @@ async function streamBrandolph({ history, routeId, onToken, signal }) {
   return null;
 }
 
-/* Mock replies — heuristic match on user input.                       */
+/* Offline replies — heuristic match on user input. This path only runs when
+   Brandolph can't reach the backend, so it has NO brand data. Every line must
+   stay honest: point at where the real answer lives, never invent a fact about
+   the user's brand, team, spend, or work in flight.                     */
 function fakeReply(msg) {
   const m = msg.toLowerCase();
   if (/status|going on|in flight|what'?s up|running/.test(m))
-    return "*Two things alive.* Pricing relaunch is in production — Email 2 reads dutiful and needs one more pass before it ships. Honduras essay is with Lia for a finishing pass. Everything else is on you to push.";
+    return "*I can't read your workspace right now.* Your briefs list carries the true status of everything in flight — I'll pick it back up the moment the connection returns.";
   if (/next|brief.*next|what.*ship|new brief/.test(m))
-    return "*Summer Tuesdays.* You sketched it on Friday. I have two sharpening questions before we assemble: in or out for wholesale, and is this an organic-only push or do we have paid?";
+    return "*I'd rather ask than guess.* Describe the job in a sentence — audience, channel, and what has to change — and I'll sharpen it into a brief once I'm reading your data again.";
   if (/bio|read.*me|positioning|brand/.test(m))
-    return "*Vinilo is a coffee for the Tuesday you decide to slow down on purpose.* The writing earns the conviction. The visual system doesn't yet. If you ask me what to do in Q3, it's the brand book — not new campaigns.";
+    return "*I won't tell you what your brand stands for from memory.* I can only judge the BIO when I can read it. Open it and ask me again once I'm reconnected.";
   if (/block|stuck|wait/.test(m))
-    return "*One thing is actively stuck.* The annual price — 10× or 11.4× — gates five outputs in flight. Until you decide, I'm holding Email 2 and the pricing hero.";
+    return "*I can't see what's blocked from here.* Anything waiting on a decision is flagged on the brief it gates — check there, and I'll surface it myself when I'm live again.";
   if (/cost|credit|spend|budget/.test(m))
-    return "*337 cr spent this cycle. 563 left, 14 days to reset.* The split: 41% AI work, 33% human craft, 8% QA. If you're heavy on craft this cycle it's because the Hero KV and the Honduras essay both landed with Aitana and Lia.";
+    return "*Credit spend comes from your ledger, not from me guessing.* The credits screen has the exact number for this cycle and what's left before reset.";
   if (/team|aitana|marc|lia|diego/.test(m))
-    return "*The team has two of your jobs.* Aitana on the Hero KV — delivered v3, you commented this morning. Lia on the Honduras essay — finishing pass. Both on track.";
+    return "*I can't see the team queue right now.* The craft view lists who's holding which job and where each one stands.";
   if (/refuse|not doing|kill/.test(m))
-    return "*I'd kill the brewing-kit page.* It converts at 0.4% and dilutes the subscription story. Doing that frees a Sonnet pass for the wholesale flow you've been deferring.";
+    return "*Refusals should come from evidence, not from vibes.* When I can read your run history again I'll tell you what's underperforming — I'm not going to name something blind.";
   if (/who|specialist|agent/.test(m))
-    return "*For your next brief I'd assemble The Sharpener, The Strategist, Conversion Copy, Email Sequence, and Brand Consistency QA.* That's 36 cr and the smallest crew that earns the brief.";
+    return "*The crew depends on the brief.* Describe the job and I'll assemble the smallest set of specialists that earns it, with the credit preview, as soon as I'm back on.";
   return "*Heard.* Give me a beat — I'd rather come back with a brief or a question than an answer. Probably a question.";
 }
 

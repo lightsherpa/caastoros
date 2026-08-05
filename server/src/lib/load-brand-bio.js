@@ -1,15 +1,14 @@
 // Loads a brand + its currently-active BIO from Supabase.
 //
 // Per modes-templates-steward-plan.md rev-2 §5.5 (`loadBioForRun()`):
-// specialist runs must read a CERTIFIED BIO. Until P1.5 ships the
-// Steward certification flow, NO brand will have certified=true. For
-// dev unblock, this loader supports a `requireCertified` flag — set
-// false during P0/P1 and true once P1.5 lands.
+// specialist runs must read a CERTIFIED BIO. Certification is two-tier —
+// Discovery self-certifies its own compile (certified=true, certified_by
+// null) so briefs are never blocked, and a senior Steward can then
+// re-certify to attach the human attribution (certified_by set).
 //
 // Returns { brand, bio, refusals } shaped for prompt.js consumption.
 
 import { supabaseAdmin } from "./supabase.js";
-import { VINILO_BIO, VINILO_REFUSALS, VINILO_BRAND } from "../data/vinilo.js";
 
 /**
  * @param {object} opts
@@ -55,21 +54,17 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
     .maybeSingle();
   if (bioErr) throw new Error(`BIO lookup failed: ${bioErr.message}`);
 
-  // Fallback: no BIO yet (brand was auto-created on signup, never ran Discovery).
-  // Return the Vinilo seed so the Ask Brandolph endpoint still works during P0
-  // before P1 Discovery ships. Logged so we can spot this in dev.
+  // No BIO yet (brand auto-created on signup, never ran Discovery). There is
+  // no seed fallback on purpose: serving another brand's BIO here leaked that
+  // brand's positioning and refusals into this brand's prompts.
   if (!bioRow) {
-    if (requireCertified) {
-      const err = new Error(`BIO_NOT_CERTIFIED for brand ${brandRow.id}`);
-      err.code = "BIO_NOT_CERTIFIED";
-      throw err;
-    }
-    console.warn(`[load-brand-bio] No BIO for brand ${brandRow.id} (${brandRow.name}); using Vinilo seed fallback. Run Discovery (P1) to create a real BIO.`);
-    return {
-      brand:    { ...VINILO_BRAND, id: brandRow.id, name: brandRow.name || VINILO_BRAND.name },
-      bio:      VINILO_BIO,
-      refusals: brandRow.refusals?.length ? brandRow.refusals : VINILO_REFUSALS,
-    };
+    const err = new Error(
+      requireCertified
+        ? `BIO_NOT_CERTIFIED for brand ${brandRow.id}`
+        : `No BIO for brand ${brandRow.name || brandRow.id}. Run Discovery to build one.`
+    );
+    err.code = requireCertified ? "BIO_NOT_CERTIFIED" : "NO_BIO";
+    throw err;
   }
 
   return {
@@ -84,7 +79,9 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
       certified_at: bioRow.certified_at,
       cert_kind:    bioRow.cert_kind,
     },
-    refusals: brandRow.refusals?.length ? brandRow.refusals : VINILO_REFUSALS,
+    // Only this brand's own refusals. An empty list means "no hard don'ts
+    // recorded yet" — never borrow another brand's.
+    refusals: brandRow.refusals || [],
   };
 }
 

@@ -137,6 +137,38 @@
 }
 
 /* =================================================================
+   REPLIT-GRADE DESIGN LANGUAGE (Phase 1) — shared tokens
+   Coexist with the existing tokens above; nothing here is deleted.
+   NOTE: the "ONE accent" is defined as --accent-caastor (a fixed
+   Caastor yellow), NOT --accent. The existing --accent is palette-
+   driven purple and is load-bearing for the whole --purple-* bridge,
+   --text-link and --border-focus (and is consumed by the canvas in
+   portal-briefs.jsx). Overriding it would recolor out-of-scope
+   surfaces, so the new single accent gets its own name.
+   ================================================================= */
+:root {
+  /* ── The ONE accent (Caastor yellow) — fixed across light + dark ── */
+  --accent-caastor: #F8C036;   /* single brand accent */
+  --accent-ink:     #1A1F36;   /* ink/text sitting on the accent */
+
+  /* ── Artifact surfaces — warm paper, LIGHT IN BOTH THEMES.
+        Consumed Phase 2/3 by canvas nodes / deliverable + brief cards. ── */
+  --artifact-bg:     #FCFAF6;
+  --artifact-ink:    #1A1F36;
+  --artifact-radius: 16px;
+  --artifact-shadow: 0 1px 2px rgba(26,31,54,0.06), 0 8px 24px rgba(26,31,54,0.10);
+
+  /* ── Radii: chrome (controls) / artifact / pill ── */
+  --radius-chrome:   8px;      /* toolbar/panel/control corners */
+  --radius-artifact: 16px;     /* == --radius-xl */
+  /* pill reuses existing --radius-pill (9999px) */
+
+  /* ── Desk dot-grid (used by later phases; token defined now) ── */
+  --desk-dot-size: 1px;
+  --desk-dot-gap:  24px;
+}
+
+/* =================================================================
    LIGHT MODE — white / light-gray surfaces, vivid brand
    ================================================================= */
 :root, [data-theme="light"] {
@@ -189,6 +221,16 @@
   --shadow-brand: 0 12px 32px rgba(var(--brand-glow), 0.28);
   --shadow-accent: 0 12px 32px rgba(var(--accent-glow), 0.28);
 
+  /* ── Replit-grade chrome — LIGHT (refined warm paper, tightened) ── */
+  --bg-desk:   #F4F1EA;                 /* desk / canvas backdrop (warm paper) */
+  --bg-chrome: #FBFAF7;                 /* sidebar, topbar, panels */
+  --bg-raised: #FFFFFF;                 /* dropdowns, pills, toolbars */
+  --line:      rgba(26,31,54,0.10);     /* hairlines */
+  --text-1:    #1A1F36;                 /* primary ink (matches artifact/accent ink) */
+  --text-2:    #4B5675;                 /* mid — == --text-secondary */
+  --text-3:    #78829D;                 /* faint — == --text-tertiary */
+  --desk-dot-color: rgba(26,31,54,0.10);
+
   color-scheme: light;
 }
 
@@ -240,6 +282,16 @@
   --shadow-focus: 0 0 0 4px rgba(var(--accent-glow), 0.32);
   --shadow-brand: 0 12px 32px rgba(var(--brand-glow), 0.4);
   --shadow-accent: 0 12px 32px rgba(var(--accent-glow), 0.4);
+
+  /* ── Replit-grade chrome — DARK (new Replit look) ── */
+  --bg-desk:   #0C0D0E;                 /* desk / canvas backdrop */
+  --bg-chrome: #141517;                 /* sidebar, topbar, panels */
+  --bg-raised: #1C1D20;                 /* dropdowns, pills, toolbars */
+  --line:      rgba(255,255,255,0.08);  /* hairlines */
+  --text-1:    #ECECEC;
+  --text-2:    #9BA0A6;
+  --text-3:    #6B7076;
+  --desk-dot-color: rgba(255,255,255,0.07);
 
   color-scheme: dark;
 }

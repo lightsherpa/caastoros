@@ -131,11 +131,13 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
     if (job.status !== "pending_lead_review") return c.json({ error: `Job is ${job.status}, not pending_lead_review` }, 409);
 
     if (body.leadApprove === false) {
-      /* Send back for revision — clear the in-flight cert metadata on
-         the bios row (if it was tentatively set) and reopen the job. */
+      /* Send back for revision — clear the in-flight tier-2 metadata and
+         reopen the job. `certified` is deliberately untouched: rejecting a
+         senior sign-off must not revoke the BIO's self-certification and
+         take the brand's specialist runs down with it. */
       await supabaseAdmin
         .from("bios")
-        .update({ certified: false, certified_by: null, certified_at: null, cert_kind: null })
+        .update({ certified_by: null, certified_at: null, cert_kind: null })
         .eq("id", job.bio_id);
       await supabaseAdmin
         .from("steward_jobs")
@@ -228,15 +230,18 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
     certifiedBioId = newRow.id;
     certifiedVersion = newRow.version;
   } else {
+    /* Never downgrade `certified`. Discovery self-certifies every BIO
+       (tier 1), and loadBioForRun requires certified=true — so writing
+       false here would revoke the brand's working BIO and fail every
+       specialist run with BIO_NOT_CERTIFIED until a Lead approved.
+       A pending senior review stages the tier-2 metadata only; tier 1
+       is left exactly as it was. */
+    const certPatch = finalCertified
+      ? { certified: true, certified_by: steward.id, certified_at: new Date().toISOString(), cert_kind: job.kind }
+      : { certified_by: null, certified_at: null, cert_kind: null };
     const { data: updated, error: updateErr } = await supabaseAdmin
       .from("bios")
-      .update({
-        certified: finalCertified,
-        certified_by: finalCertified ? steward.id : null,
-        certified_at: finalCertified ? new Date().toISOString() : null,
-        cert_kind: finalCertified ? job.kind : null,
-        steward_notes: body.notes || null,
-      })
+      .update({ ...certPatch, steward_notes: body.notes || null })
       .eq("id", job.bio_id)
       .select("version")
       .single();

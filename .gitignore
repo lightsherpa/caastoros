@@ -10,3 +10,15 @@ dist/
 
 # Large raw media — keep out of git (use external storage / git-lfs if needed)
 explainer-video/
+
+# Internal cost modelling — never ship API economics with the source.
+CaastorOS_API_Cost_Model.xlsx
+
+# Superseded snapshots and scratch output. ~300MB that `git add -A`
+# would otherwise sweep into a commit.
+OldCaastor/
+Caastor V3/
+.impeccable/
+artifacts/
+website/local-preview/
+*.selfcontained.html

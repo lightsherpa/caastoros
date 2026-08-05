@@ -1,5 +1,5 @@
 import React from "react";
-import { apiFetch } from "./lib/supabase-browser.js";
+import { apiFetch, supabase } from "./lib/supabase-browser.js";
 const { BrandolphAvatar, BrandolphDot, Counter, Drawer, Icon, LayerTag, ModelChip, PageHeader } = window;
 /* Craft marketplace + Credits ledger + Settings. */
 
@@ -370,8 +370,42 @@ function NotificationPrefs() {
   );
 }
 
+const ROLE_LABEL = { client: "Client", team: "Caastor team", admin: "Admin" };
+
+/* A failed load must not read as "you have nothing" — say so instead. */
+const ErrCard = ({ children }) => (
+  <div className="card" style={{padding:"10px 14px", marginBottom: 14, borderLeft:"3px solid var(--pink-500)", fontSize: 13}}>{children}</div>
+);
+
+/* Workspace identity + roster. The `workspaces` row comes straight from the
+   browser client (RLS ws_workspaces scopes it to the caller's own workspace);
+   members must go through the server because `users` RLS is self-read only. */
+function useWorkspace() {
+  const [state, setState] = useCState({ loading: true, name: null, members: [], error: null });
+  useCEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [wsRes, memRes] = await Promise.all([
+          supabase.from("workspaces").select("name").maybeSingle(),
+          apiFetch("/api/workspace/members"),
+        ]);
+        if (wsRes.error) throw new Error(wsRes.error.message);
+        if (!memRes.ok) throw new Error((await memRes.json().catch(() => ({}))).error || `HTTP ${memRes.status}`);
+        const { members } = await memRes.json();
+        if (alive) setState({ loading: false, name: wsRes.data?.name || null, members: members || [], error: null });
+      } catch (e) {
+        if (alive) setState({ loading: false, name: null, members: [], error: e?.message || String(e) });
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+  return state;
+}
+
 function SettingsView() {
   const [tab, setTab] = useCState("workspace");
+  const ws = useWorkspace();
   return (
     <div style={{padding:"24px 36px 60px"}}>
       <PageHeader eyebrow="Workspace governance" title="Settings" sub="Workspace, billing, members, BIO governance. The rules that hold across every brief, every specialist." />
@@ -400,39 +434,35 @@ function SettingsView() {
           {tab === "workspace" && (
             <div style={{display:"flex", flexDirection:"column", gap: 18, maxWidth: 480}}>
               <h3 style={{margin: 0}}>Workspace</h3>
-              <div><label style={{display:"block", fontSize:12, fontWeight:500, marginBottom: 6}}>Name</label><input className="input" defaultValue="Vinilo Coffee" /></div>
-              <div><label style={{display:"block", fontSize:12, fontWeight:500, marginBottom: 6}}>Time zone</label><input className="input" defaultValue="Europe/Madrid" /></div>
-              <div><label style={{display:"block", fontSize:12, fontWeight:500, marginBottom: 6}}>Workspace logo</label>
-                <div style={{display:"flex", gap: 12, alignItems:"center"}}>
-                  <div style={{width:56, height:56, borderRadius: 10, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:24}}>V</div>
-                  <button className="btn btn--ghost">Upload</button>
-                  <button className="btn btn--link" style={{fontSize: 12, color:"var(--c-faint)"}}>Remove</button>
+              {ws.error && <ErrCard>Couldn't load your workspace — {ws.error}</ErrCard>}
+              <div style={{display:"flex", gap: 12, alignItems:"center"}}>
+                <div style={{width:56, height:56, borderRadius: 10, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:24}}>
+                  {(ws.name || "?").trim().charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{fontSize: 15, fontWeight: 500}}>{ws.loading ? "Loading…" : (ws.name || "—")}</div>
+                  {/* No rename/logo endpoint yet — say so rather than show controls that do nothing. */}
+                  <div style={{fontSize: 12, color:"var(--c-faint)"}}>Renaming and workspace logos aren't available yet.</div>
                 </div>
               </div>
-              <button className="btn btn--primary" style={{alignSelf:"flex-start"}}>Save changes →</button>
             </div>
           )}
           {tab === "members" && (
             <div>
-              <h3 style={{margin: 0, marginBottom: 18}}>Members · 3</h3>
+              <h3 style={{margin: 0, marginBottom: 18}}>Members{ws.loading || ws.error ? "" : ` · ${ws.members.length}`}</h3>
+              {ws.error && <ErrCard>Couldn't load members — {ws.error}</ErrCard>}
+              {ws.loading && <div style={{fontSize: 12, color:"var(--c-faint)"}}>Loading…</div>}
               <div style={{display:"flex", flexDirection:"column", gap: 8}}>
-                {[
-                  { name:"Marina Reyes", email:"marina@vinilo.coffee", role:"Owner", p:"caastor/assets/profile-3.jpg" },
-                  { name:"Aleix Roca",   email:"aleix@vinilo.coffee", role:"Member", p:"caastor/assets/profile-2.jpg" },
-                  { name:"Júlia Bonet",  email:"julia@vinilo.coffee", role:"Viewer", p:"caastor/assets/profile-4.jpg" },
-                ].map((m, i) => (
-                  <div key={i} style={{display:"flex", alignItems:"center", gap: 12, padding: 12, border:"1px solid var(--c-line)", borderRadius: 10}}>
-                    <img src={m.p} alt="" style={{width: 36, height: 36, borderRadius:"50%", objectFit:"cover"}} />
-                    <div style={{flex:1}}>
-                      <div style={{fontSize: 14, fontWeight: 500}}>{m.name}</div>
-                      <div style={{fontSize: 12, color:"var(--c-faint)"}}>{m.email}</div>
+                {ws.members.map((m) => (
+                  <div key={m.id} style={{display:"flex", alignItems:"center", gap: 12, padding: 12, border:"1px solid var(--c-line)", borderRadius: 10}}>
+                    <div style={{width: 36, height: 36, borderRadius:"50%", background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:14}}>
+                      {(m.email || "?").charAt(0).toUpperCase()}
                     </div>
-                    <select className="input" style={{width: 110, height: 32, fontSize: 12}} defaultValue={m.role}><option>Owner</option><option>Member</option><option>Viewer</option></select>
-                    <button className="btn btn--icon btn--ghost" aria-label="Remove"><Icon name="close" size={13} /></button>
+                    <div style={{flex:1, fontSize: 14, fontWeight: 500}}>{m.email}</div>
+                    <span className="pill">{ROLE_LABEL[m.role] || m.role}</span>
                   </div>
                 ))}
               </div>
-              <button className="btn btn--primary" style={{marginTop: 18}}>Invite member <Icon name="plus" size={13} /></button>
             </div>
           )}
           {tab === "bio" && (

@@ -1,6 +1,6 @@
 import React from "react";
 import { supabase, apiFetch } from "./lib/supabase-browser.js";
-const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory } = window;
+const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefViewCanvas, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
 
@@ -8,7 +8,6 @@ const { useState: useShellState, useEffect: useShellEffect } = React;
 
 /* Defaults persisted via the tweaks panel host protocol */
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "homeVariant": "create",
   "brandolphMood": "midway",
   "tier": "02",
   "bioScore": 91,
@@ -67,6 +66,16 @@ function useShellTweaks() {
    reloads. */
 const DS_KEY = "ci_ds";
 const DS_DEFAULTS = { theme: "light", palette: "caastor", font: "inter", density: "cozy" };
+/* Resolve a stored theme preference to the effective data-theme value.
+   "system" follows the OS via prefers-color-scheme; "light"/"dark" pass
+   through unchanged. The stored preference keeps "system"; only the
+   applied html[data-theme] attribute is ever the resolved light|dark. */
+function resolveTheme(theme) {
+  if (theme === "system") {
+    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  }
+  return theme;
+}
 function useDesignSettings() {
   const [ds, setDs] = useShellState(() => {
     try { return { ...DS_DEFAULTS, ...JSON.parse(localStorage.getItem(DS_KEY) || "{}") }; }
@@ -74,12 +83,26 @@ function useDesignSettings() {
   });
   useShellEffect(() => {
     const r = document.documentElement;
-    r.setAttribute("data-theme", ds.theme);
+    r.setAttribute("data-theme", resolveTheme(ds.theme));   // store the preference, apply the resolved value
     r.setAttribute("data-palette", ds.palette);
     r.setAttribute("data-font", ds.font);
     r.setAttribute("data-density", ds.density);
     try { localStorage.setItem(DS_KEY, JSON.stringify(ds)); } catch (e) {}
   }, [ds.theme, ds.palette, ds.font, ds.density]);
+  /* Follow the OS live while in "system" mode — flip html[data-theme]
+     the moment the user changes their system appearance, no reload. */
+  useShellEffect(() => {
+    if (ds.theme !== "system" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => document.documentElement.setAttribute("data-theme", mq.matches ? "dark" : "light");
+    apply();
+    if (mq.addEventListener) mq.addEventListener("change", apply);
+    else if (mq.addListener) mq.addListener(apply);        // Safari < 14 fallback
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", apply);
+      else if (mq.removeListener) mq.removeListener(apply);
+    };
+  }, [ds.theme]);
   const setDsKey = (k, v) => setDs(prev => ({ ...prev, [k]: v }));
   return [ds, setDsKey];
 }
@@ -204,6 +227,28 @@ function useLiveCredits() {
   return credits;
 }
 
+/* Recent briefs — the 3 newest, RLS-scoped (read-only), for the
+   workspace menu's quick-access list. Refetches on brand switch, same
+   as useBrandList. No writes, no model/API cost. */
+function useRecentBriefs() {
+  const [briefs, setBriefs] = useShellState([]);
+  useShellEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from("briefs")
+        .select("id, title, created_at")
+        .order("created_at", { ascending: false })
+        .limit(3);
+      if (!cancelled) setBriefs(data || []);
+    };
+    load();
+    window.addEventListener("brand:changed", load);
+    return () => { cancelled = true; window.removeEventListener("brand:changed", load); };
+  }, []);
+  return briefs;
+}
+
 function WorkspaceSwitcher() {
   const { brands, loading } = useBrandList();
   const tier = useWorkspaceTier();
@@ -268,6 +313,167 @@ function WorkspaceSwitcher() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* Workspace menu ──────────────────────────────────────────────────
+   Replaces the plain brand switcher at the top of the AppDock. The
+   trigger shows the current workspace (avatar tile · name · chevron).
+   The dropdown KEEPS brand switching (no functional loss) and adds the
+   Replit-style app menu the spec authorises: Home, up to 3 recent
+   briefs, Settings, Notifications (reusing NotificationBell), a Theme
+   submenu (System / Light / Dark → ds.theme), a Help placeholder and
+   Log out. Every action reuses an existing handler — no new routes. */
+const WSM_LEAD = { background: "transparent", color: "var(--text-2)", boxShadow: "inset 0 0 0 1px var(--line)" };
+function WorkspaceMenu({ go, onLogout, ds, setDs }) {
+  const { brands, loading } = useBrandList();
+  const tier = useWorkspaceTier();
+  const currentId = useCurrentBrandId();
+  const recent = useRecentBriefs();
+  const [open, setOpen] = useShellState(false);
+  const current = brands.find((b) => b.id === currentId) || brands[0];
+  const initial = (current?.name?.trim()?.[0] || "?").toUpperCase();
+
+  const limit = window.CI_BRAND_LIMITS[tier] ?? 1;
+  const canAdd = brands.length < limit;
+
+  const rootRef = React.useRef(null);
+  useShellEffect(() => {
+    if (!open) return;
+    const onClick = (e) => { if (!rootRef.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const nav = (path) => { setOpen(false); go(path); };
+  const briefLabel = (b) => (b.title && String(b.title).trim()) || "Untitled brief";
+  const themeOpts = [
+    { value: "system", label: "System" },
+    { value: "light",  label: "Light" },
+    { value: "dark",   label: "Dark" },
+  ];
+
+  if (loading || !current) {
+    return <div className="ws-switcher ws-switcher--ghost" aria-hidden="true" />;
+  }
+
+  return (
+    <div className="ws-switcher" ref={rootRef}>
+      <button className={"ws-switcher__trigger" + (open ? " ws-switcher__trigger--open" : "")}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu" aria-expanded={open}>
+        <span className="ws-switcher__chip" aria-hidden="true">{initial}</span>
+        <span className="ws-switcher__name">{current.name || "Workspace"}</span>
+        <span className="ws-switcher__chev" aria-hidden="true"><Icon name="chev" size={12} /></span>
+      </button>
+      {open && (
+        <div className="ws-switcher__menu" role="menu">
+          {brands.length > 1 && <div className="ws-switcher__label">Workspaces</div>}
+          {brands.length > 1 && brands.map((b) => {
+            const active = b.id === current.id;
+            const ini = (b.name?.trim()?.[0] || "?").toUpperCase();
+            return (
+              <button key={b.id} role="menuitem"
+                className={"ws-switcher__option" + (active ? " ws-switcher__option--active" : "")}
+                onClick={() => { setCurrentBrandId(b.id); setOpen(false); }}>
+                <span className="ws-switcher__chip ws-switcher__chip--sm">{ini}</span>
+                <span className="ws-switcher__name">{b.name}</span>
+                {active && <span className="ws-switcher__tick"><Icon name="check" size={12} /></span>}
+              </button>
+            );
+          })}
+          <button type="button" role="menuitem" className="ws-switcher__option"
+            onClick={() => { window.location.hash = canAdd ? "#/discovery/new" : "#/upgrade"; setOpen(false); }}>
+            <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true">+</span>
+            <span className="ws-switcher__name" style={{color:"var(--text-2)"}}>Add brand</span>
+          </button>
+
+          <div className="ws-switcher__divider" />
+
+          <button role="menuitem" className="ws-switcher__option" onClick={() => nav("home")}>
+            <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true"><Icon name="home" size={13} /></span>
+            <span className="ws-switcher__name">Home</span>
+          </button>
+
+          {recent.length > 0 && <div className="ws-switcher__label">Recent briefs</div>}
+          {recent.map((b) => (
+            <button key={b.id} role="menuitem" className="ws-switcher__option" onClick={() => nav("board/" + b.id)}>
+              <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true"><Icon name="brief" size={12} /></span>
+              <span className="ws-switcher__name">{briefLabel(b)}</span>
+            </button>
+          ))}
+
+          <div className="ws-switcher__divider" />
+
+          <button role="menuitem" className="ws-switcher__option" onClick={() => nav("settings")}>
+            <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true"><Icon name="settings" size={13} /></span>
+            <span className="ws-switcher__name">Settings</span>
+          </button>
+
+          {/* Notifications — reuse the existing NotificationBell surface */}
+          <div className="ws-switcher__note">
+            <NotificationBell />
+            <span className="ws-switcher__name">Notifications</span>
+          </div>
+
+          <div className="ws-switcher__label">Theme</div>
+          <div className="ws-theme" role="group" aria-label="Theme">
+            {themeOpts.map((o) => (
+              <button key={o.value} type="button"
+                className={"ws-theme__opt" + (ds.theme === o.value ? " ws-theme__opt--active" : "")}
+                aria-pressed={ds.theme === o.value}
+                onClick={() => setDs("theme", o.value)}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="ws-switcher__divider" />
+
+          <button type="button" role="menuitem" className="ws-switcher__option" disabled
+            style={{opacity: 0.5, cursor: "default"}} title="Help — coming soon">
+            <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true">?</span>
+            <span className="ws-switcher__name">Help</span>
+          </button>
+
+          <button type="button" role="menuitem" className="ws-switcher__option"
+            onClick={() => { setOpen(false); onLogout && onLogout(); }}>
+            <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true"><Icon name="arrowLeft" size={13} /></span>
+            <span className="ws-switcher__name">Log out</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Bottom plan block — tier name · ONE credits meter · Upgrade.
+   CREDITS ONLY (balance / monthly pool) — never any currency or API
+   cost. Mounted only for client/admin, so the credit/tier reads never
+   fire on the team portal. */
+function PlanBlock({ onNav }) {
+  const tier = useWorkspaceTier();
+  const credits = useLiveCredits();
+  const tierName = (window.CI_TIERS && window.CI_TIERS[tier]) || `Tier ${tier}`;
+  /* Clamp low as well as high: a workspace whose ledger predates the starting
+     grant has a NEGATIVE balance, and a negative width is invalid CSS. */
+  const pct = credits.monthly > 0 ? Math.max(0, Math.min(100, (credits.balance / credits.monthly) * 100)) : 100;
+  return (
+    <div className="app-dock__plan">
+      <div className="app-dock__plan-head">
+        <span className="app-dock__plan-tier">{tierName}</span>
+        <span className="app-dock__plan-num">
+          <strong>{credits.balance}</strong> / {credits.monthly > 0 ? credits.monthly : "∞"}
+        </span>
+      </div>
+      <span className="app-dock__plan-label">Credits</span>
+      <div className="app-dock__meter">
+        <div className="app-dock__meter-fill" style={{ width: pct + "%" }} />
+      </div>
+      <button className="app-dock__upgrade" onClick={() => onNav("upgrade")}>
+        <Icon name="credit" size={13} /> Upgrade
+      </button>
     </div>
   );
 }
@@ -430,6 +636,10 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
 function useNotifications() {
   const [items, setItems] = useShellState([]);
   const [unread, setUnread] = useShellState(0);
+  /* Unique channel topic per hook instance so more than one NotificationBell
+     (e.g. the TopBar bell + the workspace-menu bell) can subscribe without a
+     Phoenix "already joined" collision on a shared topic. */
+  const chanId = React.useRef(Math.random().toString(36).slice(2)).current;
   useShellEffect(() => {
     let alive = true;
     let channel = null;
@@ -446,7 +656,7 @@ function useNotifications() {
       // Subscribe FIRST so a row created during the fetch isn't missed; merge()
       // dedups any overlap between the live push and the fetched snapshot.
       channel = supabase
-        .channel("notif:" + user.id)
+        .channel("notif:" + user.id + ":" + chanId)
         .on("postgres_changes",
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
           (payload) => {
@@ -577,28 +787,18 @@ function TopBar({ portal, route, brandName, go }) {
   const ws = portal === "team" ? "La Mesa team" : brandName;
   return (
     <div className="topbar">
-      <div className="titlestrip__crumb">{ws} · {crumb}</div>
-      <span style={{color:"rgba(48,48,48,0.4)"}}>/</span>
+      <div className="topbar__crumb">{ws} · {crumb}</div>
+      <span className="topbar__sep" aria-hidden="true">/</span>
       <div className="topbar__title">{title}</div>
       <div style={{marginLeft:"auto", display:"flex", alignItems:"center", gap: 14}}>
         <NotificationBell />
+        {/* "Start a brief" moved to the sidebar "+ New brief" primary. */}
         {isClient && (
-          <button onClick={() => go && go("home")}
-            style={{
-              display:"inline-flex", alignItems:"center", gap:7, height:32, padding:"0 14px",
-              background:"var(--neutral-900)", color:"#fff", border:"none", borderRadius:9,
-              fontFamily:"var(--font-sans)", fontWeight:600, fontSize:13, letterSpacing:"-0.01em",
-              cursor:"pointer", boxShadow:"0 2px 6px rgba(0,0,0,0.18)",
-            }}>
-            <Icon name="plus" size={14} /> Start a brief
-          </button>
-        )}
-        {isClient && (
-          <div style={{display:"flex", alignItems:"center", gap:6, fontFamily:"var(--font-mono)", fontSize:10.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"rgba(48,48,48,0.7)"}}>
+          <div className="topbar__reading">
             <BrandolphDot /> Brandolph is reading
           </div>
         )}
-        <img src={isClient ? window.CI_USER.avatar : "caastor/assets/profile-1.jpg"} alt="" style={{width: 30, height: 30, borderRadius: "50%", objectFit:"cover", border:"1.5px solid rgba(0,0,0,0.12)"}} />
+        <img src={isClient ? window.CI_USER.avatar : "caastor/assets/profile-1.jpg"} alt="" className="topbar__avatar" />
       </div>
     </div>
   );
@@ -606,7 +806,7 @@ function TopBar({ portal, route, brandName, go }) {
 
 /* App-wide menu — a persistent, always-open sidebar with a prominent
    brand logo at the top. No collapse. */
-function AppDock({ portal, currentRoute, onNav, onLogout }) {
+function AppDock({ portal, currentRoute, onNav, onLogout, ds, setDs }) {
   /* Admins see the client nav + the admin extras. Team users see their
      own nav unchanged. This keeps the admin's everyday surfaces intact
      and just adds operator tooling at the bottom of the dock. */
@@ -615,6 +815,7 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
     : portal === "admin"
       ? [...CLIENT_ROUTES, ...ADMIN_ROUTES]
       : CLIENT_ROUTES;
+  const isTeam = portal === "team";
   const isActive = (id) => currentRoute === id
     || (id === "briefs" && currentRoute === "brief-detail")
     || (id === "bio" && currentRoute === "discovery")
@@ -643,7 +844,13 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
         <img src="caastor/assets/logo-full-yellow.png" alt="CaastorOS" className="brand-logo" style={{height:30, width:"auto", flexShrink:0}} />
         <span className="app-dock__os">OS</span>
       </button>
-      {portal !== "team" && <WorkspaceSwitcher />}
+      {!isTeam && <WorkspaceMenu go={onNav} onLogout={onLogout} ds={ds} setDs={setDs} />}
+      {!isTeam && (
+        <button className="app-dock__new" onClick={() => onNav("home")}>
+          <Icon name="plus" size={15} />
+          <span className="app-dock__new-label">New brief</span>
+        </button>
+      )}
       <div className="app-dock__items">
         {routes.map((r, i) => (
           <React.Fragment key={r.id}>
@@ -657,10 +864,16 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
           </React.Fragment>
         ))}
       </div>
-      <button className="app-dock__item app-dock__logout" onClick={onLogout}>
-        <span className="app-dock__icon"><Icon name="arrowLeft" size={18} /></span>
-        <span>Log out</span>
-      </button>
+      {/* Client/admin: tier + credits meter + Upgrade. Log out lives in
+          the workspace menu. Team keeps its own bottom Log out button. */}
+      {!isTeam ? (
+        <PlanBlock onNav={onNav} />
+      ) : (
+        <button className="app-dock__item app-dock__logout" onClick={onLogout}>
+          <span className="app-dock__icon"><Icon name="arrowLeft" size={18} /></span>
+          <span>Log out</span>
+        </button>
+      )}
     </nav>
   );
 }
@@ -698,9 +911,10 @@ function App() {
      plumbing (switcher + data refetch) without recoloring the UI. */
   const currentBrandId = useCurrentBrandId();
   const { brands: allBrands } = useBrandList();
+  /* No seed-brand fallback: a user with no brands yet gets the neutral
+     label, never another company's name in their own breadcrumb. */
   const currentBrandName = allBrands.find((b) => b.id === currentBrandId)?.name
                         || allBrands[0]?.name
-                        || window.CI_BRAND?.name
                         || "Workspace";
 
   /* Expose current portal to shared components so they can hide model/route detail on client */
@@ -742,7 +956,7 @@ function App() {
   return (
     <div className="app" data-screen-label={portal === "client" ? "Client portal" : "Team portal"}>
       <WorkspaceLogo shellMode={shellMode} />
-      <AppDock portal={portal} currentRoute={route.id} onNav={go} onLogout={logout} />
+      <AppDock portal={portal} currentRoute={route.id} onNav={go} onLogout={logout} ds={ds} setDs={setDs} />
       <div style={{display:"flex", flexDirection:"column", minWidth:0}}>
         <TopBar portal={portal} route={route.id} brandName={currentBrandName} go={go} />
         <main className="scroll" style={{flex:1, overflowY:"auto"}}>
@@ -769,8 +983,11 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "bio":          return <BioViewer go={go} bioScore={tweaks.bioScore} />;
     case "briefs":       return <BriefsLibrary go={go} />;
     case "library":      return <Library go={go} />;
-    case "board":        return <BriefBoard id={route.param} go={go} />;
-    case "brief-detail": return <BriefBoard id={route.param} go={go} />;
+    /* Both open the real canvas off the brief id. They used to render a
+       mock board that fell back to demo data whenever the id missed. */
+    case "board":
+    case "brief-detail": return <BriefViewCanvas briefId={route.param} go={go}
+                                  onClear={() => { try { sessionStorage.removeItem("ci_run_context"); } catch {} }} />;
     case "specialists":  return <SpecialistsDirectory go={go} />;
     case "specialist-new": return <SpecialistAuthor go={go} />;
     case "canvas":       return <CanvasView go={go} />;
@@ -972,8 +1189,9 @@ function PortalTweaks({ tweaks, setTweak, ds, setDs }) {
           value={ds.theme}
           onChange={v => setDs("theme", v)}
           options={[
-            { value:"light", label:"Light" },
-            { value:"dark",  label:"Dark" },
+            { value:"system", label:"System" },
+            { value:"light",  label:"Light" },
+            { value:"dark",   label:"Dark" },
           ]} />
         <TweakSelect label="Palette"
           value={ds.palette}
@@ -1005,15 +1223,6 @@ function PortalTweaks({ tweaks, setTweak, ds, setDs }) {
       </TweakSection>
 
       <TweakSection title="Brandolph">
-        <TweakSelect label="Home layout"
-          value={tweaks.homeVariant}
-          onChange={v => setTweak("homeVariant", v)}
-          options={[
-            { value:"create",   label:"Create launchpad (default)" },
-            { value:"console",  label:"Console (chat + assembly)" },
-            { value:"cards",    label:"Cards (Brandolph offers options)" },
-            { value:"desk",     label:"Desk (operator dashboard)" },
-          ]} />
         <TweakSelect label="Opening mood"
           value={tweaks.brandolphMood}
           onChange={v => setTweak("brandolphMood", v)}

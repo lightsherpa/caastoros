@@ -201,17 +201,25 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr;
-  background: var(--c-bg);
+  background: var(--bg-desk);    /* warm-paper desk (light) / near-black desk (dark) */
   min-width: 1000px;
   padding-left: 248px;          /* content sits beside the persistent sidebar */
+}
+
+/* Desk dot-grid utility — subtle 1px dots on the desk background.
+   Token-driven; consumed by later-phase focus/canvas surfaces. */
+.desk-bg {
+  background-color: var(--bg-desk);
+  background-image: radial-gradient(var(--desk-dot-color) var(--desk-dot-size), transparent var(--desk-dot-size));
+  background-size: var(--desk-dot-gap) var(--desk-dot-gap);
 }
 
 /* Persistent menu — always open, prominent logo at the top-left corner. */
 .app-dock {
   position: fixed; top: 16px; left: 16px; bottom: 16px; width: 216px; z-index: 40;
   display: flex; flex-direction: column; gap: 2px; padding: 10px 8px;
-  background: var(--bg-canvas, var(--c-card));
-  border: 1px solid var(--c-line);
+  background: var(--bg-chrome);
+  border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: var(--shadow-lg);
 }
@@ -240,7 +248,7 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 }
 .app-dock__os { font-family: var(--font-mono); font-weight: 700; font-size: 17px; color: var(--c-ink); letter-spacing: 0.02em; align-self: center; }
 .app-dock__items { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-.app-dock__section { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-faint); padding: 14px 12px 6px; }
+.app-dock__section { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); padding: 14px 12px 6px; }
 .app-dock__items > .app-dock__section:first-child { padding-top: 4px; }
 .app-dock__item {
   display: flex; align-items: center; gap: 11px; height: 40px; padding: 0 10px; width: 100%;
@@ -272,24 +280,72 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
   .app { min-width: 0; }
 }
 
+/* ─── Primary "+ New brief" (moved here from the TopBar pill) ─── */
+.app-dock__new {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 4px 8px 8px; height: 38px; width: calc(100% - 16px);
+  border: none; border-radius: var(--radius-chrome);
+  background: var(--accent-caastor); color: var(--accent-ink);
+  font-family: var(--font-sans); font-size: 13px; font-weight: 600;
+  letter-spacing: -0.005em; cursor: pointer;
+  transition: filter 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.app-dock__new:hover { filter: brightness(0.96); }
+.app-dock__new:active { transform: translateY(1px); }
+.app-dock__new .app-dock__new-label { white-space: nowrap; }
+
+/* ─── Bottom plan block — tier · ONE credits meter · Upgrade ─── */
+.app-dock__plan {
+  margin-top: auto; padding: 12px 10px 6px;
+  border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.app-dock__plan-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.app-dock__plan-tier {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.app-dock__plan-num { font-family: var(--font-mono); font-size: 11px; color: var(--text-2); flex-shrink: 0; }
+.app-dock__plan-num strong { color: var(--text-1); font-weight: 600; }
+.app-dock__meter { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.app-dock__meter-fill {
+  height: 100%; border-radius: 999px; background: var(--accent-caastor);
+  transition: width 600ms var(--ease-out);
+}
+.app-dock__plan-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-3);
+}
+.app-dock__upgrade {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; border-radius: var(--radius-chrome);
+  border: 1px solid var(--line); background: var(--bg-raised);
+  color: var(--text-1); font-family: var(--font-sans); font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: background 140ms ease, border-color 140ms ease;
+}
+.app-dock__upgrade:hover { background: var(--neutral-50); border-color: var(--border-strong); }
+
 /* ─── Workspace switcher (under the logo, inside the dock) ─── */
 .ws-switcher { position: relative; padding: 2px 8px 12px; }
 .ws-switcher--ghost { height: 44px; }
 .ws-switcher__trigger {
   display: flex; align-items: center; gap: 9px; width: 100%;
-  padding: 7px 9px; border-radius: 10px;
-  border: 1px solid var(--c-line); background: var(--c-card);
-  font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--c-ink);
+  padding: 7px 9px; border-radius: var(--radius-chrome);
+  border: 1px solid var(--line); background: var(--bg-raised);
+  font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--text-1);
   cursor: pointer; text-align: left;
   transition: border-color 160ms ease, background 160ms ease, box-shadow 220ms ease;
 }
 .ws-switcher__trigger:hover {
-  border-color: var(--c-line-2);
+  border-color: var(--border-strong);
   background: var(--neutral-50);
   box-shadow: 0 1px 0 rgba(0,0,0,0.02), 0 4px 12px rgba(0,0,0,0.04);
 }
 .ws-switcher__trigger--open {
-  border-color: var(--neutral-900);
+  border-color: var(--border-strong);
   background: var(--neutral-50);
 }
 .ws-switcher__chip {
@@ -315,14 +371,42 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 .ws-switcher__menu {
   position: absolute; top: calc(100% - 6px); left: 8px; right: 8px;
   z-index: 60;
-  background: var(--c-card);
-  border: 1px solid var(--c-line);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
   border-radius: 12px;
   padding: 6px;
-  box-shadow: 0 12px 36px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-lg);
   animation: wsPopIn 180ms cubic-bezier(.2,.8,.2,1) both;
   display: flex; flex-direction: column; gap: 2px;
-  max-height: 60vh; overflow-y: auto;
+  /* visible (not scroll) so the embedded NotificationBell popover isn't
+     clipped by a scroll container. Menus are short in practice. */
+  overflow: visible;
+}
+.ws-switcher__note {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 4px 8px 4px 6px; border-radius: 8px; color: var(--text-1);
+}
+.ws-switcher__note .ws-switcher__name { cursor: default; }
+/* Menu section eyebrow + hairline divider (new workspace menu) */
+.ws-switcher__label {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-3);
+  padding: 8px 8px 4px;
+}
+.ws-switcher__divider { height: 1px; background: var(--line); margin: 5px 2px; }
+/* Theme submenu — segmented System / Light / Dark */
+.ws-theme { display: flex; gap: 4px; padding: 2px 4px 4px; }
+.ws-theme__opt {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 30px; border-radius: var(--radius-chrome);
+  border: 1px solid var(--line); background: transparent; cursor: pointer;
+  font-family: var(--font-sans); font-size: 11.5px; font-weight: 500; color: var(--text-2);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.ws-theme__opt:hover { background: var(--neutral-50); color: var(--text-1); }
+.ws-theme__opt--active {
+  background: var(--accent-caastor); color: var(--accent-ink);
+  border-color: var(--accent-caastor); font-weight: 600;
 }
 @keyframes wsPopIn {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
@@ -376,10 +460,80 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 }
 .workspace-logo img { width: 24px; height: 24px; display: block; }
 
-/* Workspace mode keeps the full dock — the previous 44px collapse
-   was disjointed. The standalone WorkspaceLogo is also hidden so the
-   in-dock logo handles branding consistently across every route. */
+/* The standalone workspace logo stays retired — the top bar carries
+   brand and back on focus surfaces. Kept as a no-op rather than deleted
+   because WorkspaceLogo still renders the node. */
 .workspace-logo { display: none !important; }
+
+/* ─── Workspace mode — the dock becomes a floating icon palette ─────
+   Canvas, brief-detail and board are focus surfaces. There the dock is
+   not a sidebar that lost its labels; it is a small palette of nav
+   icons, vertically centred and sized to its contents.
+
+   Three earlier attempts failed because the 216px geometry survived
+   with labels merely set to opacity:0. An invisible label still takes
+   flex space, so a centred 40px item held a 22px icon plus ~60px of
+   nothing and the icon was pushed off the left edge into overflow:hidden.
+   Labels are zero-width here, not just transparent.
+
+   Brand, CTA and plan block are dropped: the top bar already carries
+   brand and back, and "New brief" is a home action, not a canvas one.
+   Dropping them also keeps the palette's HEIGHT identical in both
+   states, so hovering animates width and nothing else. */
+[data-shell-mode="workspace"] .app { padding-left: 88px; }   /* 56 palette + 16+16 */
+
+[data-shell-mode="workspace"] .app-dock {
+  top: 50%; bottom: auto;
+  transform: translateY(-50%);
+  height: auto; max-height: calc(100vh - 32px);
+  width: 56px; padding: 8px;
+  border-radius: 16px;
+  gap: 2px;
+}
+[data-shell-mode="workspace"] .app-dock:hover { width: 216px; }
+
+/* Not part of a canvas palette. */
+[data-shell-mode="workspace"] .app-dock__logo,
+[data-shell-mode="workspace"] .ws-switcher,
+[data-shell-mode="workspace"] .app-dock__new,
+[data-shell-mode="workspace"] .app-dock__plan { display: none; }
+
+/* Content-sized, so the palette ends where the icons end. */
+[data-shell-mode="workspace"] .app-dock__items {
+  flex: 0 0 auto; overflow: visible; min-height: 0;
+}
+
+/* Icons only, in both states — a section heading appearing on hover
+   would change the height and turn the slide into a jump. display:none
+   still fires the adjacent-sibling selector, so grouping survives as a
+   wider gap with nothing drawn to carry it. */
+[data-shell-mode="workspace"] .app-dock__section { display: none; }
+[data-shell-mode="workspace"] .app-dock__section + .app-dock__item { margin-top: 7px; }
+
+/* One 40px square target line. 56 palette - 8 - 8 = 40, exactly. */
+[data-shell-mode="workspace"] .app-dock:not(:hover) .app-dock__item {
+  width: 40px; height: 40px;
+  padding: 0; gap: 0;
+  justify-content: center;
+  margin-left: auto; margin-right: auto;
+}
+[data-shell-mode="workspace"] .app-dock__item { overflow: hidden; }
+[data-shell-mode="workspace"] .app-dock__item > span:last-child { white-space: nowrap; }
+
+/* Zero-width, not merely transparent — see the note above. */
+[data-shell-mode="workspace"] .app-dock:not(:hover) .app-dock__item > span:last-child {
+  width: 0; flex: 0 0 0; overflow: hidden;
+  opacity: 0; pointer-events: none;
+  transition: opacity 120ms ease;
+}
+[data-shell-mode="workspace"] .app-dock .app-dock__item > span:last-child {
+  transition: opacity 140ms ease 80ms;
+}
+
+/* Nudging an icon sideways only reads as motion when a label follows it. */
+[data-shell-mode="workspace"] .app-dock:not(:hover) .app-dock__item:not(.app-dock__item--active):hover {
+  transform: none;
+}
 
 /* OutputCard hover-reveal debug attribution (client portal).
    The strategic chip (`certified by {steward}`) leads in the public
@@ -430,18 +584,36 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 }
 
 .topbar {
-  height: 56px;
-  background: var(--yellow-500);
+  height: 48px;
+  background: var(--bg-chrome);
+  border-bottom: 1px solid var(--line);
   display: flex; align-items: center;
-  padding: 0 24px;
-  gap: 16px;
+  padding: 0 20px;
+  gap: 12px;
 }
 .topbar__title {
   font-family: var(--font-sans);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.005em;
-  font-size: 16px;
-  color: var(--neutral-900);
+  font-size: 14px;
+  color: var(--text-1);
+}
+/* Topbar breadcrumb + indicators — own classes so the shared yellow
+   .titlestrip__crumb (used by section strips elsewhere) is untouched. */
+.topbar__crumb {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.topbar__sep { color: var(--text-3); opacity: 0.55; }
+.topbar__reading {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-3);
+}
+.topbar__avatar {
+  width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
+  border: 1.5px solid var(--line);
 }
 
 /* Nav item --------------------------------------------------------- */

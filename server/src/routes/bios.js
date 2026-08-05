@@ -120,9 +120,9 @@ app.post("/:brandId/sources/upload", requireAuth, async (c) => {
 
 /* PATCH /api/bios/:brandId
    Body: { payload }
-   Creates a NEW bios row (append-only versioned per rev-2 §5.5) with
-   certified=false. Doesn't auto-enqueue a Steward drift_check yet —
-   that's P1.5-005, deferred. Returns the new bios row. */
+   Creates a NEW bios row (append-only versioned per rev-2 §5.5),
+   self-certified so the edit takes effect on the next run, and enqueues a
+   Steward drift_check for senior re-certification. Returns the new row. */
 app.patch("/:brandId", requireAuth, async (c) => {
   const { workspaceId, userId } = c.get("auth");
   const brandId = c.req.param("brandId");
@@ -146,7 +146,12 @@ app.patch("/:brandId", requireAuth, async (c) => {
       version: nextVersion,
       payload: body.payload,
       score: scoreBio(body.payload || {}),
-      certified: false,
+      /* Self-certified like the Discovery compile — otherwise the user edits
+         their BIO and loadBioForRun keeps serving the older certified version,
+         so the edit silently never reaches a specialist. certified_by stays
+         NULL until a Steward signs the drift_check queued below. */
+      certified: true,
+      certified_at: new Date().toISOString(),
       created_by: userId,
     })
     .select("id, version, payload, score, certified, created_at")
@@ -154,11 +159,11 @@ app.patch("/:brandId", requireAuth, async (c) => {
   if (error) return c.json({ error: error.message }, 500);
 
   /* P1.5-005 — every BIO edit enqueues a drift_check Steward job so a
-     senior human re-reviews the user's edits before this version
-     becomes the active BIO for specialist runs. loadBioForRun (§5.5)
-     keeps serving the previously-certified version until this one is
-     certified. Fire-and-forget here — the route returns immediately;
-     the helper handles its own errors via the override_reason field. */
+     senior human re-reads the user's edits. Note the row above is already
+     self-certified, so loadBioForRun serves THIS version immediately; the
+     Steward job is what later attaches certified_by (tier 2), not what
+     activates the version. Fire-and-forget here — the route returns
+     immediately; the helper handles its own errors via override_reason. */
   try {
     const { data: stewardJob } = await supabaseAdmin
       .from("steward_jobs")
