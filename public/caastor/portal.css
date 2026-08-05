@@ -425,6 +425,13 @@ textarea.input { padding: 12px 14px; height: auto; min-height: 80px; line-height
 }
 .ws-switcher__option--active .ws-switcher__name { font-weight: 600; }
 .ws-switcher__tick { margin-left: auto; color: var(--green-600); display: inline-flex; }
+/* Current value on a row that opens a submenu (Appearance → Light). */
+.ws-switcher__value {
+  margin-left: auto;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-3); letter-spacing: 0.02em;
+}
+.ws-switcher__option .ws-switcher__value + .ws-switcher__chev { margin-left: 6px; }
 
 /* ─── Route view fade-in on every navigation ─── */
 .route-view {

@@ -229,26 +229,6 @@ function useLiveCredits() {
 
 /* Recent briefs — the 3 newest, RLS-scoped (read-only), for the
    workspace menu's quick-access list. Refetches on brand switch, same
-   as useBrandList. No writes, no model/API cost. */
-function useRecentBriefs() {
-  const [briefs, setBriefs] = useShellState([]);
-  useShellEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const { data } = await supabase
-        .from("briefs")
-        .select("id, title, created_at")
-        .order("created_at", { ascending: false })
-        .limit(3);
-      if (!cancelled) setBriefs(data || []);
-    };
-    load();
-    window.addEventListener("brand:changed", load);
-    return () => { cancelled = true; window.removeEventListener("brand:changed", load); };
-  }, []);
-  return briefs;
-}
-
 function WorkspaceSwitcher() {
   const { brands, loading } = useBrandList();
   const tier = useWorkspaceTier();
@@ -330,8 +310,10 @@ function WorkspaceMenu({ go, onLogout, ds, setDs }) {
   const { brands, loading } = useBrandList();
   const tier = useWorkspaceTier();
   const currentId = useCurrentBrandId();
-  const recent = useRecentBriefs();
   const [open, setOpen] = useShellState(false);
+  /* "main" | "theme" — the theme picker swaps the panel rather than
+     flying out, so there is no second layer of positioning to get wrong. */
+  const [view, setView] = useShellState("main");
   const current = brands.find((b) => b.id === currentId) || brands[0];
   const initial = (current?.name?.trim()?.[0] || "?").toUpperCase();
 
@@ -347,7 +329,6 @@ function WorkspaceMenu({ go, onLogout, ds, setDs }) {
   }, [open]);
 
   const nav = (path) => { setOpen(false); go(path); };
-  const briefLabel = (b) => (b.title && String(b.title).trim()) || "Untitled brief";
   const themeOpts = [
     { value: "system", label: "System" },
     { value: "light",  label: "Light" },
@@ -367,9 +348,32 @@ function WorkspaceMenu({ go, onLogout, ds, setDs }) {
         <span className="ws-switcher__name">{current.name || "Workspace"}</span>
         <span className="ws-switcher__chev" aria-hidden="true"><Icon name="chev" size={12} /></span>
       </button>
-      {open && (
+      {open && view === "theme" && (
         <div className="ws-switcher__menu" role="menu">
-          {brands.length > 1 && <div className="ws-switcher__label">Workspaces</div>}
+          <button role="menuitem" className="ws-switcher__option" onClick={() => setView("main")}>
+            <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true"><Icon name="arrowLeft" size={13} /></span>
+            <span className="ws-switcher__name">Appearance</span>
+          </button>
+          <div className="ws-switcher__divider" />
+          {themeOpts.map((o) => (
+            <button key={o.value} role="menuitem" className="ws-switcher__option"
+              aria-pressed={ds.theme === o.value}
+              onClick={() => { setDs("theme", o.value); setView("main"); setOpen(false); }}>
+              <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true">
+                <Icon name="dot" size={13} />
+              </span>
+              <span className="ws-switcher__name">{o.label}</span>
+              {ds.theme === o.value && <span className="ws-switcher__tick"><Icon name="check" size={12} /></span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {open && view === "main" && (
+        <div className="ws-switcher__menu" role="menu">
+          {/* "Brands", not "Workspaces". A workspace CONTAINS brands — the
+              old label taught the wrong data model on first open, and the
+              "Add brand" action directly under it gave the lie away. */}
+          {brands.length > 1 && <div className="ws-switcher__label">Brands</div>}
           {brands.length > 1 && brands.map((b) => {
             const active = b.id === current.id;
             const ini = (b.name?.trim()?.[0] || "?").toUpperCase();
@@ -389,21 +393,13 @@ function WorkspaceMenu({ go, onLogout, ds, setDs }) {
             <span className="ws-switcher__name" style={{color:"var(--text-2)"}}>Add brand</span>
           </button>
 
-          <div className="ws-switcher__divider" />
-
-          <button role="menuitem" className="ws-switcher__option" onClick={() => nav("home")}>
-            <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true"><Icon name="home" size={13} /></span>
-            <span className="ws-switcher__name">Home</span>
-          </button>
-
-          {recent.length > 0 && <div className="ws-switcher__label">Recent briefs</div>}
-          {recent.map((b) => (
-            <button key={b.id} role="menuitem" className="ws-switcher__option" onClick={() => nav("board/" + b.id)}>
-              <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true"><Icon name="brief" size={12} /></span>
-              <span className="ws-switcher__name">{briefLabel(b)}</span>
-            </button>
-          ))}
-
+          {/* Home, Recent briefs, Notifications and Help all left this menu.
+              Home and Briefs are already in the sidebar; Notifications
+              duplicated the topbar bell; Help was a disabled placeholder.
+              Recent briefs was the worst of them — a brief list inside a
+              BRAND switcher still showed the previous brand's briefs the
+              moment you switched, in the one menu where brand context is
+              the whole point. */}
           <div className="ws-switcher__divider" />
 
           <button role="menuitem" className="ws-switcher__option" onClick={() => nav("settings")}>
@@ -411,30 +407,14 @@ function WorkspaceMenu({ go, onLogout, ds, setDs }) {
             <span className="ws-switcher__name">Settings</span>
           </button>
 
-          {/* Notifications — reuse the existing NotificationBell surface */}
-          <div className="ws-switcher__note">
-            <NotificationBell />
-            <span className="ws-switcher__name">Notifications</span>
-          </div>
-
-          <div className="ws-switcher__label">Theme</div>
-          <div className="ws-theme" role="group" aria-label="Theme">
-            {themeOpts.map((o) => (
-              <button key={o.value} type="button"
-                className={"ws-theme__opt" + (ds.theme === o.value ? " ws-theme__opt--active" : "")}
-                aria-pressed={ds.theme === o.value}
-                onClick={() => setDs("theme", o.value)}>
-                {o.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="ws-switcher__divider" />
-
-          <button type="button" role="menuitem" className="ws-switcher__option" disabled
-            style={{opacity: 0.5, cursor: "default"}} title="Help — coming soon">
-            <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true">?</span>
-            <span className="ws-switcher__name">Help</span>
+          <button role="menuitem" className="ws-switcher__option" aria-haspopup="menu"
+            onClick={() => setView("theme")}>
+            <span className="ws-switcher__chip ws-switcher__chip--sm" style={WSM_LEAD} aria-hidden="true">
+              <Icon name="dot" size={13} />
+            </span>
+            <span className="ws-switcher__name">Appearance</span>
+            <span className="ws-switcher__value">{themeOpts.find((o) => o.value === ds.theme)?.label || "System"}</span>
+            <span className="ws-switcher__chev" aria-hidden="true"><Icon name="chev" size={12} /></span>
           </button>
 
           <button type="button" role="menuitem" className="ws-switcher__option"

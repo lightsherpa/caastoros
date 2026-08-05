@@ -381,26 +381,116 @@ const ErrCard = ({ children }) => (
    browser client (RLS ws_workspaces scopes it to the caller's own workspace);
    members must go through the server because `users` RLS is self-read only. */
 function useWorkspace() {
-  const [state, setState] = useCState({ loading: true, name: null, members: [], error: null });
+  const [state, setState] = useCState({ loading: true, name: null, tier: null, members: [], brands: [], credits: null, error: null });
   useCEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const [wsRes, memRes] = await Promise.all([
-          supabase.from("workspaces").select("name").maybeSingle(),
+        const [wsRes, memRes, brandRes, credRes] = await Promise.all([
+          supabase.from("workspaces").select("name, tier").maybeSingle(),
           apiFetch("/api/workspace/members"),
+          supabase.from("brands").select("id, name").order("created_at", { ascending: true }),
+          apiFetch("/api/credits").then((r) => (r.ok ? r.json() : null)).catch(() => null),
         ]);
         if (wsRes.error) throw new Error(wsRes.error.message);
         if (!memRes.ok) throw new Error((await memRes.json().catch(() => ({}))).error || `HTTP ${memRes.status}`);
         const { members } = await memRes.json();
-        if (alive) setState({ loading: false, name: wsRes.data?.name || null, members: members || [], error: null });
+        if (alive) setState({
+          loading: false,
+          name: wsRes.data?.name || null,
+          tier: wsRes.data?.tier || null,
+          members: members || [],
+          brands: brandRes.data || [],
+          credits: credRes,
+          error: null,
+        });
       } catch (e) {
-        if (alive) setState({ loading: false, name: null, members: [], error: e?.message || String(e) });
+        if (alive) setState({ loading: false, name: null, tier: null, members: [], brands: [], credits: null, error: e?.message || String(e) });
       }
     })();
     return () => { alive = false; };
   }, []);
   return state;
+}
+
+/* A destination we intend to build. Says so plainly instead of showing
+   invented connections or a plan upsell for something that doesn't exist. */
+function ComingSoon({ title, body }) {
+  return (
+    <div style={{padding: "40px 24px", textAlign: "center", maxWidth: 420, margin: "0 auto"}}>
+      <BrandolphAvatar size={52} />
+      <h3 style={{marginTop: 16, marginBottom: 8}}>{title}</h3>
+      <p style={{color: "var(--c-dim)", fontSize: 13.5, lineHeight: 1.55, margin: 0}}>{body}</p>
+      <span className="pill" style={{marginTop: 16, display: "inline-flex"}}>Coming soon</span>
+    </div>
+  );
+}
+
+/* Deleting a workspace destroys every brand, BIO, brief, run and output
+   in it, with no undo and no export. Two deliberate gates: an arm step,
+   then typing the workspace name. Deletion is blocked while other members
+   remain — one person must not be able to erase a team's work from a
+   settings page. */
+function DangerZone({ workspaceName, memberCount }) {
+  const [armed, setArmed]   = useCState(false);
+  const [typed, setTyped]   = useCState("");
+  const [busy, setBusy]     = useCState(false);
+  const [err, setErr]       = useCState(null);
+  const soloOwner = memberCount <= 1;
+  const nameMatches = workspaceName && typed.trim() === workspaceName;
+
+  const destroy = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const res = await apiFetch("/api/workspace", { method: "DELETE", body: JSON.stringify({ confirmName: typed.trim() }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      try { localStorage.clear(); } catch (e) {}
+      window.location.assign("#/login");
+      window.location.reload();
+    } catch (e) {
+      setErr(e?.message || String(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap: 14, maxWidth: 520}}>
+      <h3 style={{margin: 0, color:"var(--pink-500)"}}>Danger</h3>
+      <p style={{fontSize: 13, color:"var(--c-dim)", margin: 0, lineHeight: 1.55}}>
+        Deleting this workspace permanently removes every brand, BIO, brief, specialist run and
+        output inside it. There is no undo, and no copy is kept.
+      </p>
+
+      {!soloOwner && (
+        <div className="card card--inset" style={{padding: 14, fontSize: 13, color:"var(--c-dim)"}}>
+          This workspace has {memberCount} members. Remove the others first — deleting would
+          destroy their work too.
+        </div>
+      )}
+      {err && <ErrCard>Couldn't delete the workspace — {err}</ErrCard>}
+
+      {!armed ? (
+        <button className="btn btn--danger" disabled={!soloOwner} style={{alignSelf:"flex-start", opacity: soloOwner ? 1 : 0.5}}
+          onClick={() => setArmed(true)}>Delete workspace</button>
+      ) : (
+        <div className="card card--inset" style={{padding: 16, display:"flex", flexDirection:"column", gap: 10, borderLeft:"3px solid var(--pink-500)"}}>
+          <div style={{fontSize: 13.5, color:"var(--c-ink)"}}>
+            Type <strong>{workspaceName || "the workspace name"}</strong> to confirm.
+          </div>
+          <input className="input" value={typed} onChange={(e) => setTyped(e.target.value)}
+            placeholder={workspaceName || ""} autoFocus aria-label="Confirm workspace name" />
+          <div style={{display:"flex", gap: 8}}>
+            <button className="btn btn--danger btn--sm" disabled={!nameMatches || busy} onClick={destroy}
+              style={{opacity: nameMatches && !busy ? 1 : 0.5}}>
+              {busy ? "Deleting…" : "Permanently delete"}
+            </button>
+            <button className="btn btn--ghost btn--sm" disabled={busy} onClick={() => { setArmed(false); setTyped(""); setErr(null); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function SettingsView() {
@@ -412,19 +502,26 @@ function SettingsView() {
 
       <div style={{display:"grid", gridTemplateColumns:"220px 1fr", gap: 32}}>
         <nav style={{display:"flex", flexDirection:"column", gap: 2, position:"sticky", top: 0, alignSelf:"start"}}>
+          {/* Was nine items. "Brands (Tier 03)" and "API & MCP (Tier 03)"
+              rendered the SAME upsell panel, Workspace held one field and an
+              apology, and Members is one row on a solo account — so brands
+              folded into Subscription (your plan is what sets the allowance)
+              and Members folded into Workspace. Integrations and API are
+              real destinations we haven't built; they say so instead of
+              showing invented connections. */}
           {[
-            ["workspace","Workspace"],
-            ["members","Members"],
-            ["brands","Brands (Tier 03)"],
-            ["billing","Tier & billing"],
-            ["bio","BIO governance"],
-            ["integrations","Integrations"],
-            ["notifications","Notifications"],
-            ["api","API & MCP (Tier 03)"],
-            ["danger","Danger"],
-          ].map(([k, l]) => (
-            <button key={k} className={"navitem" + (tab === k ? " navitem--active" : "")} onClick={() => setTab(k)} style={{border:"none", background: undefined, textAlign:"left", width:"100%"}}>
-              {l}
+            ["workspace",     "Workspace",     false],
+            ["subscription",  "Subscription",  false],
+            ["bio",           "BIO governance",false],
+            ["notifications", "Notifications", false],
+            ["integrations",  "Integrations",  true],
+            ["api",           "API & MCP",     true],
+            ["danger",        "Danger",        false],
+          ].map(([k, l, soon]) => (
+            <button key={k} className={"navitem" + (tab === k ? " navitem--active" : "")} onClick={() => setTab(k)}
+              style={{border:"none", background: undefined, textAlign:"left", width:"100%", display:"flex", alignItems:"center", gap:8}}>
+              <span style={soon ? {color:"var(--c-faint)"} : undefined}>{l}</span>
+              {soon && <span className="pill" style={{marginLeft:"auto", height:18, padding:"0 7px", fontSize:9.5, letterSpacing:"0.06em"}}>SOON</span>}
             </button>
           ))}
         </nav>
@@ -441,27 +538,31 @@ function SettingsView() {
                 </div>
                 <div>
                   <div style={{fontSize: 15, fontWeight: 500}}>{ws.loading ? "Loading…" : (ws.name || "—")}</div>
-                  {/* No rename/logo endpoint yet — say so rather than show controls that do nothing. */}
-                  <div style={{fontSize: 12, color:"var(--c-faint)"}}>Renaming and workspace logos aren't available yet.</div>
+                  <div style={{fontSize: 12, color:"var(--c-faint)"}}>
+                    {ws.tier ? `${window.CI_TIERS?.[ws.tier] || "Tier " + ws.tier} · renaming isn't available yet` : "Renaming isn't available yet."}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          {tab === "members" && (
-            <div>
-              <h3 style={{margin: 0, marginBottom: 18}}>Members{ws.loading || ws.error ? "" : ` · ${ws.members.length}`}</h3>
-              {ws.error && <ErrCard>Couldn't load members — {ws.error}</ErrCard>}
-              {ws.loading && <div style={{fontSize: 12, color:"var(--c-faint)"}}>Loading…</div>}
-              <div style={{display:"flex", flexDirection:"column", gap: 8}}>
-                {ws.members.map((m) => (
-                  <div key={m.id} style={{display:"flex", alignItems:"center", gap: 12, padding: 12, border:"1px solid var(--c-line)", borderRadius: 10}}>
-                    <div style={{width: 36, height: 36, borderRadius:"50%", background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:14}}>
-                      {(m.email || "?").charAt(0).toUpperCase()}
+
+              {/* Members lived on its own tab, which on a solo account was a
+                  single row. Both answer "who and what is this workspace". */}
+              <div style={{marginTop: 10}}>
+                <div className="eyebrow" style={{marginBottom: 10}}>
+                  Members{ws.loading || ws.error ? "" : ` · ${ws.members.length}`}
+                </div>
+                {ws.loading && <div style={{fontSize: 12, color:"var(--c-faint)"}}>Loading…</div>}
+                <div style={{display:"flex", flexDirection:"column", gap: 8}}>
+                  {ws.members.map((m) => (
+                    <div key={m.id} style={{display:"flex", alignItems:"center", gap: 12, padding: 12, border:"1px solid var(--c-line)", borderRadius: 10}}>
+                      <div style={{width: 36, height: 36, borderRadius:"50%", background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:14}}>
+                        {(m.email || "?").charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{flex:1, fontSize: 14, fontWeight: 500}}>{m.email}</div>
+                      <span className="pill">{ROLE_LABEL[m.role] || m.role}</span>
                     </div>
-                    <div style={{flex:1, fontSize: 14, fontWeight: 500}}>{m.email}</div>
-                    <span className="pill">{ROLE_LABEL[m.role] || m.role}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <div style={{fontSize: 12, color:"var(--c-faint)", marginTop: 10}}>Inviting teammates isn't available yet.</div>
               </div>
             </div>
           )}
@@ -490,61 +591,59 @@ function SettingsView() {
               <button className="btn btn--primary" style={{alignSelf:"flex-start"}}>Save governance →</button>
             </div>
           )}
-          {tab === "integrations" && (
-            <div>
-              <h3 style={{margin: 0, marginBottom: 18}}>Integrations</h3>
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 12}}>
-                {[
-                  { name:"Slack", desc:"Brandolph posts updates to a channel", on:true },
-                  { name:"Stripo", desc:"Email build handoff", on:true },
-                  { name:"Klaviyo", desc:"Sequence + flow sync", on:true },
-                  { name:"Gamma", desc:"Deck export", on:false },
-                  { name:"v0", desc:"Page composer handoff", on:false },
-                  { name:"Framer", desc:"Marketing site builder", on:false },
-                ].map((i, k) => (
-                  <div key={k} className="card card--inset" style={{padding: 14, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                    <div>
-                      <div style={{fontSize: 14, fontWeight: 500}}>{i.name}</div>
-                      <div style={{fontSize: 12, color:"var(--c-faint)"}}>{i.desc}</div>
-                    </div>
-                    <span className={"pill " + (i.on ? "pill--green" : "")}>{i.on ? "Connected" : "Connect"}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {tab === "billing" && (
-            <div style={{display:"flex", flexDirection:"column", gap: 18}}>
-              <h3 style={{margin: 0}}>Tier & billing</h3>
+          {/* Was a grid of six services with Slack, Stripo and Klaviyo
+              showing a green "Connected" pill. None of them were. */}
+          {tab === "integrations" && <ComingSoon title="Integrations" body="Handing work off to the tools you already use — Slack, email builders, deck and page composers. Not built yet." />}
+          {tab === "api" && <ComingSoon title="API & MCP" body="Programmatic access to briefs, specialists and the BIO, plus an MCP server so your own agents can read the canon. Not built yet." />}
+          {/* Brands merged in here: your plan is what sets the allowance,
+              so the count and the upgrade path belong on one page. Every
+              number is live — this panel used to hardcode "Tier 02 · The
+              River · 900 cr · €399 · next renewal 4 Jun" for every user. */}
+          {tab === "subscription" && (
+            <div style={{display:"flex", flexDirection:"column", gap: 18, maxWidth: 560}}>
+              <h3 style={{margin: 0}}>Subscription</h3>
+              {ws.error && <ErrCard>Couldn't load your plan — {ws.error}</ErrCard>}
               <div className="card card--inset" style={{padding: 22, background:"var(--yellow-50)", border:"1px solid var(--yellow-200)"}}>
                 <div className="eyebrow eyebrow--yellow" style={{marginBottom: 6}}>Current plan</div>
-                <div style={{fontSize: 22, fontWeight: 600, marginBottom: 6}}>Tier 02 · The River 🌊</div>
-                <div style={{fontSize: 14, color:"var(--c-dim)"}}>900 cr / month · €399 · billed monthly · next renewal 4 Jun</div>
-                <div style={{marginTop: 14, display:"flex", gap: 8}}>
-                  <button className="btn btn--ghost btn--sm">Change plan</button>
-                  <button className="btn btn--link" style={{fontSize: 12, color:"var(--c-faint)"}}>Downgrade →</button>
+                <div style={{fontSize: 22, fontWeight: 600, marginBottom: 8}}>
+                  {ws.loading ? "Loading…" : ws.tier ? `Tier ${ws.tier} · ${window.CI_TIERS?.[ws.tier] || ""}` : "—"}
+                </div>
+                <div style={{display:"flex", gap: 26, flexWrap:"wrap", fontSize: 13.5, color:"var(--c-dim)"}}>
+                  <div>
+                    <div className="eyebrow" style={{marginBottom: 3}}>Credits</div>
+                    {ws.credits
+                      ? <span><strong style={{color:"var(--c-ink)"}}>{ws.credits.balance}</strong>{ws.credits.monthly ? ` / ${ws.credits.monthly} per month` : " · unlimited pool"}</span>
+                      : "—"}
+                  </div>
+                  <div>
+                    <div className="eyebrow" style={{marginBottom: 3}}>Brands</div>
+                    <span><strong style={{color:"var(--c-ink)"}}>{ws.brands.length}</strong>
+                      {(() => { const lim = window.CI_BRAND_LIMITS?.[ws.tier]; return lim === Infinity ? " · unlimited" : lim ? ` / ${lim}` : ""; })()}
+                    </span>
+                  </div>
+                </div>
+                <div style={{marginTop: 16}}>
+                  <a href="#/upgrade" className="btn btn--ghost btn--sm">Change plan</a>
                 </div>
               </div>
+              {ws.brands.length > 0 && (
+                <div>
+                  <div className="eyebrow" style={{marginBottom: 10}}>Your brands</div>
+                  <div style={{display:"flex", flexDirection:"column", gap: 8}}>
+                    {ws.brands.map((b) => (
+                      <div key={b.id} style={{display:"flex", alignItems:"center", gap: 12, padding: 12, border:"1px solid var(--c-line)", borderRadius: 10}}>
+                        <div style={{width: 30, height: 30, borderRadius: 8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:12}}>
+                          {(b.name || "?").trim().charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{flex:1, fontSize: 14, fontWeight: 500}}>{b.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          {(tab === "brands" || tab === "api") && (
-            <div style={{padding: 40, textAlign:"center"}}>
-              <BrandolphAvatar size={56} />
-              <h3 style={{marginTop: 16}}>Tier 03 · The Colony 🐜</h3>
-              <p style={{color:"var(--c-dim)", fontSize: 14, maxWidth: 380, margin:"8px auto 18px"}}>
-                <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>This panel lives in The Colony 🐜.</em> Multi-brand workspaces, API + MCP tokens, and webhook config.
-              </p>
-              <button className="btn btn--primary">See The Colony 🐜 plan</button>
-            </div>
-          )}
-          {tab === "danger" && (
-            <div style={{display:"flex", flexDirection:"column", gap: 14, maxWidth: 480}}>
-              <h3 style={{margin: 0, color:"var(--pink-500)"}}>Danger</h3>
-              <p style={{fontSize: 13, color:"var(--c-dim)", margin: 0, lineHeight: 1.5}}>Export your BIO + all data, or delete the workspace. Both irreversible.</p>
-              <button className="btn btn--ghost" style={{alignSelf:"flex-start"}}>Export BIO + data</button>
-              <button className="btn btn--danger" style={{alignSelf:"flex-start"}}>Delete workspace</button>
-            </div>
-          )}
+          {tab === "danger" && <DangerZone workspaceName={ws.name} memberCount={ws.members.length} />}
         </section>
       </div>
     </div>
