@@ -382,35 +382,166 @@ const ErrCard = ({ children }) => (
    members must go through the server because `users` RLS is self-read only. */
 function useWorkspace() {
   const [state, setState] = useCState({ loading: true, name: null, tier: null, members: [], brands: [], credits: null, error: null });
-  useCEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [wsRes, memRes, brandRes, credRes] = await Promise.all([
-          supabase.from("workspaces").select("name, tier").maybeSingle(),
-          apiFetch("/api/workspace/members"),
-          supabase.from("brands").select("id, name").order("created_at", { ascending: true }),
-          apiFetch("/api/credits").then((r) => (r.ok ? r.json() : null)).catch(() => null),
-        ]);
-        if (wsRes.error) throw new Error(wsRes.error.message);
-        if (!memRes.ok) throw new Error((await memRes.json().catch(() => ({}))).error || `HTTP ${memRes.status}`);
-        const { members } = await memRes.json();
-        if (alive) setState({
-          loading: false,
-          name: wsRes.data?.name || null,
-          tier: wsRes.data?.tier || null,
-          members: members || [],
-          brands: brandRes.data || [],
-          credits: credRes,
-          error: null,
-        });
-      } catch (e) {
-        if (alive) setState({ loading: false, name: null, tier: null, members: [], brands: [], credits: null, error: e?.message || String(e) });
+
+  const load = React.useCallback(async () => {
+    try {
+      const [wsRes, memRes, brandRes, credRes, briefRes, ledgerRes] = await Promise.all([
+        supabase.from("workspaces").select("name, tier").maybeSingle(),
+        apiFetch("/api/workspace/members"),
+        supabase.from("brands").select("id, name, url, created_at").order("created_at", { ascending: true }),
+        apiFetch("/api/credits").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        supabase.from("briefs").select("id, brand_id, created_at, runs ( id )"),
+        supabase.from("ledger").select("credits, run_id"),
+      ]);
+      if (wsRes.error) throw new Error(wsRes.error.message);
+      if (!memRes.ok) throw new Error((await memRes.json().catch(() => ({}))).error || `HTTP ${memRes.status}`);
+      const { members } = await memRes.json();
+
+      /* Per-brand spend has to be joined: `ledger` carries run_id, not
+         brand_id, so credits attribute through runs -> briefs -> brand.
+         Only positive rows are debits (negative = a grant), and rows with
+         no run_id are workspace-level, not attributable to any brand. */
+      const runBrand = {}, briefCount = {}, lastAt = {};
+      for (const b of briefRes.data || []) {
+        briefCount[b.brand_id] = (briefCount[b.brand_id] || 0) + 1;
+        if (!lastAt[b.brand_id] || b.created_at > lastAt[b.brand_id]) lastAt[b.brand_id] = b.created_at;
+        for (const r of b.runs || []) runBrand[r.id] = b.brand_id;
       }
-    })();
-    return () => { alive = false; };
+      const spent = {};
+      for (const l of ledgerRes.data || []) {
+        const bid = l.run_id && runBrand[l.run_id];
+        if (bid && Number(l.credits) > 0) spent[bid] = (spent[bid] || 0) + Number(l.credits);
+      }
+
+      const brands = (brandRes.data || []).map((b) => ({
+        ...b,
+        briefs: briefCount[b.id] || 0,
+        spent: spent[b.id] || 0,
+        lastAt: lastAt[b.id] || null,
+      }));
+
+      setState({
+        loading: false,
+        name: wsRes.data?.name || null,
+        tier: wsRes.data?.tier || null,
+        members: members || [],
+        brands,
+        credits: credRes,
+        error: null,
+      });
+    } catch (e) {
+      setState({ loading: false, name: null, tier: null, members: [], brands: [], credits: null, error: e?.message || String(e) });
+    }
   }, []);
-  return state;
+
+  useCEffect(() => { load(); }, [load]);
+  return { ...state, reload: load };
+}
+
+/* One brand, with what it has actually consumed and produced, plus the
+   two lifecycle actions. Rename and delete go straight through the
+   browser client: the `ws_brands` RLS policy is `for all`, scoped to the
+   caller's own workspace, so no endpoint is needed to do it safely.
+
+   Deleting a brand cascades its BIO, briefs, runs and outputs. Rather
+   than ask the user to type the name, the confirm step states the blast
+   radius in the counts they can already see — that is the information
+   that makes the decision, and typing a name proves nothing about
+   whether they understood the consequence. */
+function BrandRow({ brand, canDelete, onChanged }) {
+  const [editing, setEditing] = useCState(false);
+  const [name, setName]       = useCState(brand.name || "");
+  const [confirming, setConf] = useCState(false);
+  const [busy, setBusy]       = useCState(false);
+  const [err, setErr]         = useCState(null);
+
+  const save = async () => {
+    const next = name.trim();
+    if (!next || next === brand.name) { setEditing(false); setName(brand.name || ""); return; }
+    setBusy(true); setErr(null);
+    const { error } = await supabase.from("brands").update({ name: next }).eq("id", brand.id);
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    setEditing(false);
+    window.dispatchEvent(new Event("brand:changed"));   // dock switcher + data hooks refetch
+    onChanged();
+  };
+
+  const destroy = async () => {
+    setBusy(true); setErr(null);
+    const { error } = await supabase.from("brands").delete().eq("id", brand.id);
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    /* The dock may still be pointing at the brand that just went away. */
+    try { if (window.getCurrentBrandId?.() === brand.id) window.setCurrentBrandId?.(null); } catch (e) {}
+    window.dispatchEvent(new Event("brand:changed"));
+    onChanged();
+  };
+
+  const stat = (label, value) => (
+    <div>
+      <div className="eyebrow" style={{marginBottom: 2}}>{label}</div>
+      <div style={{fontFamily:"var(--font-mono)", fontSize: 12.5, color:"var(--c-ink)"}}>{value}</div>
+    </div>
+  );
+
+  return (
+    <div style={{border:"1px solid var(--c-line)", borderRadius: 10, padding: 14, display:"flex", flexDirection:"column", gap: 12}}>
+      <div style={{display:"flex", alignItems:"center", gap: 12}}>
+        <div style={{width: 30, height: 30, borderRadius: 8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:12, flexShrink:0}}>
+          {(brand.name || "?").trim().charAt(0).toUpperCase()}
+        </div>
+        {editing ? (
+          <input className="input" value={name} autoFocus disabled={busy}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setEditing(false); setName(brand.name || ""); } }}
+            style={{flex:1, height: 32, fontSize: 14}} aria-label="Brand name" />
+        ) : (
+          <div style={{flex:1, minWidth:0}}>
+            <div style={{fontSize: 14, fontWeight: 500}}>{brand.name}</div>
+            {brand.url && <div style={{fontSize: 11.5, color:"var(--c-faint)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{brand.url}</div>}
+          </div>
+        )}
+        <div style={{display:"flex", gap: 6, flexShrink:0}}>
+          {editing ? (
+            <>
+              <button className="btn btn--primary btn--sm" onClick={save} disabled={busy}>{busy ? "…" : "Save"}</button>
+              <button className="btn btn--ghost btn--sm" onClick={() => { setEditing(false); setName(brand.name || ""); }} disabled={busy}>Cancel</button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn--ghost btn--sm" onClick={() => setEditing(true)}>Rename</button>
+              <button className="btn btn--ghost btn--sm" onClick={() => setConf(true)}
+                disabled={!canDelete} style={{opacity: canDelete ? 1 : 0.45}}
+                title={canDelete ? "Delete this brand" : "A workspace needs at least one brand"}>Delete</button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={{display:"flex", gap: 26, flexWrap:"wrap", paddingTop: 10, borderTop:"1px dashed var(--c-line-2)"}}>
+        {stat("Briefs", brand.briefs)}
+        {stat("Credits spent", `${brand.spent} cr`)}
+        {stat("Last brief", brand.lastAt ? new Date(brand.lastAt).toLocaleDateString(undefined, { day:"numeric", month:"short", year:"numeric" }) : "—")}
+      </div>
+
+      {err && <ErrCard>Couldn't update this brand — {err}</ErrCard>}
+
+      {confirming && (
+        <div className="card card--inset" style={{padding: 14, borderLeft:"3px solid var(--pink-500)", display:"flex", flexDirection:"column", gap: 10}}>
+          <div style={{fontSize: 13.5, lineHeight: 1.5, color:"var(--c-ink)"}}>
+            Delete <strong>{brand.name}</strong>? This also removes its BIO
+            {brand.briefs > 0 && <> and <strong>{brand.briefs}</strong> brief{brand.briefs === 1 ? "" : "s"}</>}
+            {brand.spent > 0 && <> ({brand.spent} cr of work)</>}. There is no undo.
+          </div>
+          <div style={{display:"flex", gap: 8}}>
+            <button className="btn btn--danger btn--sm" onClick={destroy} disabled={busy}>{busy ? "Deleting…" : "Delete brand"}</button>
+            <button className="btn btn--ghost btn--sm" onClick={() => setConf(false)} disabled={busy}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* A destination we intend to build. Says so plainly instead of showing
@@ -629,14 +760,9 @@ function SettingsView() {
               {ws.brands.length > 0 && (
                 <div>
                   <div className="eyebrow" style={{marginBottom: 10}}>Your brands</div>
-                  <div style={{display:"flex", flexDirection:"column", gap: 8}}>
+                  <div style={{display:"flex", flexDirection:"column", gap: 10}}>
                     {ws.brands.map((b) => (
-                      <div key={b.id} style={{display:"flex", alignItems:"center", gap: 12, padding: 12, border:"1px solid var(--c-line)", borderRadius: 10}}>
-                        <div style={{width: 30, height: 30, borderRadius: 8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize:12}}>
-                          {(b.name || "?").trim().charAt(0).toUpperCase()}
-                        </div>
-                        <div style={{flex:1, fontSize: 14, fontWeight: 500}}>{b.name}</div>
-                      </div>
+                      <BrandRow key={b.id} brand={b} canDelete={ws.brands.length > 1} onChanged={ws.reload} />
                     ))}
                   </div>
                 </div>
