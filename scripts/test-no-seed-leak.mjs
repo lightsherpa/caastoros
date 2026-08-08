@@ -94,3 +94,68 @@ assert.match(
 );
 
 console.log("ok — CAA-25 steward-patch integrity + tier-2 gate wired");
+
+// ── CAA-25 P1: enforcement decision recorded + claim aligned ────────
+// Brandolph's call is ENFORCE (prod REQUIRE_HUMAN_CERT=1), with the moat
+// stated honestly: the BIO is human-certified; outputs are optionally
+// human-finished — NOT "every output is certified". Guard both.
+
+const env = readFileSync(`${root}server/.env.example`, "utf8");
+assert.match(
+  env,
+  /PRODUCTION ENFORCES/,
+  ".env.example must record the CAA-25 decision that prod enforces tier-2",
+);
+assert.match(
+  env,
+  /docs\/tier2-enforcement-runbook\.md/,
+  ".env.example must point ops at the enforcement runbook",
+);
+assert.equal(
+  existsSync(`${root}docs/tier2-enforcement-runbook.md`),
+  true,
+  "tier-2 enforcement runbook must exist so the prod flip is sequenced safely",
+);
+
+// Marketing/product copy must not over-claim that every OUTPUT is certified.
+const auth = readFileSync(`${root}src/portal-auth.jsx`, "utf8");
+const team = readFileSync(`${root}src/portal-team.jsx`, "utf8");
+const discovery = readFileSync(`${root}src/portal-discovery.jsx`, "utf8");
+assert.doesNotMatch(
+  auth,
+  /every output certified by a senior human/,
+  "auth hero must not over-claim 'every output certified by a senior human' (BIO is certified, not every output)",
+);
+assert.doesNotMatch(
+  team,
+  /every output ships/,
+  "team view must not over-claim 'every output ships certified by …'",
+);
+assert.doesNotMatch(
+  discovery,
+  /every output your Specialists produce/,
+  "discovery copy must not claim every output is certified — the BIO is",
+);
+assert.match(
+  auth,
+  /human finishing/,
+  "auth hero must state the true guarantee: certified BIO + optional human finishing",
+);
+
+// ── CAA-25 P2: DISCOVERY_V2 no longer silently drops user materials ──
+const compileBio = readFileSync(
+  `${root}server/src/inngest/functions/compile-bio.js`,
+  "utf8",
+);
+assert.match(
+  compileBio,
+  /materials\.synthesis/,
+  "compile-bio must flag a materials.synthesis 'missing' entry when V2 is off but materials were provided",
+);
+assert.match(
+  compileBio,
+  /synthesized:\s*V2 &&/,
+  "compile-bio must record whether user materials were actually synthesized",
+);
+
+console.log("ok — CAA-25 enforcement decision recorded, claim aligned, materials signalled");

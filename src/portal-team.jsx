@@ -233,7 +233,7 @@ function TeamQueue({ go }) {
           <div className="eyebrow" style={{marginBottom: 12}}>About these jobs</div>
           <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.55}}>
             Each row is a brand awaiting BIO certification — a senior human review before any specialist run reads from it.
-            The moat: every output ships <em>"certified by {you?.first_name || "a named senior human"}"</em>.
+            The moat: every specialist run reads a BIO a senior human signed <em>"certified by {you?.first_name || "a named senior human"}"</em> — and clients can add human finishing to any output.
             <div style={{marginTop: 12, fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>rev-2 §5 · P1.5</div>
           </div>
         </div>

@@ -635,10 +635,10 @@ function DiscoveryStep2Results({ onConfirm }) {
             </div>
             <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5}}>
               {live.cert?.byName
-                ? <>Every output your Specialists produce will ship <em>"certified by {live.cert.byName}"</em>. <button onClick={() => onConfirm && onConfirm()} className="btn btn--link" style={{fontSize: 12.5, padding: 0}}>Continue to your workspace →</button></>
+                ? <>Your BIO now carries {live.cert.byName}'s certification — every run is grounded in it, and you can add human finishing to any output. <button onClick={() => onConfirm && onConfirm()} className="btn btn--link" style={{fontSize: 12.5, padding: 0}}>Continue to your workspace →</button></>
                 : live.cert
-                ? <>Brandolph compiled it, so briefs can run against it now — but no senior human has read it yet. Your Brand Steward signs it next; only then do outputs ship <em>"certified by [their name]"</em>. <button onClick={() => onConfirm && onConfirm()} className="btn btn--link" style={{fontSize: 12.5, padding: 0}}>Continue to your workspace →</button></>
-                : <>Your Brand Steward — a senior La&nbsp;Mesa designer — reads what Brandolph extracted, refines anything that's not quite right, and signs the BIO. From that moment, every output your Specialists produce ships <em>"certified by [their name]"</em>.</>}
+                ? <>Brandolph compiled it, so briefs can run against it now — but no senior human has read it yet. Your Brand Steward signs the BIO next; from then on every run is grounded in a human-certified BIO. <button onClick={() => onConfirm && onConfirm()} className="btn btn--link" style={{fontSize: 12.5, padding: 0}}>Continue to your workspace →</button></>
+                : <>Your Brand Steward — a senior La&nbsp;Mesa designer — reads what Brandolph extracted, refines anything that's not quite right, and signs the BIO. From that moment every run is grounded in a BIO a senior human certified — and you can add their finishing to any output.</>}
             </div>
           </div>
         </div>
