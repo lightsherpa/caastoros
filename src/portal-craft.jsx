@@ -75,7 +75,7 @@ function CraftMarketplace({ go, tier }) {
       <div style={{display:"grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 30}}>
         {[
           { title:"Hero KV finish · pricing relaunch", who:"Aitana V.", state:"in-progress", eta:"in 36h", cr:220 },
-          { title:"Honduras essay · finishing pass",   who:"Lia R.",    state:"review",      eta:"awaiting your approval", cr:120 },
+          { title:"Collection essay · finishing pass", who:"Lia R.",    state:"review",      eta:"awaiting your approval", cr:120 },
           { title:"Investor deck · polish",            who:"Diego M.",  state:"delivered",   eta:"delivered yesterday",     cr:300 },
         ].map((j, i) => (
           <div key={i} className="card" style={{padding: 16}}>

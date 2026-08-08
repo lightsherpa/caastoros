@@ -192,14 +192,14 @@ function CertNote({ steward, selfCertified }) {
 /* Output card — used in /briefs/[id] and canvas drawers.
    Footer renders the rev-2 §5.5 / §9 attribution. Two render modes:
    - Client (default, public): leads with the Steward chip; NO model name.
-     This is the moat-defining trust signal — `certified by Marina` is
+     This is the moat-defining trust signal — `certified by <steward>` is
      impossible to fake without the real Steward operation.
    - Team / debug: adds `routed via {model}` and `run {short_id}` for
      ops debugging. Surfaces by default on team portal; hover-reveal on
      client portal so debugging is always one mouse-hover away.
    Attribution comes in on `output` — never from ambient seed data. This
    footer used to read CI_BRAND.steward, which meant every card claimed a
-   named human had certified it ("certified by Marina · 14 May") on brands
+   named human had certified it ("certified by <steward> · 14 May") on brands
    that person has never seen. A fabricated professional endorsement is the
    one thing this footer must never render, so an output with no cert data
    now says nothing rather than borrowing someone's signature.
