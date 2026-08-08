@@ -9,6 +9,7 @@ import bios from "./routes/bios.js";
 import brands from "./routes/brands.js";
 import briefs from "./routes/briefs.js";
 import discovery from "./routes/discovery.js";
+import teardown from "./routes/teardown.js";
 import steward from "./routes/steward.js";
 import runs from "./routes/runs.js";
 import outputs from "./routes/outputs.js";
@@ -53,6 +54,7 @@ app.route("/api/bios", bios);
 app.route("/api/brands", brands);
 app.route("/api/briefs", briefs);
 app.route("/api/discovery", discovery);
+app.route("/api/teardown", teardown); // CAA-33 · public self-serve BIO Teardown
 app.route("/api/steward", steward);
 app.route("/api/runs", runs);
 app.route("/api/outputs", outputs);

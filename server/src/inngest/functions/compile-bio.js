@@ -108,9 +108,14 @@ export const compileBio = inngest.createFunction(
     triggers: [{ event: "discovery/start" }],
   },
   async ({ event, step, logger }) => {
-    const { brandId, url, workspaceId, instagram } = event.data || {};
+    const { brandId, url, workspaceId, instagram, mode } = event.data || {};
     if (!brandId || !url) throw new Error("Event missing brandId or url");
-    logger.info("BIO compile starting", { brandId, url, v2: V2 });
+    // `mode:"teardown"` = self-serve lead magnet (CAA-33). Same synthesis, but
+    // the BIO is an unclaimed lead artifact that never feeds a specialist run,
+    // so we skip the human Steward cert (Step 4) — a Steward is only spent once
+    // the lead claims/pilots. Everything else is identical to Discovery.
+    const isTeardown = mode === "teardown";
+    logger.info("BIO compile starting", { brandId, url, v2: V2, mode: mode || "discovery" });
 
     // ── Step 1 · Scrape ───────────────────────────────────────────
     // V2: crawl ≤6 high-signal pages (one bio_sources row each), concat markdown.
@@ -357,6 +362,16 @@ export const compileBio = inngest.createFunction(
     // uncertified BIO — queue a Steward to review. Assignment uses
     // the shared assignSteward() helper (P1.5-002) which handles
     // round-robin + Lead-Steward capacity fallback.
+    //
+    // Teardown (CAA-33) skips this: an anonymous lead's BIO must never spend
+    // scarce Steward capacity. It stays uncertified (certified=false) and is
+    // read only by the gated report, which never triggers a specialist run.
+    // On claim/pilot the claim flow enqueues the onboarding cert instead.
+    if (isTeardown) {
+      logger.info("Teardown lead — skipping Steward cert", { brandId, bioId: bioRow.id });
+      return { bioId: bioRow.id, version: bioRow.version, brandId, stewardJobId: null, mode: "teardown" };
+    }
+
     const stewardJob = await step.run("enqueue-steward-cert", async () => {
       const { data: job, error } = await supabaseAdmin
         .from("steward_jobs")
