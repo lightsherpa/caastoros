@@ -329,6 +329,10 @@ function HomeCreate({ tweaks, go }) {
       specialistIds: realAssembly.agents.map((a) => a.id),
       deliveryPlan:  sharp.data?.deliveryPlan || null,
       totalCr:       realAssembly.totalCr,
+      /* Carry the current brand so canvas re-runs forward a real brandId
+         instead of undefined. The server still re-derives brand from briefId,
+         but forwarding it removes the fragile "works only by coincidence". */
+      brandId:       window.getCurrentBrandId?.() || null,
       ts:            Date.now(),
     };
     try { sessionStorage.setItem("ci_run_context", JSON.stringify(ctx)); } catch (e) {}

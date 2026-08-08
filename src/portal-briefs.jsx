@@ -1528,14 +1528,108 @@ function MoodBoardCard({ tiles = [], bioVisual = null }) {
   );
 }
 
+/* Human-craft entitlement — mirrors the server gate (server/src/lib/plan-limits.js:
+   craftEnabled). Human polish unlocks at The River ('02') and up. Kept in sync by
+   hand; if the server constant moves, move this too. */
+const CRAFT_MIN_TIER = "02";
+function craftUnlocked(tier) { return String(tier ?? "00") >= CRAFT_MIN_TIER; }
+
+/* Current workspace tier for client-side gating. Fetched once (RLS-scoped);
+   defaults to Creek ('00') until it lands. Mirrors portal-shell's useWorkspaceTier
+   so the canvas can gate the "Send to human" affordance without prop-drilling. */
+function useWsTier() {
+  const [tier, setTier] = useBrState("00");
+  useBrEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from("workspaces").select("tier").limit(1).maybeSingle();
+        if (alive && data?.tier) setTier(data.tier);
+      } catch (e) { /* leave default */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+  return tier;
+}
+
+/* Whether the client should offer "Send to human" right now, plus why not.
+   Purely advisory — the server re-checks tier + credits and is the source of
+   truth — but gating here avoids a guaranteed-reject round-trip and a
+   misleading CTA. */
+function craftGate(tier) {
+  if (!craftUnlocked(tier)) return { ok: false, reason: "Human craft unlocks on The River and up." };
+  const bal = window.CI_CREDITS?.balance ?? 0;
+  if (bal < HUMAN_POLISH_CR) return { ok: false, reason: `Not enough credits — human craft costs ${HUMAN_POLISH_CR}.` };
+  return { ok: true, reason: "" };
+}
+
+/* Re-fetch the authoritative credit balance into window.CI_CREDITS after a
+   server-side debit (e.g. a queued craft job). Replaces the old optimistic
+   client-side decrement, which faked a debit even when the server rejected. */
+async function refreshCredits() {
+  try {
+    const r = await apiFetch("/api/credits");
+    if (!r.ok) return;
+    const live = await r.json();
+    if (live && window.CI_CREDITS) Object.assign(window.CI_CREDITS, { balance: live.balance, monthly: live.monthly });
+  } catch (e) { /* leave prior balance */ }
+}
+
+/* POST /api/craft and translate the server's rejection codes into a message a
+   user can act on. Throws on any non-2xx so the caller can surface it instead
+   of faking success. On success, pulls the real balance back down. */
+async function requestHumanCraft({ outputId, slot, notes }) {
+  if (outputId == null || slot == null) {
+    throw new Error("This deliverable isn't saved yet — open it from the Library to send it to a human.");
+  }
+  const res = await apiFetch("/api/craft", { method: "POST", body: JSON.stringify({ outputId, slot, notes }) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const byCode = {
+      CRAFT_TIER_LOCKED: json.error || "Human craft is available from The River and up.",
+      CRAFT_ALREADY_REQUESTED: "This deliverable is already in human craft.",
+    };
+    const insufficient = res.status === 402;
+    throw new Error(byCode[json.code] || (insufficient ? (json.error || "Not enough credits for human craft.") : (json.error || `Couldn't queue the craft job (HTTP ${res.status}).`)));
+  }
+  await refreshCredits();
+  return json;
+}
+
+/* Read-only look at a finished mood board — the tile grid plus the BIO visual
+   canon it was grounded in. Opened by clicking a completed board node (a board
+   is not a text specialist, so the notepad drawer would render empty). */
+function MoodBoardDrawer({ node, cert, onClose }) {
+  return (
+    <Drawer open={true} onClose={onClose} title="Mood board" eyebrow="L2-35 · VISUAL DIRECTION"
+      width={620} footer={<button className="btn btn--ghost" onClick={onClose}>Close</button>}>
+      <div style={{ fontSize: 13, color: "var(--c-dim)", marginBottom: 14 }}>
+        {(node.tiles || []).length} tile{(node.tiles || []).length === 1 ? "" : "s"} · grounded in the certified BIO visual canon.
+      </div>
+      <MoodBoardCard tiles={node.tiles || []} bioVisual={node.bioVisual || null} />
+      {node.done?.brand?.bioVersion != null && (
+        <div style={{
+          marginTop: 16, paddingTop: 12, borderTop: "1px dashed var(--c-line-2)",
+          fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--c-faint)", letterSpacing: "0.04em",
+        }}>
+          BIO v{node.done.brand.bioVersion}
+          <CertChip cert={cert} bioVersion={node.done.brand.bioVersion} />
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
 function BriefRunCanvas({ context, onClear, go }) {
   const [nodes, setNodes]         = useBrState(() => buildInitialRunNodes(context));
   const [edges, setEdges]         = useBrState(() => buildInitialRunEdges(context));
+  const wsTier                    = useWsTier();
   const [running, setRunning]     = useBrState(false);
   const [completed, setCompleted] = useBrState(false);
   const [err, setErr]             = useBrState(null);
   const [openId, setOpenId]       = useBrState(null);            /* selected specialist id for the notepad drawer */
   const [openDeliverable, setOpenDeliverable] = useBrState(null);   /* clicked deliverable card → content drawer */
+  const [openMoodboard, setOpenMoodboard] = useBrState(null);      /* clicked finished mood board → board drawer */
   const [openBrief, setOpenBrief] = useBrState(false);   /* clicked Brief node → brief drawer */
   const [editedText, setEditedText] = useBrState({});            /* per-spec text overrides from the notepad */
   const [briefId, setBriefId]       = useBrState(null);          /* surfaced so the notepad can fire re-runs */
@@ -1748,6 +1842,9 @@ function BriefRunCanvas({ context, onClear, go }) {
     if (running || completed) return;
     setRunning(true); setErr(null);
     let sharedBriefId = null;
+    /* Collect per-agent failures instead of aborting the whole crew — one
+       specialist erroring must not strand every remaining queued agent. */
+    const runErrors = [];
 
     /* Visual specialists that pair with a copy part in their group are fired
        per-slot (one image per caption) from the copy specialist's completion —
@@ -1783,6 +1880,7 @@ function BriefRunCanvas({ context, onClear, go }) {
         const FACETS = ["texture & material close-up", "environmental scene", "product-in-context detail"];
         const tiles = [];
         let bioVisual = null;
+        let boardBrand = null;
         for (let i = 0; i < FACETS.length; i++) {
           setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
             ? { ...n, state: "running", sub: `rendering tile ${i + 1}/${FACETS.length}…` } : n));
@@ -1796,12 +1894,15 @@ function BriefRunCanvas({ context, onClear, go }) {
               const url = img?.output?.asset_url || null;
               if (url) tiles.push(url);
               if (!bioVisual && img?.output?.bio_visual) bioVisual = img.output.bio_visual;
+              if (!boardBrand && img?.brand) boardBrand = img.brand;
             },
             onError: () => {},
           });
         }
         setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
-          ? { ...n, state: "done", kind: "moodboard", tiles, bioVisual, sub: `${tiles.length} tiles · board` } : n));
+          ? { ...n, state: "done", kind: "moodboard", tiles, bioVisual,
+              done: boardBrand ? { brand: boardBrand } : n.done,
+              sub: `${tiles.length} tiles · board` } : n));
         continue; // skip the generic single-image handling for this specialist
       }
 
@@ -1861,8 +1962,9 @@ function BriefRunCanvas({ context, onClear, go }) {
       if (local_err) {
         setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
           ? { ...n, state: "failed", sub: local_err.slice(0, 60) } : n));
-        setErr(`${agent.name}: ${local_err}`);
-        break;
+        runErrors.push(`${agent.name}: ${local_err}`);
+        setErr(runErrors.join(" · "));
+        continue;   /* keep going — the rest of the crew still runs */
       }
 
       const passed = qa?.passed !== false;
@@ -1964,10 +2066,10 @@ function BriefRunCanvas({ context, onClear, go }) {
   })();
 
   const sendToHuman = async (cardNode, notes) => {
-    if (cardNode.sourceOutputId != null && cardNode.slot != null) {
-      try { await apiFetch("/api/craft", { method: "POST", body: JSON.stringify({ outputId: cardNode.sourceOutputId, slot: cardNode.slot, notes }) }); } catch (e) {}
-    }
-    try { if (window.CI_CREDITS) window.CI_CREDITS.balance = Math.max(0, (window.CI_CREDITS.balance || 0) - HUMAN_POLISH_CR); } catch (e) {}
+    /* Throws on a rejected job (tier locked / insufficient credits / already
+       queued) so the drawer can show it — and only marks the card in-craft on a
+       real server-side queue. Credits are pulled from the server, never faked. */
+    await requestHumanCraft({ outputId: cardNode.sourceOutputId, slot: cardNode.slot, notes });
     setNodes((prev) => prev.map((n) => n.id === cardNode.id ? { ...n, humanCraft: true, polishNotes: notes } : n));
     setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true, polishNotes: notes } : d));
   };
@@ -1993,6 +2095,7 @@ function BriefRunCanvas({ context, onClear, go }) {
           /* InteractiveCanvas uses setPointerCapture on the wrapper which
              swallows any inner onClick — node clicks MUST come through here. */
           if (node?.kind === "deliverable") { setOpenDeliverable(node); return; }
+          if (node?.kind === "moodboard") { setOpenMoodboard(node); return; }
           if (node?.kind === "brief") { setOpenBrief(true); return; }
           if (!node || node.kind !== "specialist" || !node.specId) return;
           const st = node.state;
@@ -2071,10 +2174,29 @@ function BriefRunCanvas({ context, onClear, go }) {
           context={context}
           briefId={briefId}
           brandId={context.brandId}
-          onRerun={() => {
-            /* The re-run created a new run row on the same brief. We
-               don't auto-replace the canvas node — the user can refresh
-               or open the brief in view mode to see the new version. */
+          onRerun={({ done, text, modelOverride, revisionFeedback }) => {
+            /* A re-run persists a NEW runs+outputs row (versioned server-side —
+               nothing is deleted). Surface that latest version as the visible
+               node + provenance so "regenerate" produces work the user keeps,
+               not throwaway drawer output. `rerunOf` records the version it
+               replaced. See docs note in the issue for the replace-vs-version
+               decision. */
+            const newText = done?.output?.text ?? text ?? "";
+            setNodes((prev) => prev.map((n) => n.specId === openId
+              ? {
+                  ...n,
+                  outputText: newText || n.outputText,
+                  assetUrl: done?.output?.asset_url || n.assetUrl,
+                  qa: done?.qa ?? n.qa,
+                  done: done || n.done,
+                  state: done?.qa?.passed === false ? "flagged" : "done",
+                  rerunOf: n.done?.outputId || n.rerunOf || null,
+                  sub: modelOverride ? "re-run · new model" : revisionFeedback ? "re-run · revised" : "re-run · regenerated",
+                }
+              : n));
+            /* Reset the notepad baseline to the new text so it isn't flagged
+               "unsaved" and future edits save into the new output row. */
+            setEditedText((prev) => ({ ...prev, [openId]: newText || (prev[openId] ?? "") }));
           }}
           outputId={opened.done?.outputId || null}
           baselineText={opened.outputText || ""}
@@ -2090,7 +2212,10 @@ function BriefRunCanvas({ context, onClear, go }) {
         />
       )}
       {openDeliverable && (
-        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} onSendToHuman={sendToHuman} />
+        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} onSendToHuman={sendToHuman} craftGate={craftGate(wsTier)} />
+      )}
+      {openMoodboard && (
+        <MoodBoardDrawer node={openMoodboard} cert={cert} onClose={() => setOpenMoodboard(null)} />
       )}
       {openBrief && (
         <BriefDrawer
@@ -2167,13 +2292,16 @@ function BriefDrawer({ brief, onClose }) {
 /* Read the full content of one deliverable card — title, body, image, plus
    Copy / Export. Opened by clicking a deliverable card on the canvas. */
 const HUMAN_POLISH_CR = 40;   /* credits to contract a human to polish one deliverable */
-function DeliverableDrawer({ node, onClose, onSendToHuman }) {
+function DeliverableDrawer({ node, onClose, onSendToHuman, craftGate }) {
   const [copied, setCopied] = useBrState(false);
   const flagged = node.status === "flagged";
   const stateColor = flagged ? "var(--pink-500)" : "var(--green-500)";
   const inCraft = !!node.humanCraft;
   const [polishMode, setPolishMode] = useBrState(false);
   const [polishNotes, setPolishNotes] = useBrState("");
+  const [craftErr, setCraftErr] = useBrState(null);
+  const [crafting, setCrafting] = useBrState(false);
+  const gateOk = !craftGate || craftGate.ok;
   const copy = async () => {
     try { await navigator.clipboard.writeText(node.body || ""); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch (e) {}
   };
@@ -2199,9 +2327,17 @@ function DeliverableDrawer({ node, onClose, onSendToHuman }) {
           </>
         ) : polishMode ? (
           <>
-            <button className="btn btn--ghost" onClick={() => setPolishMode(false)}>Cancel</button>
-            <button className="btn btn--primary btn--sm" onClick={() => { onSendToHuman && onSendToHuman(node, polishNotes.trim()); setPolishMode(false); }}>
-              Confirm — send to human · {HUMAN_POLISH_CR} cr
+            <button className="btn btn--ghost" onClick={() => { setPolishMode(false); setCraftErr(null); }} disabled={crafting}>Cancel</button>
+            <button className="btn btn--primary btn--sm" disabled={crafting || !gateOk}
+              title={!gateOk ? craftGate.reason : undefined}
+              onClick={async () => {
+                if (!onSendToHuman) return;
+                setCrafting(true); setCraftErr(null);
+                try { await onSendToHuman(node, polishNotes.trim()); setPolishMode(false); }
+                catch (e) { setCraftErr(e?.message || String(e)); }
+                finally { setCrafting(false); }
+              }}>
+              {crafting ? "Sending…" : `Confirm — send to human · ${HUMAN_POLISH_CR} cr`}
             </button>
           </>
         ) : (
@@ -2209,7 +2345,16 @@ function DeliverableDrawer({ node, onClose, onSendToHuman }) {
             <button className="btn btn--ghost" onClick={onClose}>Close</button>
             <button className="btn btn--ghost btn--sm" onClick={exportOne}>Export</button>
             <button className="btn btn--ghost btn--sm" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
-            {onSendToHuman && <button className="btn btn--primary btn--sm" onClick={() => setPolishMode(true)}>Send to human · {HUMAN_POLISH_CR} cr</button>}
+            {onSendToHuman && !gateOk && (
+              <span style={{ fontSize: 11, color: "var(--c-faint)", marginRight: 4, maxWidth: 190, textAlign: "right", lineHeight: 1.3 }}>{craftGate.reason}</span>
+            )}
+            {onSendToHuman && (
+              <button className="btn btn--primary btn--sm" disabled={!gateOk}
+                title={!gateOk ? craftGate.reason : undefined}
+                onClick={() => { setCraftErr(null); setPolishMode(true); }}>
+                Send to human · {HUMAN_POLISH_CR} cr
+              </button>
+            )}
           </>
         )
       }
@@ -2223,6 +2368,11 @@ function DeliverableDrawer({ node, onClose, onSendToHuman }) {
       {polishMode && !inCraft && (
         <div style={{ marginBottom: 16, padding:"14px 16px", borderRadius: 12, background:"var(--c-bg)", border:"1px solid var(--c-line)" }}>
           <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 8 }}>Brief the human · what to polish</div>
+          {craftErr && (
+            <div style={{ marginBottom: 10, padding:"8px 10px", borderRadius: 8, background:"var(--pink-50, rgba(244,143,177,0.12))", color:"var(--pink-700, var(--pink-500))", fontSize: 12.5, lineHeight: 1.45 }}>
+              {craftErr}
+            </div>
+          )}
           <textarea
             value={polishNotes}
             onChange={(e) => setPolishNotes(e.target.value)}
@@ -2675,9 +2825,18 @@ function CanvasView({ go }) {
   if (ctx && Array.isArray(ctx.specialistIds) && ctx.specialistIds.length > 0) {
     return <BriefRunCanvas context={ctx} onClear={clearCtx} go={go} />;
   }
-  /* No brand in scope on the placeholder canvas — the default exportName
-     ("canvas") keeps another brand's name out of the user's downloads. */
-  return <InteractiveCanvas nodeData={CANVAS_NODES} edges={CANVAS_EDGES} />;
+  /* No run/view context — the old placeholder seed graph (CANVAS_NODES) is
+     stale VINILO demo data with no brand in scope. Redirect to Home instead of
+     rendering a graph the user can't act on or trace to a brief. */
+  return <CanvasRedirect go={go} />;
+}
+
+/* Bounce a context-less #/canvas deeplink to Home. Rendered (not returned as a
+   side-effect during CanvasView's body) so the redirect effect lives in its own
+   component and never trips the rules-of-hooks after CanvasView's early returns. */
+function CanvasRedirect({ go }) {
+  useBrEffect(() => { go && go("home"); }, []);
+  return <div style={{ padding: 60, textAlign: "center", color: "var(--c-faint)" }}>Redirecting…</div>;
 }
 
 /* ── BriefViewCanvas — loads an existing brief's runs/outputs from DB
@@ -2687,8 +2846,10 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   const [state, setState] = useBrState({ loading: true, brief: null, runs: [], cert: null, error: null });
   const [openId, setOpenId]       = useBrState(null);
   const [openDeliverable, setOpenDeliverable] = useBrState(null);   /* clicked deliverable card → drawer */
+  const [openMoodboard, setOpenMoodboard] = useBrState(null);      /* clicked mood board → board drawer */
   const [openBrief, setOpenBrief] = useBrState(false);   /* clicked Brief node → brief drawer */
   const [editedText, setEditedText] = useBrState({});
+  const wsTier                    = useWsTier();
 
   useBrEffect(() => {
     (async () => {
@@ -2753,21 +2914,48 @@ function BriefViewCanvas({ briefId, onClear, go }) {
      timestamps (rows written before latency_ms was populated), else null. */
   const runMs = (r) => r.latency_ms ?? (r.started_at && r.ended_at ? Date.parse(r.ended_at) - Date.parse(r.started_at) : null);
   const specs = [...bySpec.values()].map((e) => {
-    const primary = e.outputs[0] || null;
+    /* Re-runs are versioned: each persists a new runs+outputs row and nothing
+       is deleted. The LATEST run (max started_at) is the current version we
+       surface as the card; older runs stay in the DB as retained history. This
+       is what makes a re-run "reach the Library" instead of the stale first row. */
+    const ordered = [...e.runs].sort((a, b) => new Date(b.started_at || 0).getTime() - new Date(a.started_at || 0).getTime());
+    const primaryRun = ordered[0] || e.firstRun;
+    const primary = (primaryRun?.outputs || [])[0] || e.outputs[0] || null;
     const body = primary?.body || {};
     const text = body.edited_text || body.text || (typeof primary?.body === "string" ? primary.body : "");
-    const passed = e.outputs.length === 0 || e.outputs.every((o) => o.status !== "flagged");
+    /* Status follows the current version — a re-run that clears a flag must not
+       stay flagged because an older, replaced run was. */
+    const passed = primary ? primary.status !== "flagged" : (e.outputs.length === 0 || e.outputs.every((o) => o.status !== "flagged"));
     /* Sum: a specialist can run many times on one brief (one per image slot). */
     const latencyMs = e.runs.reduce((sum, r) => sum + (runMs(r) || 0), 0) || null;
-    return { ...e, output: primary, passed, text, latencyMs };
+    return { ...e, primaryRun, output: primary, passed, text, latencyMs };
   });
 
+  /* Mood-board specialists own their tiles — keep those image URLs out of the
+     deliverable-card pairing pool so a board's tiles don't leak onto copy cards. */
+  const moodSpecIds = new Set(specs.filter((s) => s.agent?.code === "L2-35").map((s) => s.id));
   /* Saved image asset_urls across the brief, in order — paired one per card. */
-  const imageUrls = state.runs.flatMap((r) => (r.outputs || []).map((o) => o.body?.asset_url).filter(Boolean));
+  const imageUrls = state.runs
+    .filter((r) => !moodSpecIds.has(r.specialist_id))
+    .flatMap((r) => (r.outputs || []).map((o) => o.body?.asset_url).filter(Boolean));
   let imgIdx = 0;
 
   const rowH = 176;                            /* fixed 152px node + 24px gap */
   const specNodes = specs.map((s, i) => {
+    /* Mood board (L2-35): reconstruct the tile grid from all of this
+       specialist's image outputs so a saved board round-trips a DB reload
+       instead of collapsing to one generic image node. */
+    if (s.agent?.code === "L2-35") {
+      const tiles = s.outputs.map((o) => o.body?.asset_url).filter(Boolean);
+      const bioVisual = s.outputs.map((o) => o.body?.bio_visual).find(Boolean) || null;
+      return {
+        id: "spec-" + s.id, specId: s.id,
+        x: 760, y: 40 + i * rowH, w: 340, kind: "moodboard",
+        title: s.agent?.name || s.id,
+        tiles, bioVisual, state: "done", latencyMs: s.latencyMs,
+        done: { brand: { bioVersion: s.primaryRun?.bio_version } },
+      };
+    }
     const assetUrl = s.output?.body?.asset_url || null;
     const imgCount = s.outputs.filter((o) => o.body?.asset_url).length;
     return {
@@ -2780,15 +2968,18 @@ function BriefViewCanvas({ briefId, onClear, go }) {
       cr: s.agent?.cr || 0,
       state: s.passed ? "done" : "flagged",
       outputText: s.text, assetUrl, tokenCount: 1000, qa: null, latencyMs: s.latencyMs,
-      done: { brand: { bioVersion: s.firstRun.bio_version }, output: assetUrl ? { asset_url: assetUrl } : null },
+      done: { brand: { bioVersion: s.primaryRun?.bio_version }, output: assetUrl ? { asset_url: assetUrl } : null },
     };
   });
 
   /* Reconstruct deliverable child cards from the stored {deliverables} output. */
   const cardNodes = [];
   const cardEdges = [];
+  const isDeliverables = (o) => o.body?.kind === "deliverables" && Array.isArray(o.body.deliverables);
   specs.forEach((s) => {
-    const dOut = s.outputs.find((o) => o.body?.kind === "deliverables" && Array.isArray(o.body.deliverables));
+    /* Prefer the current version's deliverables, falling back to any run's — so
+       a re-run of a deliverable specialist rebuilds the cluster from the latest. */
+    const dOut = (s.primaryRun?.outputs || []).find(isDeliverables) || s.outputs.find(isDeliverables);
     const specNode = specNodes.find((n) => n.id === "spec-" + s.id);
     if (!dOut || !specNode) return;
     const items = dOut.body.deliverables.map((d) => {
@@ -2829,6 +3020,19 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   ];
 
   const renderNode = (node) => {
+    if (node.kind === "moodboard") {
+      /* Kept in sync with BriefRunCanvas's moodboard branch — see the P3 note
+         in the issue about the two divergent renderNode copies. */
+      return (
+        <div className="cv-node" style={{
+          background: "var(--c-card)", border: "1px solid var(--c-line)",
+          borderLeft: "3px solid var(--green-500)", borderRadius: 10, overflow: "hidden",
+          boxShadow: "var(--shadow-md)", width: "100%", boxSizing: "border-box",
+        }}>
+          <MoodBoardCard tiles={node.tiles || []} bioVisual={node.bioVisual || null} />
+        </div>
+      );
+    }
     if (node.kind === "deliverable") {
       const flagged = node.status === "flagged";
       const sc = flagged ? "var(--pink-500)" : "var(--green-500)";
@@ -2912,10 +3116,9 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   const totalCr = specs.reduce((sum, s) => sum + (s.agent?.cr || 0), 0);
 
   const sendToHuman = async (cardNode, notes) => {
-    if (cardNode.sourceOutputId != null && cardNode.slot != null) {
-      try { await apiFetch("/api/craft", { method: "POST", body: JSON.stringify({ outputId: cardNode.sourceOutputId, slot: cardNode.slot, notes }) }); } catch (e) {}
-    }
-    try { if (window.CI_CREDITS) window.CI_CREDITS.balance = Math.max(0, (window.CI_CREDITS.balance || 0) - HUMAN_POLISH_CR); } catch (e) {}
+    /* Same contract as the live-run canvas: throw on rejection, mark in-craft
+       only on a real server queue, reflect the true (server) credit balance. */
+    await requestHumanCraft({ outputId: cardNode.sourceOutputId, slot: cardNode.slot, notes });
     setOpenDeliverable((d) => (d && d.id === cardNode.id ? { ...d, humanCraft: true, polishNotes: notes } : d));
   };
 
@@ -2938,6 +3141,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         exportName={"brief-" + briefId.slice(0, 8)}
         onNodeClick={(node) => {
           if (node?.kind === "deliverable") { setOpenDeliverable(node); return; }
+          if (node?.kind === "moodboard") { setOpenMoodboard(node); return; }
           if (node?.kind === "brief") { setOpenBrief(true); return; }
           if (node?.kind === "specialist" && node.specId) setOpenId(node.specId);
         }}
@@ -2962,10 +3166,10 @@ function BriefViewCanvas({ briefId, onClear, go }) {
             cr: opened.agent.cr,
             qa: null,
             done: {
-              brand: { bioVersion: opened.firstRun.bio_version },
+              brand: { bioVersion: opened.primaryRun?.bio_version },
               output: opened.output?.body?.asset_url ? { asset_url: opened.output.body.asset_url } : null,
             },
-            run: { model_used: opened.firstRun.model_used },
+            run: { model_used: opened.primaryRun?.model_used },
             state: opened.passed ? "done" : "flagged",
           }}
           cert={state.cert}
@@ -2976,20 +3180,53 @@ function BriefViewCanvas({ briefId, onClear, go }) {
           }}
           briefId={state.brief.id}
           brandId={state.brief.brand_id}
-          onRerun={() => {
-            /* New run lands in DB — the parent's useEffect refetches on
-               openId close. For now, the user can close + reopen. */
+          onRerun={({ done, text }) => {
+            /* The re-run persisted a new runs+outputs row. Inject it into local
+               state as the newest run so the derived node picks it up as the
+               current version immediately — no close/reopen, and it survives a
+               real refetch because the row is already in the DB. */
+            if (!done || !opened) return;
+            const nowIso = new Date().toISOString();
+            const outBody = done.output?.kind === "deliverables"
+              ? { kind: "deliverables", deliverables: done.output.deliverables }
+              : (done.output?.asset_url
+                  ? { asset_url: done.output.asset_url, kind: done.output.kind, bio_visual: done.output.bio_visual }
+                  : { text: done.output?.text ?? text ?? "" });
+            setState((s) => ({
+              ...s,
+              runs: [
+                ...s.runs,
+                {
+                  id: done.runId,
+                  specialist_id: opened.id,
+                  bio_version: done.brand?.bioVersion ?? null,
+                  status: done.qa?.passed === false ? "flagged" : "done",
+                  latency_ms: null,
+                  started_at: nowIso,
+                  ended_at: nowIso,
+                  model_used: done.usage?.model,
+                  outputs: [{
+                    id: done.outputId,
+                    kind: done.output?.kind || "text",
+                    body: outBody,
+                    status: done.output?.status || (done.qa?.passed === false ? "flagged" : "approved"),
+                    rationale: null,
+                  }],
+                },
+              ],
+            }));
           }}
           outputId={opened.output?.id || null}
           baselineText={opened.text || ""}
           editedText={editedText[openId] ?? opened.text ?? ""}
           onEdit={(text) => setEditedText((prev) => ({ ...prev, [openId]: text }))}
           onSaved={(saved) => {
-            /* Re-fetch via mutating the spec entry in local state */
+            /* Persist the edit into the CURRENT version's output row in local
+               state so the drawer + node reflect it without a refetch. */
             setState((s) => ({
               ...s,
-              runs: s.runs.map((r) => r.id === opened.firstRun.id
-                ? { ...r, outputs: (r.outputs || []).map((o) => o.id === opened.output.id ? { ...o, body: saved.body } : o) }
+              runs: s.runs.map((r) => r.id === opened.primaryRun?.id
+                ? { ...r, outputs: (r.outputs || []).map((o) => o.id === opened.output?.id ? { ...o, body: saved.body } : o) }
                 : r),
             }));
           }}
@@ -2997,7 +3234,10 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         />
       )}
       {openDeliverable && (
-        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} onSendToHuman={sendToHuman} />
+        <DeliverableDrawer node={openDeliverable} onClose={() => setOpenDeliverable(null)} onSendToHuman={sendToHuman} craftGate={craftGate(wsTier)} />
+      )}
+      {openMoodboard && (
+        <MoodBoardDrawer node={openMoodboard} cert={state.cert} onClose={() => setOpenMoodboard(null)} />
       )}
       {openBrief && (
         <BriefDrawer
