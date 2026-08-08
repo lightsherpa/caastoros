@@ -255,6 +255,23 @@ export const compileBio = inngest.createFunction(
         })
       : [];
 
+    // ── Step 1c · Detect user-provided materials (both modes) ────
+    // The SPA collects uploads / Instagram / intake regardless of the flag, but
+    // only the V2 branch above folds them into the synthesis input. Count what
+    // the brand actually provided so we can record — and later surface in the UI
+    // — whether those materials made it into this BIO. Runs in both modes so a
+    // non-V2 (or misconfigured) compile can't silently drop what the user gave us.
+    const materials = await step.run("detect-user-materials", async () => {
+      const { data: rows } = await supabaseAdmin
+        .from("bio_sources")
+        .select("kind, bucket")
+        .eq("brand_id", brandId)
+        .neq("kind", "url_scrape");
+      const buckets = [...new Set((rows || []).map((r) => r.bucket).filter(Boolean))];
+      const provided = (rows || []).length + (instagram ? 1 : 0);
+      return { provided, buckets, hasInstagram: !!instagram };
+    });
+
     const synthInput = buildSynthesisInput(scraped.markdown, extraSources);
 
     // ── Step 2 · Synthesize ──────────────────────────────────────
@@ -365,6 +382,25 @@ export const compileBio = inngest.createFunction(
       if (!visual.imagery?.length) addMissing(verifiedBioPayload, "visual.imagery", "No usable screenshot or visual source was available for imagery analysis.");
     }
     // When NOT V2, visual stays as the model emitted it (empty arrays) — as today.
+
+    // ── Step 2c · Record materials-synthesis status ──────────────
+    // Additive metadata the BIO viewer reads to signal whether the brand's
+    // uploads/Instagram were actually synthesized. In V2 they were; when V2 is
+    // off but materials were provided, they were NOT — surface that as a `missing`
+    // entry so the user isn't misled into thinking their files shaped this BIO.
+    verifiedBioPayload.materials = {
+      synthesized: V2 && materials.provided > 0,
+      provided: materials.provided,
+      buckets: materials.buckets,
+      instagram: materials.hasInstagram,
+    };
+    if (materials.provided > 0 && !V2) {
+      addMissing(
+        verifiedBioPayload,
+        "materials.synthesis",
+        `${materials.provided} user-provided source(s) (uploads/Instagram) were collected but not synthesized into this BIO because materials synthesis (DISCOVERY_V2) is off. Re-run Discovery with it enabled to fold them in.`,
+      );
+    }
 
     // ── Step 3 · Write bios row (self-certified) ─────────────────
     const bioRow = await step.run("write-bio-row", async () => {

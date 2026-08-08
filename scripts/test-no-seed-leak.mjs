@@ -48,3 +48,49 @@ assert.doesNotMatch(
 );
 
 console.log("ok — no seed-brand leak on the server");
+
+// ── CAA-25 regression: Steward BIO-patch integrity ──────────────────
+// Static guards (steward.js needs a live DB to exercise) that the patch path
+// keeps score + metadata in sync with the values instead of hardcoding them.
+const steward = readFileSync(`${root}server/src/routes/steward.js`, "utf8");
+const patchBlock = steward.slice(steward.indexOf("if (body.bioPatch"));
+
+assert.doesNotMatch(
+  patchBlock.slice(0, 900),
+  /score:\s*75\b/,
+  "steward patch must not hardcode score: 75 — use scoreBio(merged)",
+);
+assert.match(
+  patchBlock.slice(0, 900),
+  /score:\s*scoreBio\(/,
+  "steward patch must score the merged payload with scoreBio()",
+);
+assert.match(
+  patchBlock.slice(0, 900),
+  /deepMerge\(/,
+  "steward patch must deep-merge the bioPatch so sibling fields survive",
+);
+assert.match(
+  patchBlock.slice(0, 900),
+  /normalizeBioEvidence\(/,
+  "steward patch must re-derive confidence/missing/evidence via normalizeBioEvidence()",
+);
+assert.doesNotMatch(
+  patchBlock.slice(0, 900),
+  /\{\s*\.\.\.bio\.payload,\s*\.\.\.body\.bioPatch\s*\}/,
+  "steward patch must not shallow-spread the bioPatch (drops sibling subtrees)",
+);
+
+// ── CAA-25 regression: tier-2 gate mechanism is wired ───────────────
+assert.match(
+  loader,
+  /requireHumanCert/,
+  "load-brand-bio must expose the tier-2 (human cert) gate",
+);
+assert.match(
+  loader,
+  /REQUIRE_HUMAN_CERT/,
+  "loadBioForRun must read REQUIRE_HUMAN_CERT to enforce human certification",
+);
+
+console.log("ok — CAA-25 steward-patch integrity + tier-2 gate wired");

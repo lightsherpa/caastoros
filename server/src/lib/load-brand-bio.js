@@ -15,8 +15,10 @@ import { supabaseAdmin } from "./supabase.js";
  * @param {string} opts.workspaceId        - caller's workspace from auth middleware
  * @param {string} [opts.brandId]          - specific brand; defaults to first brand in workspace
  * @param {boolean} [opts.requireCertified=false] - true once P1.5 lands; throws BIO_NOT_CERTIFIED otherwise
+ * @param {boolean} [opts.requireHumanCert=false] - tier-2 gate: additionally require certified_by to be set
+ *                                                   (a senior human signed it). Throws BIO_NOT_CERTIFIED otherwise.
  */
-export async function loadBrandBio({ workspaceId, brandId, requireCertified = false }) {
+export async function loadBrandBio({ workspaceId, brandId, requireCertified = false, requireHumanCert = false }) {
   // Resolve brand
   let brandRow;
   if (brandId) {
@@ -48,6 +50,12 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
     .select("id, version, payload, score, certified, certified_by, certified_at, cert_kind")
     .eq("brand_id", brandRow.id);
   if (requireCertified) bioQuery = bioQuery.eq("certified", true);
+  // Tier-2 gate. Discovery self-certifies (certified=true, certified_by=NULL);
+  // requiring certified_by NOT NULL means a senior Steward actually signed the
+  // BIO before any specialist run reads it — the guarantee the moat copy claims.
+  // Off by default (REQUIRE_HUMAN_CERT) so self-certified brands keep running
+  // until Stewards are seeded and the guarantee is turned on deliberately.
+  if (requireHumanCert) bioQuery = bioQuery.not("certified_by", "is", null);
   const { data: bioRow, error: bioErr } = await bioQuery
     .order("version", { ascending: false })
     .limit(1)
@@ -94,7 +102,16 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
  *
  * Per rev-2 §5.5: "loadBioForRun() in P1.5-003 selects the highest-
  * version row where certified = true."
+ *
+ * Tier-2 enforcement is an env flip: with REQUIRE_HUMAN_CERT=1 a run additionally
+ * requires certified_by to be set (a senior Steward signed it), so the
+ * "certified by a human before any specialist run" guarantee is actually backed
+ * by the gate. Default OFF — self-certified BIOs keep running — because turning
+ * it on with no Stewards seeded would fail every run with BIO_NOT_CERTIFIED
+ * (see CAA-25 ops preconditions). All three entrypoints already surface that
+ * code as a friendly "awaiting Brand Steward certification" 409.
  */
 export function loadBioForRun({ workspaceId, brandId }) {
-  return loadBrandBio({ workspaceId, brandId, requireCertified: true });
+  const requireHumanCert = process.env.REQUIRE_HUMAN_CERT === "1";
+  return loadBrandBio({ workspaceId, brandId, requireCertified: true, requireHumanCert });
 }

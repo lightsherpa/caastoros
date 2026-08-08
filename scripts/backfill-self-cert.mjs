@@ -10,7 +10,15 @@
 // are, so history still reflects what was actually certified when.
 // certified_by stays NULL: no human signed these, so none is claimed.
 //
-// Run:  npm run backfill:self-cert          (add DRY=1 to preview)
+// SAFETY: this flips historical BIOs to certified=true with certified_by=NULL,
+// which makes legacy, never-human-reviewed BIOs runnable. It is a one-shot
+// migration and should NOT be re-run casually. A live write now requires
+// CONFIRM=1; without it the script previews (dry run) and exits. If tier-2 is
+// enforced (REQUIRE_HUMAN_CERT=1, see CAA-25) these self-certified rows are
+// blocked from runs anyway, since loadBioForRun also requires certified_by.
+//
+// Run:  DRY=1 npm run backfill:self-cert      (preview — default)
+//       CONFIRM=1 npm run backfill:self-cert  (actually write)
 // ─────────────────────────────────────────────────────────────────────
 
 import { createClient } from "@supabase/supabase-js";
@@ -20,7 +28,13 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing (run via npm script so --env-file applies)");
   process.exit(1);
 }
-const dryRun = process.env.DRY === "1";
+// Preview unless the operator explicitly confirms the write. `DRY=1` still forces
+// preview; the new default (no CONFIRM) is preview too, so an accidental invocation
+// can never silently mass-self-certify.
+const dryRun = process.env.DRY === "1" || process.env.CONFIRM !== "1";
+if (dryRun && process.env.CONFIRM !== "1") {
+  console.log("[preview] set CONFIRM=1 to actually write. Showing what would change:\n");
+}
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });

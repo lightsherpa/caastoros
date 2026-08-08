@@ -16,6 +16,9 @@ import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { computeFocus } from "../lib/bio-focus.js";
 import { notify, brandOwnerUserId } from "../lib/notify.js";
+import { scoreBio } from "../lib/score-bio.js";
+import { normalizeBioEvidence } from "../lib/bio-evidence.js";
+import { deepMerge } from "../lib/deep-merge.js";
 
 const app = new Hono();
 
@@ -210,14 +213,19 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
   if (body.bioPatch && typeof body.bioPatch === "object") {
     const { data: bio } = await supabaseAdmin
       .from("bios").select("payload, version, brand_id").eq("id", job.bio_id).single();
-    const merged = { ...bio.payload, ...body.bioPatch };
+    // Deep-merge so a partial patch (e.g. only identity.positioning) keeps its
+    // siblings instead of replacing the whole subtree, then re-derive the
+    // metadata that must track the values: normalizeBioEvidence recomputes
+    // confidence / evidence / fieldStatus / missing, and scoreBio recomputes the
+    // deterministic score used everywhere else (compile-bio, editor PATCH).
+    const merged = normalizeBioEvidence(deepMerge(bio.payload || {}, body.bioPatch));
     const { data: newRow, error: insertErr } = await supabaseAdmin
       .from("bios")
       .insert({
         brand_id: bio.brand_id,
         version: (bio.version || 0) + 1,
         payload: merged,
-        score: 75,
+        score: scoreBio(merged),
         certified: finalCertified,
         certified_by: finalCertified ? steward.id : null,
         certified_at: finalCertified ? new Date().toISOString() : null,

@@ -25,7 +25,7 @@
     "test:run": "node --env-file=server/.env scripts/test-run.mjs",
     "test:e2e": "node --env-file=server/.env scripts/test-e2e-flow.mjs",
     "test:plan": "node --env-file=server/.env scripts/test-delivery-plan.mjs",
-    "test:units": "node --test server/src/prompt.test.mjs server/src/lib/sharpener.test.mjs server/src/lib/platforms.test.mjs server/src/lib/taxonomy.test.mjs server/src/lib/delivery-plan.test.mjs server/src/lib/deliverables.test.mjs server/src/lib/credits.test.mjs server/src/lib/compose-specialist-prompt.test.mjs server/src/lib/compose-image-prompt.test.mjs server/src/lib/models/fal-image.test.mjs server/src/lib/score-bio.test.mjs server/src/lib/bio-focus.test.mjs server/src/lib/bio-evidence.test.mjs server/src/lib/extract-visual-deterministic.test.mjs server/src/lib/plan-limits.test.mjs src/lib/home-stats.test.mjs",
+    "test:units": "node --test server/src/prompt.test.mjs server/src/lib/sharpener.test.mjs server/src/lib/platforms.test.mjs server/src/lib/taxonomy.test.mjs server/src/lib/delivery-plan.test.mjs server/src/lib/deliverables.test.mjs server/src/lib/credits.test.mjs server/src/lib/compose-specialist-prompt.test.mjs server/src/lib/compose-image-prompt.test.mjs server/src/lib/models/fal-image.test.mjs server/src/lib/score-bio.test.mjs server/src/lib/bio-focus.test.mjs server/src/lib/bio-evidence.test.mjs server/src/lib/deep-merge.test.mjs server/src/lib/extract-visual-deterministic.test.mjs server/src/lib/plan-limits.test.mjs src/lib/home-stats.test.mjs",
     "test:deliverables": "node --env-file=server/.env scripts/test-deliverables.mjs",
     "test:seed-leak": "node scripts/test-no-seed-leak.mjs",
     "backfill:self-cert": "node --env-file=server/.env scripts/backfill-self-cert.mjs",

@@ -74,6 +74,14 @@ export function normalizeBioEvidence(payload = {}) {
       continue;
     }
 
+    // Field now has a value → it is no longer "missing". Drop any stale
+    // missing entry and clear a stale missing/unsupported status so the
+    // metadata tracks the value (e.g. after a Steward fills a blank field).
+    next.missing = next.missing.filter((item) => item.field !== field);
+    if (next.fieldStatus[field] === "missing" || next.fieldStatus[field] === "unsupported") {
+      next.fieldStatus[field] = typeof conf === "number" && conf >= 85 ? "supported" : "inferred";
+    }
+
     if (!next.fieldStatus[field]) {
       next.fieldStatus[field] = typeof conf === "number" && conf >= 85 ? "supported" : "inferred";
     }
