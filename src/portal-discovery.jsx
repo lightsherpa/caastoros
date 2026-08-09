@@ -1,5 +1,6 @@
 import React from "react";
 import { apiFetch, supabase } from "./lib/supabase-browser.js";
+import { BrandolphLine } from "./portal-shared.jsx";
 const { BrandolphAvatar, BrandolphDot, Confidence, Counter, Icon, Reveal } = window;
 /* Discovery (3-step intake) + BIO viewer. */
 
