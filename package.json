@@ -30,7 +30,8 @@
     "test:seed-leak": "node scripts/test-no-seed-leak.mjs",
     "backfill:self-cert": "node --env-file=server/.env scripts/backfill-self-cert.mjs",
     "backfill:credit-grant": "node --env-file=server/.env scripts/backfill-credit-grant.mjs",
-    "bench:image": "node --env-file=server/.env scripts/bench-image.mjs"
+    "bench:image": "node --env-file=server/.env scripts/bench-image.mjs",
+    "make:test-client": "node --env-file=server/.env scripts/make-test-client.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",
