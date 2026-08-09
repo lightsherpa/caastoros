@@ -119,7 +119,7 @@ function CertChip({ cert, bioVersion }) {
 }
 
 /* The footer line on every artifact card: "🧠 BIO v7 · certified by
-   Marina · 12 min". Segments the data can't back are dropped, never faked.
+   <steward> · 12 min". Segments the data can't back are dropped, never faked.
    Pinned to the bottom of the card via marginTop:auto (parent is flex). */
 function NodeProvenance({ bioVersion, cert, latencyMs }) {
   const line = [
@@ -1062,10 +1062,10 @@ function SpecialistDrawer({ open, agent, onClose }) {
 /* CANVAS (Phase 3 placeholder, but designed)                        */
 
 const CANVAS_NODES = [
-  { id:"bio",      x:40,   y:60,  w:260, kind:"bio",       title:"Brand Intelligence Object",        sub:"BIO · 91%" },
+  { id:"bio",      x:40,   y:60,  w:260, kind:"bio",       title:"Brand Intelligence Object",        sub:"BIO" },
   { id:"brief",    x:360,  y:50,  w:260, kind:"brief",     title:"Pricing relaunch · brief",         sub:"L1 · Brandolph" },
-  { id:"t1",       x:680,  y:20,  w:240, kind:"territory", title:"Territory · 'It costs the Tuesday'", sub:"L2-06 · Territory Mapper" },
-  { id:"t2",       x:680,  y:130, w:240, kind:"territory", title:"Territory · '1-in-12'",            sub:"L2-06 · Territory Mapper" },
+  { id:"t1",       x:680,  y:20,  w:240, kind:"territory", title:"Territory · 'The considered choice'", sub:"L2-06 · Territory Mapper" },
+  { id:"t2",       x:680,  y:130, w:240, kind:"territory", title:"Territory · 'One month lighter'",  sub:"L2-06 · Territory Mapper" },
   { id:"t3",       x:680,  y:240, w:240, kind:"territory", title:"Territory · 'Don't unsubscribe'",  sub:"L2-06 · Territory Mapper" },
   { id:"copy1",    x:960,  y:50,  w:260, kind:"copy",      title:"Pricing page hero",                sub:"L2-12 · Conversion Copy" },
   { id:"copy2",    x:960,  y:170, w:260, kind:"copy",      title:"Email sequence ×3",                sub:"L2-13 · Email Sequence" },
@@ -2634,7 +2634,7 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
                 onChange={(e) => setReviseText(e.target.value)}
                 onKeyDown={(e) => e.stopPropagation()}
                 rows={3}
-                placeholder="What's not landing? e.g. 'too clinical — push toward editorial' or 'change the hero from coffee to a single ceramic vessel'"
+                placeholder="What's not landing? e.g. 'too clinical — push toward editorial' or 'change the hero from the product to a single ceramic vessel'"
                 style={{
                   width:"100%", padding: 10, borderRadius: 8,
                   border: "1px solid var(--c-line)", background: "var(--c-bg)",
@@ -2826,7 +2826,7 @@ function CanvasView({ go }) {
     return <BriefRunCanvas context={ctx} onClear={clearCtx} go={go} />;
   }
   /* No run/view context — the old placeholder seed graph (CANVAS_NODES) is
-     stale VINILO demo data with no brand in scope. Redirect to Home instead of
+     stale seed-brand demo data with no brand in scope. Redirect to Home instead of
      rendering a graph the user can't act on or trace to a brief. */
   return <CanvasRedirect go={go} />;
 }

@@ -467,7 +467,7 @@ function HomeCreate({ tweaks, go }) {
               Describe the change you want made — not the deliverable. Brandolph reads the BIO, sharpens the brief, assembles the team, and shows you the cost before anything runs.
             </p>
 
-            {/* Scope pills lived here. They were four hardcoded Vinilo product
+            {/* Scope pills lived here. They were four hardcoded demo product
                 lines, and `scope` was never sent to the Sharpener — brands have
                 no sub-line model, so the control had nothing real to filter. */}
 
@@ -489,7 +489,7 @@ function HomeCreate({ tweaks, go }) {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); if (phase !== "idle") setPhase("idle"); }}
                 onKeyDown={handleKeyDown}
-                placeholder="e.g. Make the Summer Tuesdays campaign earn the slow afternoon back — café-first, no discount, lift Tuesday footfall by 18%."
+                placeholder="e.g. Make the summer campaign earn the slow afternoon back — retail-first, no discount, lift weekday footfall by 18%."
                 rows={3}
                 style={{
                   width:"100%", border:"none", outline:"none", resize:"none",

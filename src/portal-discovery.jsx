@@ -978,7 +978,7 @@ function fieldsToPayload(bio, prevPayload) {
   };
 }
 
-function BioViewer({ go, bioScore = 91 }) {
+function BioViewer({ go, bioScore = 0 }) {
   const [tab, setTab] = useDState("identity");
   const [feed, setFeed] = useDState("");
   const [reading, setReading] = useDState(false);

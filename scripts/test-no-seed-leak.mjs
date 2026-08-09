@@ -159,3 +159,35 @@ assert.match(
 );
 
 console.log("ok — CAA-25 enforcement decision recorded, claim aligned, materials signalled");
+// ─────────────────────────────────────────────────────────────────────
+// CAA-28 — extend the guard to the CLIENT bundle (src/).
+//
+// The server / model-prompt path was already clean, but the browser SPA
+// still hardcoded the seed brand's identity in window.CI_* (src/portal-data.js
+// + a few screens): Vinilo's brand + workspaces, its steward (Marina), the
+// "11.4× pricing formula" refusal, and the Honduras origin story. Those are
+// display-only, but they render live to every user and read as another
+// brand's data leaking. This mirrors the NEEDLES check in
+// scripts/test-e2e-flow.mjs, but statically over the shipped source so it
+// runs with zero external deps (same contract as the server checks above).
+//
+// "11.4" is matched only with its × / x suffix (the pricing formula) so the
+// guard doesn't trip on SVG <path> coordinate data that contains "11.4".
+const CLIENT_NEEDLES = ["vinilo", "honduras", "marina", "11\\.4\\s*[×x]"];
+let clientHits = "";
+try {
+  clientHits = execFileSync(
+    "grep",
+    ["-rniE", CLIENT_NEEDLES.join("|"), `${root}src`],
+    { encoding: "utf8" },
+  ).trim();
+} catch (e) {
+  if (e.status !== 1) throw e; // grep exits 1 on no matches — the passing case.
+}
+assert.equal(
+  clientHits,
+  "",
+  `client bundle (src/) still renders seed-brand identity — purge it (CAA-28):\n${clientHits}`,
+);
+
+console.log("ok — no seed-brand leak in the client bundle (src/)");
