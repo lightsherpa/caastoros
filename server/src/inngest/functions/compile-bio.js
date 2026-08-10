@@ -157,9 +157,14 @@ export const compileBio = inngest.createFunction(
     const scraped = await step.run("scrape-primary-url", async () => {
       if (V2) {
         const pages = await mapAndScrape(url, { max: 6, formats: ["markdown"] });
-        // Insert one bio_sources row per crawled page (kind:url_scrape, bucket:null).
-        for (const page of pages) {
-          const { error } = await supabaseAdmin.from("bio_sources").insert({
+        // Primary crawl rows are a current snapshot, not additive user evidence.
+        // Replace the previous crawl so BIO updates do not duplicate the same
+        // pages in the source ledger.
+        if (pages.length) {
+          const { error: clearError } = await supabaseAdmin.from("bio_sources")
+            .delete().eq("brand_id", brandId).eq("kind", "url_scrape");
+          if (clearError) throw new Error(`old bio_sources cleanup failed: ${clearError.message}`);
+          const { error } = await supabaseAdmin.from("bio_sources").insert(pages.map((page) => ({
             brand_id: brandId,
             kind: "url_scrape",
             bucket: null,
@@ -167,9 +172,10 @@ export const compileBio = inngest.createFunction(
             signals: {
               title: page.title || null,
               markdown_chars: page.markdown?.length || 0,
+              extraction_status: "read",
             },
             raw_ref: null,
-          });
+          })));
           if (error) throw new Error(`bio_sources insert failed: ${error.message}`);
         }
         // Concatenate page markdowns, labeled by source URL.
@@ -184,6 +190,9 @@ export const compileBio = inngest.createFunction(
 
       const result = await scrape(url, { formats: ["markdown"], onlyMainContent: true });
       // Persist as a bio_sources row (URL-derived, bucket=null per rev-2 §5.3)
+      const { error: clearError } = await supabaseAdmin.from("bio_sources")
+        .delete().eq("brand_id", brandId).eq("kind", "url_scrape");
+      if (clearError) throw new Error(`old bio_sources cleanup failed: ${clearError.message}`);
       const { error } = await supabaseAdmin.from("bio_sources").insert({
         brand_id: brandId,
         kind: "url_scrape",
@@ -193,6 +202,7 @@ export const compileBio = inngest.createFunction(
           title: result.metadata?.title,
           description: result.metadata?.description,
           markdown_chars: result.markdown?.length || 0,
+          extraction_status: "read",
         },
         raw_ref: null,
       });
@@ -219,16 +229,45 @@ export const compileBio = inngest.createFunction(
 
           const { data: rows } = await supabaseAdmin
             .from("bio_sources")
-            .select("kind, bucket, src, signals, raw_ref")
+            .select("id, kind, bucket, src, signals, raw_ref")
             .eq("brand_id", brandId);
 
           for (const row of rows || []) {
             if (row.kind !== "file_upload") {
               if (row.kind === "url_scrape") continue;
+              /* Versions of the Sources UI before the real upload flow wrote
+                 these literal demo rows. Never let a placeholder become brand
+                 evidence merely because it survived in the ledger. */
+              if (
+                (row.kind === "doc" && row.src === "Document upload · brand-deck.pdf") ||
+                row.src === "Instagram · latest posts" ||
+                row.src === "Competitor · category reference"
+              ) continue;
+
+              const isLink = ["url_reference", "competitor_url", "social_reference"].includes(row.kind);
+              if (isLink) {
+                try {
+                  const result = await scrape(row.src, { formats: ["markdown"] });
+                  const text = (result?.markdown || "").slice(0, 12000);
+                  if (!text.trim()) throw new Error("No readable text returned");
+                  blocks.push(`## ${String(row.kind).toUpperCase()}: ${row.src}${row.bucket ? ` [${row.bucket}]` : ""}\n\n${text}`);
+                  await supabaseAdmin.from("bio_sources").update({
+                    signals: { ...(row.signals || {}), extraction_status:"read", markdown_chars:text.length },
+                  }).eq("id", row.id);
+                } catch (error) {
+                  await supabaseAdmin.from("bio_sources").update({
+                    signals: { ...(row.signals || {}), extraction_status:"failed", extraction_error:String(error?.message || error).slice(0, 240) },
+                  }).eq("id", row.id);
+                }
+                continue;
+              }
               const signals = row.signals && typeof row.signals === "object"
                 ? `\nSignals: ${JSON.stringify(row.signals)}`
                 : "";
               blocks.push(`## ${String(row.kind || "SOURCE").toUpperCase()}: ${row.src || "(source)"}${row.bucket ? ` [${row.bucket}]` : ""}${signals}`);
+              await supabaseAdmin.from("bio_sources").update({
+                signals: { ...(row.signals || {}), extraction_status:"read" },
+              }).eq("id", row.id);
               continue;
             }
 
@@ -238,10 +277,15 @@ export const compileBio = inngest.createFunction(
             try {
               const result = await scrape(row.raw_ref, { formats: ["markdown"] });
               const text = (result?.markdown || "").slice(0, 12000); // cap ~12k each
-              if (text.trim()) {
-                blocks.push(`## UPLOADED FILE: ${row.src || "(file)"}\n\n${text}`);
-              }
-            } catch {
+              if (!text.trim()) throw new Error("No readable text returned");
+              blocks.push(`## UPLOADED FILE: ${row.src || "(file)"}\n\n${text}`);
+              await supabaseAdmin.from("bio_sources").update({
+                signals: { ...(row.signals || {}), extraction_status:"read", markdown_chars:text.length },
+              }).eq("id", row.id);
+            } catch (error) {
+              await supabaseAdmin.from("bio_sources").update({
+                signals: { ...(row.signals || {}), extraction_status:"failed", extraction_error:String(error?.message || error).slice(0, 240) },
+              }).eq("id", row.id);
               // a single unreadable upload must not fail the BIO
             }
           }

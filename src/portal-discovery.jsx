@@ -5,6 +5,8 @@ const { BrandolphAvatar, BrandolphDot, Confidence, Counter, Icon, Reveal } = win
 /* Discovery (3-step intake) + BIO viewer. */
 
 const { useState: useDState, useEffect: useDEffect } = React;
+const SOURCE_FILE_ACCEPT = ".pdf,.docx,.pptx,.txt,.md";
+const MAX_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
 
 /* useLiveBio — fetches the user's first brand + latest BIO + cert state.
    Polls every `pollMs` while `pendingCert` is true (BIO not yet certified
@@ -987,6 +989,10 @@ function BioViewer({ go, bioScore = 0 }) {
   const [saving, setSaving] = useDState(false);
   const [saveErr, setSaveErr] = useDState(null);
   const [reviewBusy, setReviewBusy] = useDState(false);
+  const [uploading, setUploading] = useDState(false);
+  const [recompilingFromVersion, setRecompilingFromVersion] = useDState(null);
+  const [sourceSetChanged, setSourceSetChanged] = useDState(false);
+  const [sourcesReady, setSourcesReady] = useDState(false);
 
   /* Live cert state + payload — polls /api/bios/:brandId. The BIO body
      below renders from `live.bio.payload`; the cert chip from `live.cert`. */
@@ -1003,14 +1009,37 @@ function BioViewer({ go, bioScore = 0 }) {
     if (live.bio?.payload) setBio(payloadToFields(live.bio.payload));
   }, [live.bio?.id]);
 
-  useDEffect(() => {
+  const refreshSources = React.useCallback(async () => {
     if (!live.brandId) return;
+    const { data, error } = await supabase.from("bio_sources")
+      .select("id, kind, bucket, src, signals, raw_ref, created_at")
+      .eq("brand_id", live.brandId).order("created_at", { ascending: false });
+    if (error) throw error;
+    const bioCreated = live.bio?.created_at ? new Date(live.bio.created_at).getTime() : 0;
+    setSources((data || []).map(s => {
+      const created = new Date(s.created_at).getTime();
+      const learned = s.signals?.markdown_chars ? Math.max(1, Math.round(s.signals.markdown_chars / 200)) : 0;
+      const invalidPlaceholder =
+        (s.kind === "doc" && s.src === "Document upload · brand-deck.pdf") ||
+        s.src === "Instagram · latest posts" ||
+        s.src === "Competitor · category reference";
+      return {
+        ...s,
+        date: new Date(s.created_at).toLocaleDateString(undefined, { day:"numeric", month:"short" }),
+        n: learned,
+        invalidPlaceholder,
+        pending: !invalidPlaceholder && (!bioCreated || created > bioCreated),
+      };
+    }));
+    setSourcesReady(true);
+  }, [live.brandId, live.bio?.id, live.bio?.created_at]);
+
+  useDEffect(() => {
     let alive = true;
-    supabase.from("bio_sources").select("id, kind, bucket, src, signals, raw_ref, created_at")
-      .eq("brand_id", live.brandId).order("created_at", { ascending: false })
-      .then(({ data }) => { if (alive && data) setSources(data.map(s => ({ src: s.src, date: new Date(s.created_at).toLocaleDateString(undefined,{day:"numeric",month:"short"}), n: s.signals?.markdown_chars ? Math.round(s.signals.markdown_chars / 200) : 6, bucket: s.bucket, raw_ref: s.raw_ref }))); });
+    setSourcesReady(false);
+    refreshSources().catch((e) => { if (alive) console.warn("[BIO sources] refresh failed:", e?.message || e); });
     return () => { alive = false; };
-  }, [live.brandId, live.bio?.id]);
+  }, [refreshSources]);
 
   const score = live.bio?.score ?? 0;
   const patch = (key, value) => setBio(b => b ? { ...b, [key]: value } : b);
@@ -1041,8 +1070,11 @@ function BioViewer({ go, bioScore = 0 }) {
 
   /* Client-initiated human review of the CURRENT BIO — no edit required.
      Enqueues a Steward job server-side (idempotent). */
+  const pendingSourceCount = sources.filter(s => s.pending).length;
+  const hasUnappliedSourceChanges = pendingSourceCount > 0 || sourceSetChanged;
+
   const requestReview = async () => {
-    if (!live.brandId || reviewBusy) return;
+    if (!live.brandId || !sourcesReady || reviewBusy || hasUnappliedSourceChanges || recompilingFromVersion != null) return;
     setReviewBusy(true);
     try {
       const res = await apiFetch(`/api/bios/${live.brandId}/request-review`, { method: "POST" });
@@ -1057,27 +1089,115 @@ function BioViewer({ go, bioScore = 0 }) {
     }
   };
 
-  const addReference = async (labelArg, kind) => {
+  const addReference = async (labelArg, kind = "url_reference", bucket = "foundations") => {
     const ref = (labelArg ?? feed).trim();
     if (!ref || reading || !live.brandId) return;
-    setReading(true); setFeed("");
+    if (["url_reference", "competitor_url", "social_reference"].includes(kind)) {
+      try {
+        const parsed = new URL(ref);
+        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("protocol");
+      } catch {
+        flash("Paste a complete link beginning with http:// or https://.");
+        return false;
+      }
+    }
+    setReading(true);
     try {
       const res = await apiFetch(`/api/bios/${live.brandId}/sources`, {
         method: "POST",
-        body: JSON.stringify({ sources: [{ kind: kind || "url_reference", bucket: null, src: ref }] }),
+        body: JSON.stringify({ sources: [{ kind, bucket, src: ref }] }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      /* Optimistic prepend so user sees it immediately; the next poll
-         will hydrate the real signals/markdown_chars. */
-      setSources(s => [{ src: ref, date: "just now", n: 0, fresh: true }, ...s]);
-      flash(`Added "${ref.slice(0, 40)}". Brandolph will read it on next discovery.`);
+      setFeed("");
+      await refreshSources();
+      flash("Evidence saved. Update the BIO when you're ready to incorporate it.");
+      return true;
     } catch (e) {
       flash(`Couldn't add: ${e?.message || e}`);
+      return false;
     } finally {
       setReading(false);
     }
   };
+
+  const uploadDocument = async (file, bucket) => {
+    if (!file || !live.brandId || uploading) return false;
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (!["pdf", "docx", "pptx", "txt", "md"].includes(ext)) {
+      flash("Choose a PDF, DOCX, PPTX, TXT, or Markdown file.");
+      return false;
+    }
+    if (file.size > MAX_SOURCE_FILE_BYTES) {
+      flash("That file is larger than the 20 MB upload limit.");
+      return false;
+    }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.set("bucket", bucket);
+      form.set("file", file);
+      const res = await apiFetch(`/api/bios/${live.brandId}/sources/upload`, { method:"POST", body:form });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      await refreshSources();
+      flash(`${file.name} uploaded. Update the BIO to incorporate it.`);
+      return true;
+    } catch (e) {
+      flash(`Upload failed: ${e?.message || e}`);
+      return false;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeSource = async (source) => {
+    if (!source?.id || !live.brandId) return;
+    try {
+      const res = await apiFetch(`/api/bios/${live.brandId}/sources/${source.id}`, { method:"DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setSources(current => current.filter(item => item.id !== source.id));
+      setSourceSetChanged(true);
+      flash("Source removed. Update the BIO so the next version reflects the current evidence.");
+    } catch (e) {
+      flash(`Couldn't remove source: ${e?.message || e}`);
+    }
+  };
+
+  const updateBioFromSources = async () => {
+    if (!live.brandId || !live.brandUrl || recompilingFromVersion != null || !hasUnappliedSourceChanges) return;
+    try {
+      const baseline = live.bio?.version || 0;
+      const res = await apiFetch("/api/discovery/start", {
+        method:"POST",
+        body: JSON.stringify({ url:live.brandUrl, brandId:live.brandId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setRecompilingFromVersion(baseline);
+      flash("BIO update queued. Brandolph is reading the new evidence.");
+    } catch (e) {
+      flash(`Couldn't update the BIO: ${e?.message || e}`);
+    }
+  };
+
+  useDEffect(() => {
+    if (recompilingFromVersion == null || !live.bio?.version || live.bio.version <= recompilingFromVersion) return;
+    setRecompilingFromVersion(null);
+    setSourceSetChanged(false);
+    refreshSources();
+    flash(`BIO v${live.bio.version} is ready. Review the changes before requesting certification.`);
+  }, [live.bio?.version, recompilingFromVersion, refreshSources]);
+
+  useDEffect(() => {
+    if (recompilingFromVersion == null) return;
+    const timeout = setTimeout(() => {
+      setRecompilingFromVersion(null);
+      flash("The BIO update is taking longer than expected. Your evidence is safe; try Update BIO again shortly.");
+    }, 180000);
+    return () => clearTimeout(timeout);
+  }, [recompilingFromVersion]);
 
   const tabs = [
     ["identity", "Identity"],
@@ -1204,8 +1324,8 @@ function BioViewer({ go, bioScore = 0 }) {
           </button>
           {live.bio && (
             <button className="btn btn--ghost btn--sm" onClick={requestReview}
-              disabled={reviewBusy || live.reviewPending}
-              title={live.reviewPending ? "A human review is already in progress" : "Send this BIO to your Brand Steward for a human review — no edit required"}>
+              disabled={!sourcesReady || reviewBusy || live.reviewPending || hasUnappliedSourceChanges || recompilingFromVersion != null}
+              title={!sourcesReady ? "Checking whether this BIO has pending evidence" : hasUnappliedSourceChanges ? "Update the BIO with pending evidence before requesting review" : live.reviewPending ? "A human review is already in progress" : "Send this BIO to your Brand Steward for a human review — no edit required"}>
               <Icon name="mail" size={14} /> {live.reviewPending ? "In review…" : reviewBusy ? "Sending…" : "Request human review"}
             </button>
           )}
@@ -1272,7 +1392,7 @@ function BioViewer({ go, bioScore = 0 }) {
             {tab === "visual"      && <BioVisual bio={bio} patch={patch} editing={editing} />}
             {tab === "goals"       && <BioFieldList items={bio.goals}       editing={editing} onChange={v => patch("goals", v)} />}
             {tab === "strategic"   && <BioStrategic strat={bio.strategic} patchStrategic={patchStrategic} editing={editing} brand={live.brandName || "this brand"} />}
-            {tab === "sources"     && <BioSources sources={sources} setSources={setSources} feed={feed} setFeed={setFeed} reading={reading} addReference={addReference} editing={editing} go={go} />}
+            {tab === "sources"     && <BioSources sources={sources} feed={feed} setFeed={setFeed} reading={reading} uploading={uploading} addReference={addReference} uploadDocument={uploadDocument} removeSource={removeSource} pendingCount={pendingSourceCount} sourceSetChanged={sourceSetChanged} recompiling={recompilingFromVersion != null} updateBio={updateBioFromSources} canUpdate={Boolean(live.brandUrl)} />}
           </div>
         </div>
       )}
@@ -1562,9 +1682,23 @@ function BioStrategic({ strat, patchStrategic, editing, brand = "this brand" }) 
     </div>
   );
 }
-function BioSources({ sources, setSources, feed, setFeed, reading, addReference, editing, go }) {
-  const total = sources.reduce((a, s) => a + s.n, 0);
-  const onKey = (e) => { if (e.key === "Enter") { e.preventDefault(); addReference(); } };
+function BioSources({ sources, feed, setFeed, reading, uploading, addReference, uploadDocument, removeSource, pendingCount, sourceSetChanged, recompiling, updateBio, canUpdate }) {
+  const [mode, setMode] = useDState("url");
+  const [kind, setKind] = useDState("url_reference");
+  const [bucket, setBucket] = useDState("foundations");
+  const fileRef = React.useRef(null);
+  const includedCount = sources.filter(s => !s.invalidPlaceholder && !s.pending && s.signals?.extraction_status !== "failed").length;
+  const submit = () => addReference(feed, mode === "note" ? "manual_note" : kind, bucket);
+  const onKey = (e) => { if (mode === "url" && e.key === "Enter") { e.preventDefault(); submit(); } };
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) await uploadDocument(file, bucket);
+  };
+  const sourceLabel = (s) => s.kind === "file_upload" ? s.src : s.src.length > 120 ? `${s.src.slice(0, 117)}…` : s.src;
+  const kindLabel = (s) => ({ file_upload:"Document", manual_note:"Manual note", competitor_url:"Competitor", social_reference:"Social", client_intake:"Discovery intake" }[s.kind] || "Web reference");
+  const bucketLabel = (key) => BUCKETS.find(b => b.key === key)?.label || "Unsorted";
+  const formatBytes = (n) => n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n || 0} B`;
   return (
     <div>
       {/* Feed composer */}
@@ -1572,51 +1706,64 @@ function BioSources({ sources, setSources, feed, setFeed, reading, addReference,
         <div style={{display:"flex", alignItems:"center", gap:9, marginBottom:12}}>
           <BrandolphDot state={reading ? "thinking" : "idle"} />
           <div>
-            <div style={{fontSize:14, fontWeight:600, color:"var(--c-ink)"}}>Feed Brandolph</div>
-            <div style={{fontSize:12, color:"var(--c-faint)"}}>Drop a link, a doc, or a note. Brandolph reads it and tightens the BIO.</div>
+            <div style={{fontSize:14, fontWeight:600, color:"var(--c-ink)"}}>Add evidence</div>
+            <div style={{fontSize:12, color:"var(--c-dim)"}}>Save sources first. Then ask Brandolph to build a new BIO version for you to review.</div>
           </div>
         </div>
+        <div style={{display:"flex", gap:6, marginBottom:12}} role="tablist" aria-label="Evidence type">
+          {[['url','Link'], ['note','Note']].map(([key, label]) => (
+            <button key={key} className={`btn btn--sm ${mode === key ? "btn--primary" : "btn--ghost"}`} onClick={() => { setMode(key); setFeed(""); }} role="tab" aria-selected={mode === key}>{label}</button>
+          ))}
+        </div>
         <div style={{display:"flex", gap:10}}>
-          <input
-            value={feed}
-            onChange={(e) => setFeed(e.target.value)}
-            onKeyDown={onKey}
-            disabled={reading}
-            placeholder="Paste a URL — site, article, competitor, social…"
-            style={{flex:1, height:42, borderRadius:9, border:"1px solid var(--c-line-2)", background:"var(--c-bg)", padding:"0 14px", fontSize:14, color:"var(--c-ink)", outline:"none"}}
-          />
-          <button className="btn btn--primary" disabled={reading || !feed.trim()} onClick={() => addReference()}>
-            {reading ? <><BrandolphDot state="thinking" size={11} /> Reading…</> : <><Icon name="plus" size={14} /> Read it</>}
+          {mode === "note" ? (
+            <textarea value={feed} onChange={(e) => setFeed(e.target.value)} disabled={reading} rows={3} placeholder="Add a correction, brand belief, audience insight, or voice rule…" style={{...EDIT_INPUT, flex:1, minHeight:76, resize:"vertical", lineHeight:1.5}} />
+          ) : (
+            <input value={feed} onChange={(e) => setFeed(e.target.value)} onKeyDown={onKey} disabled={reading} type="url" placeholder="https://…" style={{flex:1, height:42, borderRadius:9, border:"1px solid var(--c-line-2)", background:"var(--c-bg)", padding:"0 14px", fontSize:14, color:"var(--c-ink)", outline:"none"}} />
+          )}
+          <button className="btn btn--primary" disabled={reading || !feed.trim()} onClick={submit}>
+            {reading ? <><BrandolphDot state="thinking" size={11} /> Saving…</> : <>Save evidence</>}
           </button>
         </div>
-        <div style={{display:"flex", gap:8, marginTop:12, flexWrap:"wrap"}}>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Document upload · brand-deck.pdf", "doc")}><Icon name="files" size={13} /> Upload document</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Instagram · latest posts")}><Icon name="refresh" size={13} /> Re-pull social</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Competitor · category reference")}><Icon name="plus" size={13} /> Add competitor</button>
+        <div style={{display:"flex", gap:8, marginTop:12, flexWrap:"wrap", alignItems:"center"}}>
+          {mode === "url" && <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Link type" style={{...EDIT_INPUT, width:"auto", height:34}}><option value="url_reference">Website or article</option><option value="competitor_url">Competitor</option><option value="social_reference">Social profile or post</option></select>}
+          <select value={bucket} onChange={(e) => setBucket(e.target.value)} aria-label="Evidence area" style={{...EDIT_INPUT, width:"auto", height:34}}>{BUCKETS.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}</select>
+          <input ref={fileRef} type="file" accept={SOURCE_FILE_ACCEPT} onChange={onFile} style={{display:"none"}} />
+          <button className="btn btn--ghost btn--sm" disabled={reading || uploading} onClick={() => fileRef.current?.click()}><Icon name="files" size={13} /> {uploading ? "Uploading…" : "Upload document"}</button>
+          <span style={{fontSize:11, color:"var(--c-faint)"}}>PDF, DOCX, PPTX, TXT, MD · max 20 MB</span>
         </div>
       </div>
 
+      {(pendingCount > 0 || sourceSetChanged || recompiling) && (
+        <div style={{padding:"14px 16px", marginBottom:22, border:"1px solid var(--yellow-500)", borderRadius:12, background:"var(--yellow-50, rgba(252,211,77,0.08))", display:"flex", justifyContent:"space-between", alignItems:"center", gap:18}}>
+          <div>
+            <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{recompiling ? "Brandolph is updating the BIO" : pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? "source is" : "sources are"} waiting` : "The evidence set changed"}</div>
+            <div style={{fontSize:12, color:"var(--c-dim)", marginTop:3, lineHeight:1.45}}>{recompiling ? "You can stay on this page. The new version will appear when it is ready." : "This evidence is saved but is not part of the current BIO yet. Update it, review the changes, then request human certification."}</div>
+          </div>
+          <button className="btn btn--primary" disabled={recompiling || !canUpdate} onClick={updateBio}>{recompiling ? "Updating…" : "Update BIO"}</button>
+        </div>
+      )}
+
       {/* Ledger header */}
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:6}}>
-        <div className="eyebrow">{sources.length} sources · {total} signals learned</div>
-        <div style={{fontSize:11.5, color:"var(--c-faint)", fontStyle:"italic"}}>Every source compounds the BIO.</div>
+        <div className="eyebrow">{sources.length} sources · {includedCount} included in current BIO</div>
+        <div style={{fontSize:11.5, color:"var(--c-faint)", fontStyle:"italic"}}>Evidence is versioned before it becomes canon.</div>
       </div>
 
       {/* Source ledger */}
       <div>
-        {sources.map((s, i) => (
-          <div key={i} style={{display:"grid", gridTemplateColumns:"1fr auto auto", gap: 14, padding:"12px 0", borderBottom: "1px solid var(--c-line)", alignItems:"center", animation: s.fresh ? "cvPopIn 260ms ease" : "none"}}>
+        {sources.length === 0 && <div style={{padding:"30px 0", color:"var(--c-dim)", fontSize:13.5}}>No evidence added yet. Upload a real document, paste a link, or write a note above.</div>}
+        {sources.map((s) => (
+          <div key={s.id} style={{display:"grid", gridTemplateColumns:"1fr auto auto", gap: 14, padding:"13px 0", borderBottom: "1px solid var(--c-line)", alignItems:"center"}}>
             <div>
               <div style={{fontSize: 13.5, color:"var(--c-ink)", fontWeight:500, display:"flex", alignItems:"center", gap:8}}>
-                {s.src}
-                {s.fresh && <span className="pill" style={{height:18, padding:"0 8px", fontSize:9.5, background:"var(--green-50, rgba(127,163,122,0.16))", color:"var(--green-600)"}}>new</span>}
+                {sourceLabel(s)}
+                {s.invalidPlaceholder ? <span className="pill" style={{height:18, padding:"0 8px", fontSize:9.5, color:"var(--pink-500)"}}>invalid placeholder</span> : s.pending && <span className="pill" style={{height:18, padding:"0 8px", fontSize:9.5, background:"var(--yellow-50, rgba(252,211,77,0.14))", color:"var(--orange-600)"}}>awaiting update</span>}
               </div>
-              <div style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", marginTop: 2, letterSpacing:"0.04em"}}>{s.date}</div>
+              <div style={{fontSize: 11, color:"var(--c-faint)", marginTop: 3}}>{kindLabel(s)} · {bucketLabel(s.bucket)} · {s.date}{s.signals?.size ? ` · ${formatBytes(s.signals.size)}` : ""}</div>
             </div>
-            <span className="pill">{s.n} signals</span>
-            {editing
-              ? <button className="btn btn--link" style={{fontSize: 12, color:"var(--pink-500)"}} onClick={() => setSources(sources.filter((_, j) => j !== i))}>Remove</button>
-              : <button className="btn btn--link" style={{fontSize: 12}} onClick={() => go("discovery")}>Re-extract</button>}
+            <span className="pill" title={s.signals?.extraction_status === "failed" ? s.signals?.extraction_error || "Brandolph could not read this source" : undefined}>{s.invalidPlaceholder ? "never used" : s.pending ? "not included" : s.signals?.extraction_status === "failed" ? "couldn't read" : s.n ? `${s.n} signals` : "included"}</span>
+            <button className="btn btn--link" style={{fontSize: 12, color:"var(--pink-500)"}} onClick={() => removeSource(s)}>Remove</button>
           </div>
         ))}
       </div>

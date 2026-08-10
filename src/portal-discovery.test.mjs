@@ -43,3 +43,22 @@ test("the Discovery completion message renders without a missing component", asy
   assert.match(markup, /Brandolph/);
   assert.match(markup, /compiled the candidate BIO/);
 });
+
+test("the BIO evidence flow uses a real document picker and multipart upload", async () => {
+  const source = await readFile(discoveryUrl, "utf8");
+
+  assert.match(source, /type="file" accept=\{SOURCE_FILE_ACCEPT\}/);
+  assert.match(source, /new FormData\(\)/);
+  assert.match(source, /sources\/upload/);
+  assert.match(source, /fileRef\.current\?\.click\(\)/);
+  assert.doesNotMatch(source, /addReference\("Document upload · brand-deck\.pdf"/);
+});
+
+test("pending evidence must be incorporated before human review", async () => {
+  const source = await readFile(discoveryUrl, "utf8");
+
+  assert.match(source, /hasUnappliedSourceChanges/);
+  assert.match(source, /Update the BIO with pending evidence before requesting review/);
+  assert.match(source, /Update BIO/);
+  assert.match(source, /Review the changes before requesting certification/);
+});

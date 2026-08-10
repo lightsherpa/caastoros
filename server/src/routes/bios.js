@@ -6,6 +6,8 @@ import { scoreBio } from "../lib/score-bio.js";
 import { computeFocus } from "../lib/bio-focus.js";
 
 const app = new Hono();
+const MAX_SOURCE_FILE_BYTES = 20 * 1024 * 1024;
+const SUPPORTED_SOURCE_EXTENSIONS = new Set(["pdf", "docx", "pptx", "txt", "md"]);
 
 /* POST /api/bios/:brandId/sources
    Body: { sources: [{ kind, bucket, src, signals? }, ...] }
@@ -34,11 +36,25 @@ app.post("/:brandId/sources", requireAuth, async (c) => {
   const sources = Array.isArray(body?.sources) ? body.sources : [];
   if (sources.length === 0) return c.json({ error: "sources[] required" }, 400);
 
+  const linkKinds = new Set(["url_reference", "competitor_url", "social_reference"]);
+  for (const source of sources) {
+    const src = String(source?.src ?? "").trim();
+    if (!src) return c.json({ error: "Every source needs content" }, 400);
+    if (linkKinds.has(source?.kind)) {
+      try {
+        const parsed = new URL(src);
+        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("unsupported protocol");
+      } catch {
+        return c.json({ error: "Links must be complete http:// or https:// URLs" }, 400);
+      }
+    }
+  }
+
   const rows = sources.map((s) => ({
     brand_id: brandId,
     kind:     s.kind || "reference",
     bucket:   ["foundations", "visual", "voice"].includes(s.bucket) ? s.bucket : null,
-    src:      String(s.src ?? ""),
+    src:      String(s.src ?? "").trim(),
     signals:  s.signals ?? null,
     raw_ref:  s.raw_ref ?? null,
   }));
@@ -46,7 +62,7 @@ app.post("/:brandId/sources", requireAuth, async (c) => {
   const { data: inserted, error: insertErr } = await supabaseAdmin
     .from("bio_sources")
     .insert(rows)
-    .select("id, bucket, src");
+    .select("id, kind, bucket, src, signals, raw_ref, created_at");
   if (insertErr) return c.json({ error: insertErr.message }, 500);
 
   return c.json({ inserted: inserted.length, sources: inserted });
@@ -72,7 +88,13 @@ app.post("/:brandId/sources/upload", requireAuth, async (c) => {
   if (!["foundations","visual","voice"].includes(bucket)) return c.json({ error: "bucket must be foundations|visual|voice" }, 400);
 
   const filename = file.name || "upload.bin";
-  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
+  const ext = filename.includes(".") ? filename.split(".").pop().toLowerCase() : "bin";
+  if (!SUPPORTED_SOURCE_EXTENSIONS.has(ext)) {
+    return c.json({ error: "Unsupported file. Upload PDF, DOCX, PPTX, TXT, or Markdown." }, 400);
+  }
+  if (file.size > MAX_SOURCE_FILE_BYTES) {
+    return c.json({ error: "File is larger than the 20 MB upload limit." }, 413);
+  }
   const safeName = filename.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80);
   const objectPath = `${workspaceId}/${brandId}/${crypto.randomUUID()}-${safeName}`;
 
@@ -108,14 +130,55 @@ app.post("/:brandId/sources/upload", requireAuth, async (c) => {
       kind: "file_upload",
       bucket,
       src: filename,
-      signals: { size: file.size, mime: file.type, upload_id: uploadRow?.id, ext },
+      signals: { size: file.size, mime: file.type, upload_id: uploadRow?.id, object_path: objectPath, ext },
       raw_ref: uploadRow?.url,
     })
-    .select("id, bucket, src, signals, raw_ref")
+    .select("id, kind, bucket, src, signals, raw_ref, created_at")
     .single();
   if (sourceErr) return c.json({ error: sourceErr.message }, 500);
 
   return c.json({ source: sourceRow, signedUrl: uploadRow?.url });
+});
+
+/* DELETE /api/bios/:brandId/sources/:sourceId
+   Removes a source from the evidence ledger. A compiled BIO remains an
+   immutable version; the client prompts the user to update the BIO after
+   removing evidence so the next version is derived from the current ledger. */
+app.delete("/:brandId/sources/:sourceId", requireAuth, async (c) => {
+  const { workspaceId } = c.get("auth");
+  const brandId = c.req.param("brandId");
+  const sourceId = c.req.param("sourceId");
+
+  const { data: brand } = await supabaseAdmin
+    .from("brands").select("id, workspace_id").eq("id", brandId).maybeSingle();
+  if (!brand || brand.workspace_id !== workspaceId) return c.json({ error: "Brand not in workspace" }, 403);
+
+  const { data: source, error: sourceErr } = await supabaseAdmin
+    .from("bio_sources")
+    .select("id, signals")
+    .eq("id", sourceId)
+    .eq("brand_id", brandId)
+    .maybeSingle();
+  if (sourceErr) return c.json({ error: sourceErr.message }, 500);
+  if (!source) return c.json({ error: "Source not found" }, 404);
+
+  const { error: deleteErr } = await supabaseAdmin
+    .from("bio_sources").delete().eq("id", sourceId).eq("brand_id", brandId);
+  if (deleteErr) return c.json({ error: deleteErr.message }, 500);
+
+  const uploadId = source.signals?.upload_id;
+  const objectPath = source.signals?.object_path;
+  if (objectPath) {
+    const { error: storageDeleteErr } = await supabaseAdmin.storage.from("bio-sources").remove([objectPath]);
+    if (storageDeleteErr) console.warn("[bio source delete] storage cleanup failed:", storageDeleteErr.message);
+  }
+  if (uploadId) {
+    const { error: uploadDeleteErr } = await supabaseAdmin
+      .from("uploads").delete().eq("id", uploadId).eq("brand_id", brandId);
+    if (uploadDeleteErr) console.warn("[bio source delete] upload metadata cleanup failed:", uploadDeleteErr.message);
+  }
+
+  return c.json({ ok: true, sourceId });
 });
 
 /* PATCH /api/bios/:brandId
