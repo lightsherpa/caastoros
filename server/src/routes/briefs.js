@@ -20,6 +20,9 @@ app.post("/sharpen", requireAuth, async (c) => {
   try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
   const { briefText, brandId } = body || {};
   if (!briefText || typeof briefText !== "string") return c.json({ error: "briefText required" }, 400);
+  if (!brandId || typeof brandId !== "string") {
+    return c.json({ error: "Select a brand before creating a brief.", code: "BRAND_REQUIRED" }, 400);
+  }
 
   let brandBio;
   try {
@@ -51,7 +54,7 @@ app.post("/sharpen", requireAuth, async (c) => {
     });
     return c.json({
       ...result,
-      brand: { name: brandBio.brand.name, bioVersion: brandBio.bio?.version },
+      brand: { id: brandBio.brand.id, name: brandBio.brand.name, bioVersion: brandBio.bio?.version },
     });
   } catch (e) {
     return c.json({ error: e?.message || String(e) }, 500);

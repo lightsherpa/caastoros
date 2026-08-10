@@ -9,6 +9,7 @@
 // Returns { brand, bio, refusals } shaped for prompt.js consumption.
 
 import { supabaseAdmin } from "./supabase.js";
+import { requireBrandId } from "./brand-scope.js";
 
 /**
  * @param {object} opts
@@ -113,5 +114,5 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
  */
 export function loadBioForRun({ workspaceId, brandId }) {
   const requireHumanCert = process.env.REQUIRE_HUMAN_CERT === "1";
-  return loadBrandBio({ workspaceId, brandId, requireCertified: true, requireHumanCert });
+  return loadBrandBio({ workspaceId, brandId: requireBrandId(brandId), requireCertified: true, requireHumanCert });
 }

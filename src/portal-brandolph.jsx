@@ -225,6 +225,7 @@ function HomeCreate({ tweaks, go }) {
   /* Fetched once here and handed to HomeDashboard — the crew-cost line below
      needs the same live balance, and two hooks would mean two round-trips. */
   const stats = useHomeStats();
+  const activeBrandId = window.useCurrentBrandId();
   const [mode, setMode]   = useBState("flow");
   const [input, setInput] = useBState(() => {
     /* Pick up a "Reuse" prefill posted from the Library — when set,
@@ -262,6 +263,18 @@ function HomeCreate({ tweaks, go }) {
   const [sharp, setSharp]       = useBState({ loading: false, data: null, error: null });
   const [answers, setAnswers]   = useBState({});            /* { 0: "...", 1: "...", 2: "..." } */
   const [qStep, setQStep]       = useBState(0);             /* sharpening wizard: current question index */
+  const [briefBrandId, setBriefBrandId] = useBState(null);  /* brand pinned when sharpening starts */
+
+  /* A sharpened brief belongs to the BIO that shaped it. Switching brands
+     invalidates that draft so it cannot be run against a different BIO. */
+  useBEffect(() => {
+    if (!briefBrandId || briefBrandId === activeBrandId) return;
+    setPhase("idle");
+    setSharp({ loading:false, data:null, error:null });
+    setAnswers({});
+    setQStep(0);
+    setBriefBrandId(null);
+  }, [activeBrandId, briefBrandId]);
 
   /* Resolve the actual assembly — Sharpener's proposed specialists take
      precedence; fall back to the mock density-based pick filtered to
@@ -286,6 +299,10 @@ function HomeCreate({ tweaks, go }) {
 
   const handleStart = async () => {
     if (!input.trim()) return;
+    if (!activeBrandId) {
+      setSharp({ loading:false, data:null, error:"Select a brand before creating a brief." });
+      return;
+    }
     /* Real a02 The Sharpener pass — reads the BIO + brief, returns 2–3
        brand-aware questions + a proposed crew. If sharpening fails
        (network, parse, etc.), skip straight to proposing with the raw
@@ -294,11 +311,12 @@ function HomeCreate({ tweaks, go }) {
     setSharp({ loading: true, data: null, error: null });
     setAnswers({});
     setQStep(0);
+    setBriefBrandId(activeBrandId);
     setTimeout(() => reviewRef.current?.scrollIntoView({ behavior:"smooth", block:"nearest" }), 80);
     try {
       const res = await apiFetch("/api/briefs/sharpen", {
         method: "POST",
-        body: JSON.stringify({ briefText: input.trim() }),
+        body: JSON.stringify({ briefText: input.trim(), brandId: activeBrandId }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
@@ -313,6 +331,10 @@ function HomeCreate({ tweaks, go }) {
   };
 
   const handleProceed = () => {
+    if (!briefBrandId || briefBrandId !== activeBrandId) {
+      setSharp((current) => ({ ...current, error:"The active brand changed. Start again so this brief uses the correct BIO." }));
+      return;
+    }
     /* Hand off the run context to the Canvas: BIO → Brief → Specialists
        assemble there with animations, then the user fires the run from
        the Canvas itself. The Canvas is the moment-of-truth UX surface;
@@ -332,7 +354,7 @@ function HomeCreate({ tweaks, go }) {
       /* Carry the current brand so canvas re-runs forward a real brandId
          instead of undefined. The server still re-derives brand from briefId,
          but forwarding it removes the fragile "works only by coincidence". */
-      brandId:       window.getCurrentBrandId?.() || null,
+      brandId:       briefBrandId,
       ts:            Date.now(),
     };
     try { sessionStorage.setItem("ci_run_context", JSON.stringify(ctx)); } catch (e) {}
@@ -404,6 +426,7 @@ function HomeCreate({ tweaks, go }) {
       await streamSpecialistRun({
         specialistId: agent.id,
         briefText:    composedBrief,
+        brandId:      briefBrandId || activeBrandId,
         briefId:      sharedBriefId,
         onToken: ({ text: t }) => {
           text += t;
@@ -433,6 +456,7 @@ function HomeCreate({ tweaks, go }) {
     setAgentStates({}); setAgentOutputs({}); setRunErr(null);
     setSharp({ loading: false, data: null, error: null });
     setAnswers({});
+    setBriefBrandId(null);
   };
 
   const isActive = phase !== "idle";

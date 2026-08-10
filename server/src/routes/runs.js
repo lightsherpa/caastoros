@@ -36,6 +36,7 @@ import { recordSignal } from "../lib/brandolph-memory.js";
 import { generate as generateImage, isImageRoute } from "../lib/models/fal-image.js";
 import { maxTokensForDeliverables, parseDeliverables, buildDeliverableContract, falSizeForPlatform } from "../lib/deliverables.js";
 import { assertCreditsAvailable, creditErrorResponse, estimateRunCredits } from "../lib/credits.js";
+import { resolveRunBrandId } from "../lib/brand-scope.js";
 
 const app = new Hono();
 
@@ -45,6 +46,25 @@ app.post("/stream", requireAuth, async (c) => {
   try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
   const { specialistId, briefText, brandId, briefId: existingBriefId, briefMeta, modelOverride, revisionFeedback, deliverableSpec } = body || {};
   if (!specialistId || !briefText) return c.json({ error: "specialistId and briefText required" }, 400);
+
+  /* Pin the run to an explicit brand. For a continuation/re-run, the brief is
+     the authority; for a new brief, the caller must supply brandId. Never let
+     loadBioForRun fall back to the workspace's oldest brand. */
+  let existingBrief = null;
+  let effectiveBrandId;
+  if (existingBriefId) {
+    const { data, error } = await supabaseAdmin
+      .from("briefs").select("id, brand_id").eq("id", existingBriefId).maybeSingle();
+    if (error || !data) return c.json({ error: "briefId not found or not in workspace" }, 404);
+    existingBrief = data;
+  }
+  try {
+    effectiveBrandId = resolveRunBrandId({ brandId, existingBriefBrandId: existingBrief?.brand_id });
+  } catch (error) {
+    const status = error.code === "BRAND_MISMATCH" ? 409 : 400;
+    const message = error.code === "BRAND_REQUIRED" ? "Select a brand before creating a brief." : error.message;
+    return c.json({ error:message, code:error.code }, status);
+  }
 
   /* Re-run / revise — caller can override which model handles this
      run (curated per-spec dropdown in the SPA), and/or append revision
@@ -68,7 +88,7 @@ app.post("/stream", requireAuth, async (c) => {
      Discovery creates a candidate; Steward certification turns it into canon. */
   let brandBio;
   try {
-    brandBio = await loadBioForRun({ workspaceId, brandId });
+    brandBio = await loadBioForRun({ workspaceId, brandId: effectiveBrandId });
   } catch (err) {
     if (err.code === "BIO_NOT_CERTIFIED") {
       return c.json({ error: "BIO is awaiting Brand Steward certification.", code: err.code }, 409);
@@ -155,13 +175,11 @@ app.post("/stream", requireAuth, async (c) => {
        create a fresh one. Ownership check applies either way. */
     let briefId;
     if (existingBriefId) {
-      const { data: existing } = await supabaseAdmin
-        .from("briefs").select("id, brand_id").eq("id", existingBriefId).maybeSingle();
-      if (!existing || existing.brand_id !== brandBio.brand.id) {
+      if (!existingBrief || existingBrief.brand_id !== brandBio.brand.id) {
         await stream.writeSSE({ event: "error", data: JSON.stringify({ message: "briefId not found or not in brand" }) });
         return;
       }
-      briefId = existing.id;
+      briefId = existingBrief.id;
     } else {
       /* Brief title prefers the Sharpener's editorial title (4–6 words,
          not a slice of raw text). Falls back to the first sharpened

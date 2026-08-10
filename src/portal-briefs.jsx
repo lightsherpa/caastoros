@@ -801,6 +801,7 @@ function composeSpecialistPrompt(a, isTeam, specArg) {
    renders streaming output + QA verdict + the moat-defining cert
    attribution footer. Used inline at the top of SpecialistDrawer. */
 function TryPanel({ agent, onClose }) {
+  const activeBrandId = window.useCurrentBrandId();
   const [brief, setBrief]       = useBrState("");
   const [running, setRunning]   = useBrState(false);
   const [output, setOutput]     = useBrState("");
@@ -816,6 +817,7 @@ function TryPanel({ agent, onClose }) {
     await streamSpecialistRun({
       specialistId: agent.id,
       briefText: brief.trim(),
+      brandId: activeBrandId,
       onToken:  ({ text }) => setOutput((o) => o + text),
       onQa:     (data) => setQa(data),
       onDone:   (data) => setDone(data),
@@ -1641,12 +1643,7 @@ function BriefRunCanvas({ context, onClear, go }) {
   React.useEffect(() => {
     (async () => {
       try {
-        const wantedId = window.getCurrentBrandId?.();
-        let brandId = wantedId;
-        if (!brandId) {
-          const { data: brands } = await supabase.from("brands").select("id").order("created_at", { ascending: true }).limit(1);
-          brandId = brands?.[0]?.id;
-        }
+        const brandId = context.brandId;
         if (!brandId) return;
         const { data: bio } = await supabase.from("bios").select("certified_by, certified_at, version")
           .eq("brand_id", brandId).eq("certified", true).order("version", { ascending: false }).limit(1).maybeSingle();
@@ -1663,7 +1660,7 @@ function BriefRunCanvas({ context, onClear, go }) {
         }
       } catch (e) { /* non-fatal */ }
     })();
-  }, []);
+  }, [context.brandId]);
 
   /* Compact, fixed-height node renderer. Specialist cards never grow
      beyond their reserved Y slot, so they can never stack/overlap.
@@ -1887,6 +1884,7 @@ function BriefRunCanvas({ context, onClear, go }) {
           await streamSpecialistRun({
             specialistId: agent.id,
             briefText: `${context.rawBrief || context.title || ""} — mood board tile: ${FACETS[i]}`,
+            brandId: context.brandId,
             briefId: sharedBriefId,
             onProgress: () => {},
             onDone: (img) => {
@@ -1932,6 +1930,7 @@ function BriefRunCanvas({ context, onClear, go }) {
       await streamSpecialistRun({
         specialistId: agent.id,
         briefText:    context.composedBrief,
+        brandId:      context.brandId,
         briefId:      sharedBriefId,
         briefMeta,
         deliverableSpec: dspec ? { ...dspec, withVisualDirection: hasVisual } : undefined,
@@ -2030,6 +2029,7 @@ function BriefRunCanvas({ context, onClear, go }) {
             await streamSpecialistRun({
               specialistId: visualId,
               briefText: context.rawBrief || context.title || "",
+              brandId: context.brandId,
               briefId: sharedBriefId,
               deliverableSpec: { type: group.type, part: "image", count: 1, platform, sourceText: items[i].body, artDirection: items[i].visualDirection || null },
               onProgress: () => {},
@@ -2822,7 +2822,7 @@ function CanvasView({ go }) {
   if (ctx?.mode === "view" && ctx.briefId) {
     return <BriefViewCanvas briefId={ctx.briefId} onClear={clearCtx} go={go} />;
   }
-  if (ctx && Array.isArray(ctx.specialistIds) && ctx.specialistIds.length > 0) {
+  if (ctx && Array.isArray(ctx.specialistIds) && ctx.specialistIds.length > 0 && ctx.brandId) {
     return <BriefRunCanvas context={ctx} onClear={clearCtx} go={go} />;
   }
   /* No run/view context — the old placeholder seed graph (CANVAS_NODES) is

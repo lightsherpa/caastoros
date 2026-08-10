@@ -147,14 +147,14 @@ function getContextLine(routeId) {
 
 /* Stream tokens from POST /api/brandolph/ask. Throws on network/HTTP
    error so the caller can fall back to fakeReply.                       */
-async function streamBrandolph({ history, routeId, onToken, signal }) {
+async function streamBrandolph({ history, routeId, brandId, onToken, signal }) {
   /* apiFetch attaches the session JWT — /api/brandolph/ask is requireAuth,
      so a raw fetch() (no Authorization header) 401s and silently drops the
      floater to the mock reply. apiFetch also returns the streaming Response
      untouched, so SSE reading below is unchanged. */
   const res = await apiFetch("/api/brandolph/ask", {
     method: "POST",
-    body: JSON.stringify({ messages: history, routeId }),
+    body: JSON.stringify({ messages: history, routeId, brandId }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -374,6 +374,7 @@ function FloatingBrandolph() {
       await streamBrandolph({
         history,
         routeId,
+        brandId: currentBrandId,
         onToken: (delta) => {
           setMessages(prev => {
             const copy = prev.slice();

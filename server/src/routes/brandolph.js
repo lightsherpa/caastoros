@@ -32,6 +32,7 @@ app.post("/ask", requireAuth, async (c) => {
   const { workspaceId } = c.get("auth");
   const routeId = typeof body?.routeId === "string" ? body.routeId : null;
   const brandId = typeof body?.brandId === "string" ? body.brandId : null;
+  if (!brandId) return c.json({ error: "Select a brand before asking Brandolph.", code: "BRAND_REQUIRED" }, 400);
 
   let brandBio;
   try {
