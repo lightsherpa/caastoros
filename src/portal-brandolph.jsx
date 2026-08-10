@@ -1,6 +1,7 @@
 import React from "react";
 import { apiFetch, supabase } from "./lib/supabase-browser.js";
 import { briefProgress, daysLeftInCycle, successRate } from "./lib/home-stats.js";
+import { handleComposerKeyDown } from "./lib/editing-shortcuts.js";
 const { BrandolphAvatar, BrandolphDot, Icon, LayerTag, Reveal, StatusPill, StreamedText, useIsTeam } = window;
 
 /* Same SSE helper as portal-briefs's TryPanel — duplicated here to keep
@@ -56,27 +57,31 @@ function getAssembly(density) {
    the tiles only count and label, so we skip outputs.body (image prompts and
    long copy) which would be the bulk of the payload on every home load. */
 function useHomeStats() {
-  const [state, setState] = useBState({ loading: true, briefs: [], credits: null, error: null });
+  const [state, setState] = useBState({ loading: true, briefs: [], credits: null, brand: null, bio: null, error: null });
+  const loadSequence = useBRef(0);
 
   const load = React.useCallback(async () => {
+    const sequence = ++loadSequence.current;
+    setState((current) => ({ ...current, loading: true, error: null }));
     try {
       /* Same brand resolution as the Briefs page: switcher's pick, else the
          first brand. RLS scopes rows to the caller's workspaces regardless. */
       const wantedId = window.getCurrentBrandId?.();
       let brand = null;
       if (wantedId) {
-        const { data } = await supabase.from("brands").select("id").eq("id", wantedId).maybeSingle();
+        const { data, error } = await supabase.from("brands").select("id, name").eq("id", wantedId).maybeSingle();
+        if (error) throw new Error(error.message);
         brand = data;
       }
       if (!brand) {
         /* Surface a failed brand lookup — swallowing it renders the tiles as
            a confident "you have nothing" when we simply couldn't read. */
-        const { data, error: brandErr } = await supabase.from("brands").select("id").order("created_at", { ascending: true }).limit(1);
+        const { data, error: brandErr } = await supabase.from("brands").select("id, name").order("created_at", { ascending: true }).limit(1);
         if (brandErr) throw new Error(brandErr.message);
         brand = data?.[0];
       }
 
-      const [briefsRes, creditsRes] = await Promise.all([
+      const [briefsRes, bioRes, creditsRes] = await Promise.all([
         brand
           ? supabase
               .from("briefs")
@@ -84,16 +89,30 @@ function useHomeStats() {
               .eq("brand_id", brand.id)
               .order("created_at", { ascending: false })
           : Promise.resolve({ data: [] }),
+        brand
+          ? supabase
+              .from("bios")
+              .select("id, version, score, certified, certified_by, certified_at")
+              .eq("brand_id", brand.id)
+              .eq("certified", true)
+              .order("version", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
         apiFetch("/api/credits").then((r) => (r.ok ? r.json() : null)).catch(() => null),
       ]);
 
+      if (sequence !== loadSequence.current) return;
       setState({
         loading: false,
         briefs: briefsRes.data || [],
         credits: creditsRes,
-        error: briefsRes.error?.message || null,
+        brand,
+        bio: bioRes.data || null,
+        error: briefsRes.error?.message || bioRes.error?.message || null,
       });
     } catch (e) {
+      if (sequence !== loadSequence.current) return;
       setState((s) => ({ ...s, loading: false, error: e?.message || String(e) }));
     }
   }, []);
@@ -326,9 +345,7 @@ function HomeCreate({ tweaks, go }) {
     }
   };
 
-  const handleKeyDown = (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleStart();
-  };
+  const handleKeyDown = (e) => handleComposerKeyDown(e, handleStart);
 
   const handleProceed = () => {
     if (!briefBrandId || briefBrandId !== activeBrandId) {
@@ -510,6 +527,8 @@ function HomeCreate({ tweaks, go }) {
               tabIndex={-1}
             >
               <textarea
+                className="brandolph-composer__input"
+                aria-label="Describe the brief you want Brandolph to sharpen"
                 value={input}
                 onChange={(e) => { setInput(e.target.value); if (phase !== "idle") setPhase("idle"); }}
                 onKeyDown={handleKeyDown}
@@ -561,8 +580,17 @@ function HomeCreate({ tweaks, go }) {
               </div>
             </div>
 
-            <div style={{marginTop: 16, fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.06em"}}>
-              <BrandolphDot /> &nbsp;BIO 91% · Brandolph will sharpen your brief before assembly · Asking is free
+            <div aria-live="polite" style={{marginTop: 16, fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
+              <BrandolphDot /> &nbsp;
+              {stats.loading
+                ? "Checking the selected brand and BIO…"
+                : stats.error
+                  ? `BIO status unavailable · ${stats.error}`
+                  : stats.brand && stats.bio
+                    ? `${stats.brand.name} · BIO ${stats.bio.score ?? "—"}/100 · v${stats.bio.version} · ready to sharpen`
+                    : stats.brand
+                      ? `${stats.brand.name} · No certified BIO yet · finish Discovery before briefing`
+                      : "Select a brand before creating a brief"}
             </div>
           </div>
 
