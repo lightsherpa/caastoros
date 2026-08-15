@@ -27,17 +27,21 @@ function useStewardJobs() {
 }
 
 function useStewardJob(jobId) {
-  const [data, setData] = useTState({ job: null, sources: [], you: null, focus: [], error: null, loading: true });
+  const empty = { job: null, sources: [], you: null, focus: [], rubric: null, autoSignals: null };
+  const [data, setData] = useTState({ ...empty, error: null, loading: true });
   const reload = async () => {
-    if (!jobId) { setData({ job: null, sources: [], you: null, focus: [], error: "No job id", loading: false }); return; }
+    if (!jobId) { setData({ ...empty, error: "No job id", loading: false }); return; }
     setData(d => ({ ...d, loading: true, error: null }));
     try {
       const res = await apiFetch(`/api/steward/jobs/${jobId}`);
-      if (!res.ok) { setData({ job: null, sources: [], you: null, focus: [], error: `HTTP ${res.status}`, loading: false }); return; }
+      if (!res.ok) { setData({ ...empty, error: `HTTP ${res.status}`, loading: false }); return; }
       const json = await res.json();
-      setData({ job: json.job, sources: json.sources || [], you: json.you || null, focus: json.focus || [], error: null, loading: false });
+      setData({
+        job: json.job, sources: json.sources || [], you: json.you || null, focus: json.focus || [],
+        rubric: json.rubric || null, autoSignals: json.autoSignals || null, error: null, loading: false,
+      });
     } catch (e) {
-      setData({ job: null, sources: [], you: null, focus: [], error: e?.message || String(e), loading: false });
+      setData({ ...empty, error: e?.message || String(e), loading: false });
     }
   };
   useTEffect(() => { reload(); }, [jobId]);
@@ -463,14 +467,81 @@ function EditableTypeList({ value, onChange }) {
   );
 }
 
+/* RubricPanel — the Steward scores each human criterion 0–4 (anchored) with a
+   confidence. Auto criteria (coverage, grounding) are computed from the BIO's
+   signals and shown read-only. The rubric ENGINE decides the band + decision
+   from these scores server-side — the reviewer scores, the rubric decides. */
+const ANCHORS = ["Absent", "Weak", "Adequate", "Strong", "Exemplary"];
+const CONF_OPTS = [["Low", 0], ["Med", 1], ["High", 2]];
+
+function RubricPanel({ rubric, autoSignals, scores, setScores }) {
+  if (!rubric?.criteria) return null;
+  const human = rubric.criteria.filter((c) => c.source === "human");
+  const auto  = rubric.criteria.filter((c) => c.source === "auto");
+  const sig = autoSignals || {};
+  const autoPct = (c) => c.signal === "coverage"
+    ? Math.round((sig.coverage ?? 0) * 100)
+    : Math.round(((sig.avgConf ?? 0) * 0.7 + (sig.sourceDiversity ?? 0) * 0.3) * 100);
+  const set = (id, patch) => setScores((s) => ({ ...s, [id]: { ...(s[id] || { confidence: 2 }), ...patch } }));
+
+  return (
+    <div style={{padding: 20, borderBottom:"1px solid var(--c-line)"}}>
+      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Rubric · score each criterion</div>
+      {auto.map((c) => (
+        <div key={c.id} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"5px 0", fontSize: 12.5}}>
+          <span style={{color:"var(--c-dim)"}}>{c.label}{c.gating && <span style={{color:"var(--c-faint)"}}> · gate ≥{c.floor}</span>}</span>
+          <span className="pill" style={{height: 18, padding:"0 7px", fontSize: 10}}>auto · {autoPct(c)}%</span>
+        </div>
+      ))}
+      {human.map((c) => {
+        const cur = scores[c.id] || {};
+        return (
+          <div key={c.id} style={{padding:"10px 0", borderTop:"1px dashed var(--c-line-2)"}}>
+            <div style={{fontSize: 12.5, color:"var(--c-ink)", marginBottom: 6}}>
+              {c.label}
+              {c.gating && <span className="pill" style={{marginLeft: 6, height: 16, padding:"0 6px", fontSize: 9, background:"var(--neutral-50)", color:"var(--c-dim)"}}>gate ≥{c.floor}</span>}
+            </div>
+            <div style={{display:"flex", gap: 4, marginBottom: 6}}>
+              {[0, 1, 2, 3, 4].map((n) => (
+                <button key={n} type="button" title={ANCHORS[n]} onClick={() => set(c.id, { score: n })}
+                  style={{flex: 1, padding:"5px 0", fontSize: 12, borderRadius: 6, cursor:"pointer",
+                    border: cur.score === n ? "1px solid var(--yellow-600)" : "1px solid var(--c-line)",
+                    background: cur.score === n ? "var(--yellow-50, rgba(212,175,55,0.16))" : "var(--c-card)",
+                    color: cur.score === n ? "var(--yellow-800)" : "var(--c-dim)", fontWeight: cur.score === n ? 600 : 400}}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <div style={{display:"flex", gap: 6, alignItems:"center"}}>
+              <span style={{fontSize: 10.5, color:"var(--c-faint)"}}>{cur.score != null ? ANCHORS[cur.score] : "not scored"}</span>
+              <span style={{marginLeft:"auto", fontSize: 10.5, color:"var(--c-faint)"}}>confidence</span>
+              {CONF_OPTS.map(([lbl, val]) => (
+                <button key={val} type="button" onClick={() => set(c.id, { confidence: val })}
+                  style={{padding:"2px 7px", fontSize: 10.5, borderRadius: 5, cursor:"pointer", background:"var(--c-card)",
+                    border: (cur.confidence ?? 2) === val ? "1px solid var(--c-ink)" : "1px solid var(--c-line)",
+                    color: (cur.confidence ?? 2) === val ? "var(--c-ink)" : "var(--c-faint)"}}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* TeamJob — Steward review of a candidate BIO.
-   Pulls /api/steward/jobs/:id. The Steward reads the BIO + sources
-   and either certifies (with notes), cancels, or — V2 — patches the
-   BIO before certifying (refinement P1.5-001). */
+   Pulls /api/steward/jobs/:id. The Steward reads the BIO + sources, scores the
+   rubric, and submits — the engine computes the decision (approve /
+   approve_with_conditions / return_changes / reject). May patch the BIO first. */
 function TeamJob({ id, go }) {
-  const { job, sources, you, focus, error, loading, reload } = useStewardJob(id);
+  const { job, sources, you, focus, rubric, autoSignals, error, loading, reload } = useStewardJob(id);
   const [notes, setNotes] = useTState("");
   const [edited, setEdited] = useTState(null);                /* edited BIO payload — null until job loads */
+  const [scores, setScores] = useTState({});                 /* { C3: {score, confidence}, ... } */
+  const [actionItems, setActionItems] = useTState("");       /* one per line → conditions / required_changes */
+  const [rejectReason, setRejectReason] = useTState("");
   const [submitting, setSubmitting] = useTState(false);
   const [submitErr, setSubmitErr] = useTState(null);
   const [submitInfo, setSubmitInfo] = useTState(null);
@@ -479,6 +550,18 @@ function TeamJob({ id, go }) {
   useTEffect(() => {
     if (job?.bio?.payload) setEdited(JSON.parse(JSON.stringify(job.bio.payload)));
   }, [job?.bio?.id]);
+
+  /* Initialize the scoring form from the active rubric's human criteria. */
+  useTEffect(() => {
+    if (rubric?.criteria) {
+      const init = {};
+      rubric.criteria.filter((c) => c.source === "human").forEach((c) => { init[c.id] = { score: null, confidence: 2 }; });
+      setScores(init);
+    }
+  }, [rubric]);
+
+  const humanCriteria = (rubric?.criteria || []).filter((c) => c.source === "human");
+  const allScored = humanCriteria.length > 0 && humanCriteria.every((c) => scores[c.id]?.score != null);
 
   const setPath = (path, value) => {
     setEdited((prev) => {
@@ -495,30 +578,63 @@ function TeamJob({ id, go }) {
 
   const isDirty = edited && job?.bio?.payload && JSON.stringify(edited) !== JSON.stringify(job.bio.payload);
 
-  const submit = async (status) => {
+  /* Submit the rubric decision. The Steward scores criteria; the engine
+     computes approve / approve_with_conditions / return_changes / reject and
+     records it to cert_decisions server-side. */
+  const submitReview = async () => {
     setSubmitting(true); setSubmitErr(null); setSubmitInfo(null);
     try {
-      const body = { status, notes: notes || null };
-      /* Only send bioPatch when the Steward actually edited something — server
-         creates a new BIO version when bioPatch is present, vs. just marks
-         the existing row certified=true. */
-      if (status === "completed" && isDirty) body.bioPatch = edited;
-      const res = await apiFetch(`/api/steward/jobs/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(body),
+      const reviewerScores = {};
+      humanCriteria.forEach((c) => {
+        if (scores[c.id]?.score != null) reviewerScores[c.id] = { score: scores[c.id].score, confidence: scores[c.id].confidence ?? 2 };
       });
+      const items = actionItems.split("\n").map((s) => s.trim()).filter(Boolean);
+      const body = { reviewerScores, notes: notes || null };
+      if (items.length) { body.conditions = items; body.required_changes = items; } // server keeps the one the decision needs
+      if (rejectReason.trim()) body.reject_reason_code = rejectReason.trim();
+      if (isDirty) body.bioPatch = edited; // server creates a new BIO version when present
+
+      const res = await apiFetch(`/api/steward/jobs/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || (json.missingScores ? `Score every criterion: ${json.missingScores.join(", ")}` : `HTTP ${res.status}`));
+
+      const gate = (json.gateFailures || []).length ? ` · gate: ${json.gateFailures.map((g) => g.id).join(", ")}` : "";
+      setSubmitInfo(json.needsLeadApproval
+        ? `Submitted for Lead review — proposed ${json.decision}, ${json.composite}/100${gate}.`
+        : `Decision: ${json.decision} · ${json.composite}/100 (${json.band})${gate}${json.needsCalibration ? " · low-confidence → calibration" : ""}`);
+      setTimeout(() => go("team"), 1600);
+    } catch (e) {
+      setSubmitErr(e?.message || String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const cancel = async () => {
+    setSubmitting(true); setSubmitErr(null); setSubmitInfo(null);
+    try {
+      const res = await apiFetch(`/api/steward/jobs/${id}`, { method: "PATCH", body: JSON.stringify({ status: "cancelled" }) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      if (status === "completed") {
-        if (json.needsLeadApproval) {
-          setSubmitInfo(`Submitted for Lead review · v${json.certifiedVersion}. A Lead Steward will approve before final certification.`);
-        } else {
-          setSubmitInfo(`Certified · v${json.certifiedVersion} by ${json.certifiedBy?.name || "you"}${isDirty ? " (with edits)" : ""}`);
-        }
-      } else {
-        setSubmitInfo("Cancelled");
-      }
-      setTimeout(() => go("team"), 1100);
+      setSubmitInfo("Cancelled");
+      setTimeout(() => go("team"), 1000);
+    } catch (e) {
+      setSubmitErr(e?.message || String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /* Decertify — Lead/super_admin pulls a live certification. */
+  const decertify = async () => {
+    if (!window.confirm("Decertify this BIO? Production pauses until it is re-certified. Briefing stays available and running jobs finish.")) return;
+    setSubmitting(true); setSubmitErr(null); setSubmitInfo(null);
+    try {
+      const res = await apiFetch(`/api/steward/decertify`, { method: "POST", body: JSON.stringify({ brandId: job.brand_id, reason_code: "manual_review", notes: notes || null }) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setSubmitInfo(`Decertified · v${json.decertifiedVersion}. Production paused; a re-review was queued.`);
+      setTimeout(() => go("team"), 1400);
     } catch (e) {
       setSubmitErr(e?.message || String(e));
     } finally {
@@ -710,6 +826,10 @@ function TeamJob({ id, go }) {
           <AddReferencePanel brandId={job.brand_id} onAdded={reload} />
         </div>
 
+        {!isPendingLead && !completed && (
+          <RubricPanel rubric={rubric} autoSignals={autoSignals} scores={scores} setScores={setScores} />
+        )}
+
         <div style={{padding: 20, flex: 1, display:"flex", flexDirection:"column"}}>
           {isPendingLead && (
             <div style={{marginBottom: 14, padding:"10px 12px", background:"var(--purple-50, rgba(160,140,210,0.10))", borderLeft:"3px solid var(--purple-500)", borderRadius: 6, fontSize: 12.5, color:"var(--c-ink)", lineHeight: 1.5}}>
@@ -734,6 +854,30 @@ function TeamJob({ id, go }) {
             style={{resize:"vertical", fontSize: 13, lineHeight: 1.45, padding: 10}}
           />
 
+          {!isPendingLead && !completed && (
+            <>
+              <div className="eyebrow" style={{margin:"14px 0 6px"}}>Conditions / required changes (one per line)</div>
+              <textarea
+                value={actionItems}
+                onChange={(e) => setActionItems(e.target.value)}
+                disabled={submitting}
+                placeholder={"Used when the decision is approve-with-conditions or return-for-changes.\ne.g. Replace the placeholder logo before Visual runs."}
+                rows={3}
+                className="input"
+                style={{resize:"vertical", fontSize: 12.5, lineHeight: 1.4, padding: 9}}
+              />
+              <div className="eyebrow" style={{margin:"12px 0 6px"}}>Reject reason code (only if rejecting)</div>
+              <input
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                disabled={submitting}
+                placeholder="e.g. unverifiable_authority"
+                className="input"
+                style={{fontSize: 12.5, padding: 9}}
+              />
+            </>
+          )}
+
           {submitErr  && <div style={{marginTop: 12, padding:"8px 10px", background:"var(--pink-50, rgba(244,143,177,0.12))", color:"var(--pink-700, var(--pink-500))", borderRadius: 8, fontSize: 12}}>{submitErr}</div>}
           {submitInfo && <div style={{marginTop: 12, padding:"8px 10px", background:"var(--green-50, rgba(127,163,122,0.16))", color:"var(--green-600)", borderRadius: 8, fontSize: 12}}>{submitInfo}</div>}
 
@@ -755,28 +899,46 @@ function TeamJob({ id, go }) {
               </div>
             )
           ) : (
-            <div style={{marginTop: 16, display:"flex", gap: 8}}>
-              <button
-                onClick={() => submit("completed")}
-                disabled={submitting || completed}
-                className="btn btn--primary"
-                style={{flex: 1}}>
-                {submitting ? "…" : completed ? "Already certified" : isDirty ? <>Save edits & certify <Icon name="check" size={13} /></> : <>Certify BIO <Icon name="check" size={13} /></>}
-              </button>
-              <button
-                onClick={() => { if (window.confirm("Cancel this certification job?")) submit("cancelled"); }}
-                disabled={submitting || completed}
-                className="btn btn--ghost btn--sm">
-                Cancel
-              </button>
+            <div style={{marginTop: 16}}>
+              <div style={{display:"flex", gap: 8}}>
+                <button
+                  onClick={submitReview}
+                  disabled={submitting || completed || !allScored}
+                  className="btn btn--primary"
+                  style={{flex: 1}}>
+                  {submitting ? "…" : completed ? "Already reviewed" : isDirty ? <>Save edits & submit review <Icon name="check" size={13} /></> : <>Submit review <Icon name="check" size={13} /></>}
+                </button>
+                <button
+                  onClick={() => { if (window.confirm("Cancel this certification job?")) cancel(); }}
+                  disabled={submitting || completed}
+                  className="btn btn--ghost btn--sm">
+                  Cancel
+                </button>
+              </div>
+              {!allScored && !completed && (
+                <div style={{marginTop: 8, fontSize: 11, color:"var(--c-faint)"}}>Score every rubric criterion above to submit.</div>
+              )}
             </div>
           )}
 
           <div style={{marginTop: 12, fontSize: 11, color:"var(--c-faint)", lineHeight: 1.5}}>
             {isLead && isPendingLead
-              ? <>Approving finalizes the cert and writes <code>lead_reviewed_by</code> on this job. The original Steward stays as <code>certified_by</code>.</>
-              : <>Certifying writes <code>certified_by</code> + <code>certified_at</code>. {(process.env.NODE_ENV !== "production") && "During the first-30-days calibration window, a Lead approves before the cert finalizes."}</>}
+              ? <>Approving finalizes the cert and writes <code>lead_reviewed_by</code>. The original Steward stays as <code>certified_by</code> (four-eyes: you can't approve your own).</>
+              : <>The rubric decides the outcome from your scores; every decision is recorded to <code>cert_decisions</code> for defensibility. Under calibration a Lead approves before an approval finalizes.</>}
           </div>
+
+          {bio.certified && isLead && (
+            <div style={{marginTop: 18, paddingTop: 14, borderTop:"1px solid var(--c-line)"}}>
+              <div className="eyebrow" style={{marginBottom: 6, color:"var(--pink-500)"}}>Decertify</div>
+              <button onClick={decertify} disabled={submitting} className="btn btn--ghost btn--sm"
+                style={{color:"var(--pink-500)", borderColor:"var(--pink-300, rgba(244,143,177,0.4))"}}>
+                Decertify this BIO
+              </button>
+              <div style={{marginTop: 6, fontSize: 11, color:"var(--c-faint)", lineHeight: 1.5}}>
+                Pulls certification. New/queued production blocks immediately; running jobs finish; completed outputs keep their chip; briefing stays up. A re-review is queued.
+              </div>
+            </div>
+          )}
         </div>
       </aside>
     </div>

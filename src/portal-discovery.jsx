@@ -961,6 +961,70 @@ function fieldsToPayload(bio, prevPayload) {
   };
 }
 
+/* SelfCertPanel — stage-1 client attestation. Three statements → POST
+   /self-certify → flips self_certified, which UNLOCKS briefing. Production
+   still waits for a human Steward. (The richer per-field accurate/aspirational
+   marking lands with the discovery S12 rebuild in M3.) */
+function SelfCertPanel({ brandId, bio, onDone }) {
+  const [st, setSt] = useDState({ authority: false, reflects: false, aspirationalMarked: false });
+  const [busy, setBusy] = useDState(false);
+  const [err, setErr] = useDState(null);
+  const allChecked = st.authority && st.reflects && st.aspirationalMarked;
+
+  if (bio?.self_certified) {
+    return (
+      <div className="card" style={{padding:"10px 14px", marginBottom: 18, borderLeft:"3px solid var(--green-500)", display:"flex", alignItems:"center", gap: 10}}>
+        <Icon name="check" size={15} />
+        <div style={{fontSize: 13, color:"var(--c-ink)"}}>
+          <strong>Self-attested</strong> — briefing is unlocked. Production stays gated until your Brand Steward certifies.
+        </div>
+      </div>
+    );
+  }
+
+  const submit = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const res = await apiFetch(`/api/bios/${brandId}/self-certify`, {
+        method: "POST",
+        body: JSON.stringify({ statements: { authority: st.authority, reflects: st.reflects, aspirationalMarked: st.aspirationalMarked }, statementVersion: "1" }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (j.code === "HIGH_IMPORTANCE_GAPS") throw new Error(`Fill these before self-certifying: ${(j.fields || []).join(", ")}`);
+        if (j.code === "BELOW_MIN_SCORE") throw new Error(`BIO score ${j.score} is below the ${j.minScore} needed — add sources to raise it.`);
+        throw new Error(j.error || `HTTP ${res.status}`);
+      }
+      if (onDone) onDone();
+    } catch (e) { setErr(e?.message || String(e)); } finally { setBusy(false); }
+  };
+
+  const Check = ({ k, children }) => (
+    <label style={{display:"flex", gap: 8, alignItems:"flex-start", fontSize: 12.5, color:"var(--c-ink)", cursor:"pointer", lineHeight: 1.45}}>
+      <input type="checkbox" checked={st[k]} onChange={(e) => setSt((s) => ({ ...s, [k]: e.target.checked }))} style={{marginTop: 2}} />
+      <span>{children}</span>
+    </label>
+  );
+
+  return (
+    <div className="card" style={{padding:"14px 16px", marginBottom: 18, borderLeft:"3px solid var(--yellow-500)"}}>
+      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 8}}>Self-certify to start briefing</div>
+      <div style={{fontSize: 12.5, color:"var(--c-dim)", marginBottom: 10, lineHeight: 1.5}}>
+        Confirm the BIO is accurate enough to brief against. This unlocks briefing now; a senior Brand Steward still certifies before production.
+      </div>
+      <div style={{display:"flex", flexDirection:"column", gap: 8, marginBottom: 12}}>
+        <Check k="authority">I'm authorized to represent this brand.</Check>
+        <Check k="reflects">This BIO reflects the brand as it actually is.</Check>
+        <Check k="aspirationalMarked">I've separated what's factual from what's aspirational.</Check>
+      </div>
+      {err && <div style={{fontSize: 12, color:"var(--pink-500)", marginBottom: 8}}>{err}</div>}
+      <button className="btn btn--primary btn--sm" disabled={!allChecked || busy} onClick={submit}>
+        {busy ? "Submitting…" : "Self-certify & unlock briefing"}
+      </button>
+    </div>
+  );
+}
+
 function BioViewer({ go, bioScore = 91 }) {
   const [tab, setTab] = useDState("identity");
   const [feed, setFeed] = useDState("");
@@ -1130,6 +1194,11 @@ function BioViewer({ go, bioScore = 91 }) {
             </span>
           )}
         </div>
+      )}
+
+      {/* Stage-1 self-certification — unlocks briefing (shown until human cert lands) */}
+      {live.brandId && live.bio && !live.cert && (
+        <SelfCertPanel brandId={live.brandId} bio={live.bio} onDone={live.refresh} />
       )}
 
       {/* Hero */}

@@ -28,14 +28,31 @@ export async function assignSteward(stewardJobId) {
   if (jobErr) throw new Error(`assignSteward: load job failed — ${jobErr.message}`);
   if (!job) throw new Error(`assignSteward: job ${stewardJobId} not found`);
 
-  /* 1 + 2. Eligible Stewards. The rotation exclusion (TODO: P3+) would
-     filter out anyone listed on a non-completed `runs` row for this brand. */
-  const { data: stewards } = await supabaseAdmin
+  /* 1. Eligible Stewards. */
+  let { data: stewards } = await supabaseAdmin
     .from("team_members")
     .select("id, first_name, user_id")
     .contains("roles", ["steward"])
     .eq("active", true)
     .not("user_id", "is", null); // must have a login: they need to be notified AND certify
+
+  /* 2. Rotation rule (rev-2 §5.1): a Steward never certifies a brand they
+     craft on. Exclude any Steward whose user id appears as a craft deliverer
+     on one of this brand's outputs. If that empties the pool, the capacity
+     fallback below routes to a Lead. */
+  if (stewards && stewards.length) {
+    const { data: briefRows } = await supabaseAdmin.from("briefs").select("id").eq("brand_id", job.brand_id);
+    const briefIds = (briefRows || []).map((b) => b.id);
+    if (briefIds.length) {
+      const { data: outs } = await supabaseAdmin.from("outputs").select("body").in("brief_id", briefIds);
+      const crafters = new Set();
+      for (const o of outs || []) {
+        const dels = o.body?.deliverables;
+        if (Array.isArray(dels)) for (const d of dels) if (d?.craft?.delivered_by) crafters.add(d.craft.delivered_by);
+      }
+      if (crafters.size) stewards = stewards.filter((s) => !crafters.has(s.user_id));
+    }
+  }
 
   if (stewards && stewards.length > 0) {
     /* 3. Round-robin by least-recent assignment.
