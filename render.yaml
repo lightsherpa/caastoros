@@ -3,7 +3,7 @@ services:
     runtime: node
     name: caastoros-app
     plan: free
-    branch: feature/image-quality-overhaul
+    branch: main
     buildCommand: npm ci --include=dev && npm run build && cd server && npm ci
     startCommand: npm start
     healthCheckPath: /healthz
