@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale } from "./lib/i18n.js";
 import { apiFetch } from "./lib/supabase-browser.js";
 const { BrandolphDot, Confidence, Counter, Icon, ModelChip, PageHeader, SlaHeat, StatusPill } = window;
 /* Team portal — queue, job workspace, capacity, clients, earnings. */
@@ -66,6 +67,7 @@ function relativeTime(iso) {
    (TeamJob) where the Steward reads the candidate BIO + sources and
    submits a certification.                                              */
 function TeamQueue({ go }) {
+  const { t } = useLocale();
   const { jobs, you, error, loading, reload } = useStewardJobs();
   const [filter, setFilter] = useTState("all");
 
@@ -86,10 +88,10 @@ function TeamQueue({ go }) {
       <section className="scroll" style={{padding: "24px 32px 40px", overflowY:"auto"}}>
         <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap: 14, marginBottom: 24}}>
           {[
-            { kpi: queuedCount,   label:"Queued"           },
-            { kpi: reviewCount,    label:"In review"         },
-            { kpi: mineCount,      label:"Yours · open"      },
-            { kpi: overrideCount,  label:"Capacity overrides" },
+            { kpi: queuedCount,   label:t("team.queued")            },
+            { kpi: reviewCount,    label:t("team.inReview")          },
+            { kpi: mineCount,      label:t("team.yoursOpen")         },
+            { kpi: overrideCount,  label:t("team.capacityOverrides") },
           ].map((s, i) => (
             <div key={i} className="card" style={{padding: 18}}>
               <div className="eyebrow" style={{marginBottom: 6}}>{s.label}</div>
@@ -102,15 +104,15 @@ function TeamQueue({ go }) {
 
         <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 14}}>
           <h2 style={{fontSize: 20, margin: 0, letterSpacing:"-0.01em"}}>
-            Steward queue · {loading ? "…" : list.length}
+            {t("team.stewardQueue")} · {loading ? "…" : list.length}
           </h2>
           <div style={{display:"flex", gap: 6, flexWrap:"wrap", alignItems:"center"}}>
-            {[["all","All"],["queued","Queued"],["in_review","In review"],["pending_lead_review","Pending Lead"],["unassigned","Unassigned"],["mine","Mine"]].map(([k, l]) => (
+            {[["all",t("team.filterAll")],["queued",t("team.queued")],["in_review",t("team.inReview")],["pending_lead_review",t("team.filterPendingLead")],["unassigned",t("team.unassigned")],["mine",t("team.filterMine")]].map(([k, l]) => (
               <button key={k} onClick={() => setFilter(k)}
                 className={"pill" + (filter === k ? " pill--dark" : "")}
                 style={{cursor:"pointer", height: 28, padding:"0 12px"}}>{l}</button>
             ))}
-            <button onClick={reload} className="btn btn--ghost btn--sm" style={{height: 28}} title="Reload">
+            <button onClick={reload} className="btn btn--ghost btn--sm" style={{height: 28}} title={t("team.reload")}>
               <Icon name="refresh" size={13} />
             </button>
           </div>
@@ -126,7 +128,7 @@ function TeamQueue({ go }) {
           <table style={{width:"100%", borderCollapse:"collapse", fontSize: 13}}>
             <thead>
               <tr style={{background:"var(--c-bg)", borderBottom:"1px solid var(--c-line)"}}>
-                {["Brand","Kind","Queued","Status","Assignee",""].map((h, i) => (
+                {[t("team.colBrand"),t("team.colKind"),t("team.queued"),t("team.colStatus"),t("team.colAssignee"),""].map((h, i) => (
                   <th key={i} style={{textAlign:"left", padding:"10px 14px", fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight: 500}}>{h}</th>
                 ))}
               </tr>
@@ -134,7 +136,7 @@ function TeamQueue({ go }) {
             <tbody className="stagger">
               {!loading && list.length === 0 && (
                 <tr><td colSpan={6} style={{padding: 28, textAlign:"center", color:"var(--c-faint)", fontSize: 13}}>
-                  No jobs match this filter. Fire a Discovery run to create one: <code style={{fontFamily:"var(--font-mono)", fontSize:12}}>npm run test:discovery</code>
+                  {t("team.queueEmpty")} <code style={{fontFamily:"var(--font-mono)", fontSize:12}}>npm run test:discovery</code>
                 </td></tr>
               )}
               {list.map((j, i) => {
@@ -144,7 +146,7 @@ function TeamQueue({ go }) {
                 if (j.override_reason) borderLeft = "2px solid var(--pink-500)";
                 else if (mine) borderLeft = "2px solid var(--yellow-500)";
                 else if (unassigned) borderLeft = "2px solid var(--mint-500)";
-                const brandName = j.brand?.name || "(brand)";
+                const brandName = j.brand?.name || t("team.brandFallback");
                 const initial = brandName[0]?.toUpperCase() || "?";
                 return (
                   <tr key={j.id} onClick={() => go("team-job/" + j.id)} style={{
@@ -171,11 +173,11 @@ function TeamQueue({ go }) {
                     <td style={{padding:"12px 14px"}}><StatusPill status={j.status === "in_review" ? "review" : j.status === "queued" ? "unassigned" : j.status === "pending_lead_review" ? "review" : j.status} /></td>
                     <td style={{padding:"12px 14px"}}>
                       {mine ? (
-                        <span style={{fontSize: 12.5, color:"var(--c-ink)", fontWeight:500}}>You</span>
+                        <span style={{fontSize: 12.5, color:"var(--c-ink)", fontWeight:500}}>{t("team.you")}</span>
                       ) : j.assigned_to ? (
-                        <span style={{fontSize: 12.5, color:"var(--c-dim)"}}>Assigned</span>
+                        <span style={{fontSize: 12.5, color:"var(--c-dim)"}}>{t("team.assigned")}</span>
                       ) : (
-                        <span style={{fontSize: 12.5, color:"var(--c-faint)"}}>Unassigned</span>
+                        <span style={{fontSize: 12.5, color:"var(--c-faint)"}}>{t("team.unassigned")}</span>
                       )}
                     </td>
                     <td style={{padding:"12px 8px"}}><Icon name="arrow" size={14} /></td>
@@ -189,7 +191,7 @@ function TeamQueue({ go }) {
 
       <aside className="tqueue-right scroll" style={{borderLeft:"1px solid var(--c-line)", background:"var(--c-card)", overflowY:"auto"}}>
         <div style={{padding: "20px"}}>
-          <div className="eyebrow" style={{marginBottom: 12}}>You</div>
+          <div className="eyebrow" style={{marginBottom: 12}}>{t("team.you")}</div>
           <div className="card" style={{padding: 14, marginBottom: 18}}>
             {you ? (
               <>
@@ -201,14 +203,13 @@ function TeamQueue({ go }) {
                 </div>
               </>
             ) : (
-              <div style={{fontSize: 12, color:"var(--c-faint)"}}>Not a Steward — run <code>EMAIL=you npm run grant:steward</code></div>
+              <div style={{fontSize: 12, color:"var(--c-faint)"}}>{t("team.notSteward")}<code>EMAIL=you npm run grant:steward</code></div>
             )}
           </div>
 
-          <div className="eyebrow" style={{marginBottom: 12}}>About these jobs</div>
+          <div className="eyebrow" style={{marginBottom: 12}}>{t("team.aboutJobs")}</div>
           <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.55}}>
-            Each row is a brand awaiting BIO certification — a senior human review before any specialist run reads from it.
-            The moat: every output ships <em>"certified by {you?.first_name || "Marina"}"</em>.
+            {t("team.aboutJobsBody")}<em>"{t("team.certifiedByName", { name: you?.first_name || "Marina" })}"</em>.
             <div style={{marginTop: 12, fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>rev-2 §5 · P1.5</div>
           </div>
         </div>
@@ -266,7 +267,9 @@ function EditableText({ label, value, onChange, placeholder, multiline = true, a
   );
 }
 
-function EditableChipList({ label, value, onChange, placeholder = "+ Add", strike = false, accent = null }) {
+function EditableChipList({ label, value, onChange, placeholder, strike = false, accent = null }) {
+  const { t } = useLocale();
+  const ph = placeholder ?? t("team.addGeneric");
   const [draft, setDraft] = useTState("");
   const list = Array.isArray(value) ? value : [];
   const commit = () => {
@@ -291,7 +294,7 @@ function EditableChipList({ label, value, onChange, placeholder = "+ Add", strik
             display:"inline-flex", alignItems:"center", gap: 4,
           }}>
             <span>{String(v)}</span>
-            <button type="button" onClick={() => remove(i)} aria-label={`Remove ${v}`}
+            <button type="button" onClick={() => remove(i)} aria-label={t("team.removeItem", { item: v })}
               style={{border:"none", background:"transparent", cursor:"pointer", color:"inherit", opacity: 0.55, lineHeight: 1, padding:"2px 4px"}}
               onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
               onMouseLeave={(e) => e.currentTarget.style.opacity = 0.55}>×</button>
@@ -302,7 +305,7 @@ function EditableChipList({ label, value, onChange, placeholder = "+ Add", strik
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } e.stopPropagation(); }}
           onBlur={() => draft.trim() && commit()}
-          placeholder={placeholder}
+          placeholder={ph}
           style={{
             height: 24, padding:"0 8px", borderRadius: 999,
             border: "1px dashed var(--c-line-2)", background: "transparent",
@@ -316,28 +319,29 @@ function EditableChipList({ label, value, onChange, placeholder = "+ Add", strik
 }
 
 function EditablePalette({ value, onChange }) {
+  const { t } = useLocale();
   const list = Array.isArray(value) ? value : [];
   const update = (i, patch) => onChange(list.map((c, idx) => idx === i ? { ...c, ...patch } : c));
   const remove = (i) => onChange(list.filter((_, idx) => idx !== i));
   const add    = () => onChange([...list, { hex: "#1F1A14", name: "" }]);
   return (
     <div style={{marginBottom: 14}}>
-      <div className="eyebrow" style={{marginBottom: 6}}>Palette</div>
+      <div className="eyebrow" style={{marginBottom: 6}}>{t("team.palette")}</div>
       <div style={{display:"flex", flexWrap:"wrap", gap: 8}}>
         {list.map((c, i) => (
           <div key={i} style={{display:"flex", alignItems:"center", gap: 6, padding: 4, border:"1px solid var(--c-line)", borderRadius: 8}}>
             <input type="color" value={c.hex || "#000000"} onChange={(e) => update(i, { hex: e.target.value })}
               style={{width: 28, height: 28, border:"none", padding: 0, background:"transparent", cursor:"pointer", borderRadius: 4}} />
             <input value={c.name || ""} onChange={(e) => update(i, { name: e.target.value })}
-              placeholder="name"
+              placeholder={t("team.namePlaceholder")}
               style={{width: 80, border:"none", outline:"none", fontSize: 12, fontFamily:"inherit", background:"transparent", color:"var(--c-ink)"}} />
-            <button type="button" onClick={() => remove(i)} aria-label="Remove color"
+            <button type="button" onClick={() => remove(i)} aria-label={t("team.removeColor")}
               style={{border:"none", background:"transparent", cursor:"pointer", color:"var(--c-faint)", padding:"0 4px"}}>×</button>
           </div>
         ))}
         <button type="button" onClick={add}
           style={{height: 36, padding:"0 12px", border:"1px dashed var(--c-line-2)", borderRadius: 8, background:"transparent", cursor:"pointer", fontSize: 12, color:"var(--c-dim)"}}>
-          + Add color
+          {t("team.addColor")}
         </button>
       </div>
     </div>
@@ -349,6 +353,7 @@ function EditablePalette({ value, onChange }) {
    Files land in the `bio-sources` Storage bucket and write rows to
    uploads + bio_sources. */
 function AddReferencePanel({ brandId, onAdded }) {
+  const { t } = useLocale();
   const [bucket, setBucket] = useTState("foundations");
   const [url, setUrl] = useTState("");
   const [busy, setBusy] = useTState(false);
@@ -368,7 +373,7 @@ function AddReferencePanel({ brandId, onAdded }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      setInfo(`Added URL to ${bucket}`);
+      setInfo(t("team.addedUrlTo", { bucket }));
       reset();
       onAdded && onAdded();
     } catch (e) { setErr(e?.message || String(e)); }
@@ -391,7 +396,7 @@ function AddReferencePanel({ brandId, onAdded }) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      setInfo(`Uploaded "${file.name}" to ${bucket}`);
+      setInfo(t("team.uploadedTo", { name: file.name, bucket }));
       if (fileRef.current) fileRef.current.value = "";
       onAdded && onAdded();
     } catch (e) { setErr(e?.message || String(e)); }
@@ -400,9 +405,9 @@ function AddReferencePanel({ brandId, onAdded }) {
 
   return (
     <div style={{padding: 16, border:"1px dashed var(--c-line-2)", borderRadius: 10, background:"var(--c-bg)", marginTop: 14}}>
-      <div className="eyebrow" style={{marginBottom: 8}}>Add reference</div>
+      <div className="eyebrow" style={{marginBottom: 8}}>{t("team.addReference")}</div>
       <div style={{display:"flex", gap: 4, marginBottom: 10}}>
-        {[["foundations","Foundations"],["visual","Visual"],["voice","Voice"]].map(([k, l]) => (
+        {[["foundations",t("team.bucketFoundations")],["visual",t("team.bucketVisual")],["voice",t("team.bucketVoice")]].map(([k, l]) => (
           <button key={k} type="button" onClick={() => setBucket(k)}
             className={"pill" + (bucket === k ? " pill--dark" : "")}
             style={{cursor:"pointer", height: 22, padding:"0 9px", fontSize: 11}}>{l}</button>
@@ -415,11 +420,11 @@ function AddReferencePanel({ brandId, onAdded }) {
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitUrl(); } e.stopPropagation(); }}
           disabled={busy}
-          placeholder="Paste a URL…"
+          placeholder={t("team.pasteUrl")}
           style={{flex: 1, height: 30, padding:"0 10px", border:"1px solid var(--c-line)", borderRadius: 6, fontSize: 12, fontFamily:"inherit", background:"var(--c-card)", outline:"none"}}
         />
         <button type="button" onClick={submitUrl} disabled={busy || !url.trim()}
-          className="btn btn--ghost btn--sm" style={{height: 30}}>Add URL</button>
+          className="btn btn--ghost btn--sm" style={{height: 30}}>{t("team.addUrl")}</button>
       </div>
 
       <label style={{display:"flex", alignItems:"center", gap: 8, fontSize: 12, color:"var(--c-dim)", cursor:"pointer"}}>
@@ -429,7 +434,7 @@ function AddReferencePanel({ brandId, onAdded }) {
           style={{flex: 1, fontSize: 12}}
         />
       </label>
-      <div style={{fontSize: 10.5, color:"var(--c-faint)", marginTop: 6}}>Max 50MB · PDF, image, .doc, .txt, .md</div>
+      <div style={{fontSize: 10.5, color:"var(--c-faint)", marginTop: 6}}>{t("team.fileHint")}</div>
 
       {err  && <div style={{marginTop: 8, padding:"6px 10px", background:"var(--pink-50, rgba(244,143,177,0.12))", color:"var(--pink-700, var(--pink-500))", borderRadius: 6, fontSize: 11.5}}>{err}</div>}
       {info && <div style={{marginTop: 8, padding:"6px 10px", background:"var(--green-50, rgba(127,163,122,0.16))", color:"var(--green-600)", borderRadius: 6, fontSize: 11.5}}>{info}</div>}
@@ -438,29 +443,30 @@ function AddReferencePanel({ brandId, onAdded }) {
 }
 
 function EditableTypeList({ value, onChange }) {
+  const { t } = useLocale();
   const list = Array.isArray(value) ? value : [];
-  const update = (i, patch) => onChange(list.map((t, idx) => idx === i ? { ...t, ...patch } : t));
+  const update = (i, patch) => onChange(list.map((ty, idx) => idx === i ? { ...ty, ...patch } : ty));
   const remove = (i) => onChange(list.filter((_, idx) => idx !== i));
   const add    = () => onChange([...list, { kind: "Body", family: "" }]);
   return (
     <div style={{marginBottom: 14}}>
-      <div className="eyebrow" style={{marginBottom: 6}}>Typography</div>
+      <div className="eyebrow" style={{marginBottom: 6}}>{t("team.typography")}</div>
       <div style={{display:"flex", flexDirection:"column", gap: 6}}>
-        {list.map((t, i) => (
+        {list.map((ty, i) => (
           <div key={i} style={{display:"flex", alignItems:"center", gap: 8}}>
-            <input value={t.kind || ""} onChange={(e) => update(i, { kind: e.target.value })}
-              placeholder="Kind (e.g. Display)"
+            <input value={ty.kind || ""} onChange={(e) => update(i, { kind: e.target.value })}
+              placeholder={t("team.typeKindPlaceholder")}
               style={{width: 130, height: 28, padding:"0 10px", border:"1px solid var(--c-line)", borderRadius: 6, fontSize: 12.5, fontFamily:"inherit", background:"var(--c-card)", outline:"none"}} />
-            <input value={t.family || ""} onChange={(e) => update(i, { family: e.target.value })}
-              placeholder="Family (e.g. Söhne Breit)"
+            <input value={ty.family || ""} onChange={(e) => update(i, { family: e.target.value })}
+              placeholder={t("team.typeFamilyPlaceholder")}
               style={{flex: 1, height: 28, padding:"0 10px", border:"1px solid var(--c-line)", borderRadius: 6, fontSize: 12.5, fontFamily:"inherit", background:"var(--c-card)", outline:"none"}} />
-            <button type="button" onClick={() => remove(i)} aria-label="Remove typeface"
+            <button type="button" onClick={() => remove(i)} aria-label={t("team.removeTypeface")}
               style={{border:"none", background:"transparent", cursor:"pointer", color:"var(--c-faint)", padding:"0 6px"}}>×</button>
           </div>
         ))}
         <button type="button" onClick={add}
           style={{alignSelf:"flex-start", height: 28, padding:"0 12px", border:"1px dashed var(--c-line-2)", borderRadius: 6, background:"transparent", cursor:"pointer", fontSize: 12, color:"var(--c-dim)"}}>
-          + Add typeface
+          {t("team.addTypeface")}
         </button>
       </div>
     </div>
@@ -471,10 +477,10 @@ function EditableTypeList({ value, onChange }) {
    confidence. Auto criteria (coverage, grounding) are computed from the BIO's
    signals and shown read-only. The rubric ENGINE decides the band + decision
    from these scores server-side — the reviewer scores, the rubric decides. */
-const ANCHORS = ["Absent", "Weak", "Adequate", "Strong", "Exemplary"];
-const CONF_OPTS = [["Low", 0], ["Med", 1], ["High", 2]];
-
 function RubricPanel({ rubric, autoSignals, scores, setScores }) {
+  const { t } = useLocale();
+  const ANCHORS = [t("team.anchorAbsent"), t("team.anchorWeak"), t("team.anchorAdequate"), t("team.anchorStrong"), t("team.anchorExemplary")];
+  const CONF_OPTS = [[t("team.confLow"), 0], [t("team.confMed"), 1], [t("team.confHigh"), 2]];
   if (!rubric?.criteria) return null;
   const human = rubric.criteria.filter((c) => c.source === "human");
   const auto  = rubric.criteria.filter((c) => c.source === "auto");
@@ -486,11 +492,11 @@ function RubricPanel({ rubric, autoSignals, scores, setScores }) {
 
   return (
     <div style={{padding: 20, borderBottom:"1px solid var(--c-line)"}}>
-      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Rubric · score each criterion</div>
+      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>{t("team.rubricScore")}</div>
       {auto.map((c) => (
         <div key={c.id} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"5px 0", fontSize: 12.5}}>
-          <span style={{color:"var(--c-dim)"}}>{c.label}{c.gating && <span style={{color:"var(--c-faint)"}}> · gate ≥{c.floor}</span>}</span>
-          <span className="pill" style={{height: 18, padding:"0 7px", fontSize: 10}}>auto · {autoPct(c)}%</span>
+          <span style={{color:"var(--c-dim)"}}>{c.label}{c.gating && <span style={{color:"var(--c-faint)"}}> · {t("team.gateFloor", { floor: c.floor })}</span>}</span>
+          <span className="pill" style={{height: 18, padding:"0 7px", fontSize: 10}}>{t("team.autoPct", { pct: autoPct(c) })}</span>
         </div>
       ))}
       {human.map((c) => {
@@ -499,7 +505,7 @@ function RubricPanel({ rubric, autoSignals, scores, setScores }) {
           <div key={c.id} style={{padding:"10px 0", borderTop:"1px dashed var(--c-line-2)"}}>
             <div style={{fontSize: 12.5, color:"var(--c-ink)", marginBottom: 6}}>
               {c.label}
-              {c.gating && <span className="pill" style={{marginLeft: 6, height: 16, padding:"0 6px", fontSize: 9, background:"var(--neutral-50)", color:"var(--c-dim)"}}>gate ≥{c.floor}</span>}
+              {c.gating && <span className="pill" style={{marginLeft: 6, height: 16, padding:"0 6px", fontSize: 9, background:"var(--neutral-50)", color:"var(--c-dim)"}}>{t("team.gateFloor", { floor: c.floor })}</span>}
             </div>
             <div style={{display:"flex", gap: 4, marginBottom: 6}}>
               {[0, 1, 2, 3, 4].map((n) => (
@@ -513,8 +519,8 @@ function RubricPanel({ rubric, autoSignals, scores, setScores }) {
               ))}
             </div>
             <div style={{display:"flex", gap: 6, alignItems:"center"}}>
-              <span style={{fontSize: 10.5, color:"var(--c-faint)"}}>{cur.score != null ? ANCHORS[cur.score] : "not scored"}</span>
-              <span style={{marginLeft:"auto", fontSize: 10.5, color:"var(--c-faint)"}}>confidence</span>
+              <span style={{fontSize: 10.5, color:"var(--c-faint)"}}>{cur.score != null ? ANCHORS[cur.score] : t("team.notScored")}</span>
+              <span style={{marginLeft:"auto", fontSize: 10.5, color:"var(--c-faint)"}}>{t("team.confidence")}</span>
               {CONF_OPTS.map(([lbl, val]) => (
                 <button key={val} type="button" onClick={() => set(c.id, { confidence: val })}
                   style={{padding:"2px 7px", fontSize: 10.5, borderRadius: 5, cursor:"pointer", background:"var(--c-card)",
@@ -536,6 +542,7 @@ function RubricPanel({ rubric, autoSignals, scores, setScores }) {
    rubric, and submits — the engine computes the decision (approve /
    approve_with_conditions / return_changes / reject). May patch the BIO first. */
 function TeamJob({ id, go }) {
+  const { t } = useLocale();
   const { job, sources, you, focus, rubric, autoSignals, error, loading, reload } = useStewardJob(id);
   const [notes, setNotes] = useTState("");
   const [edited, setEdited] = useTState(null);                /* edited BIO payload — null until job loads */
@@ -596,12 +603,12 @@ function TeamJob({ id, go }) {
 
       const res = await apiFetch(`/api/steward/jobs/${id}`, { method: "PATCH", body: JSON.stringify(body) });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || (json.missingScores ? `Score every criterion: ${json.missingScores.join(", ")}` : `HTTP ${res.status}`));
+      if (!res.ok) throw new Error(json.error || (json.missingScores ? t("team.scoreEveryCriterion", { list: json.missingScores.join(", ") }) : `HTTP ${res.status}`));
 
-      const gate = (json.gateFailures || []).length ? ` · gate: ${json.gateFailures.map((g) => g.id).join(", ")}` : "";
+      const gate = (json.gateFailures || []).length ? t("team.gateSuffix", { ids: json.gateFailures.map((g) => g.id).join(", ") }) : "";
       setSubmitInfo(json.needsLeadApproval
-        ? `Submitted for Lead review — proposed ${json.decision}, ${json.composite}/100${gate}.`
-        : `Decision: ${json.decision} · ${json.composite}/100 (${json.band})${gate}${json.needsCalibration ? " · low-confidence → calibration" : ""}`);
+        ? t("team.submittedForLead", { decision: json.decision, composite: json.composite, gate })
+        : t("team.decisionResult", { decision: json.decision, composite: json.composite, band: json.band, gate, cal: json.needsCalibration ? t("team.calibrationSuffix") : "" }));
       setTimeout(() => go("team"), 1600);
     } catch (e) {
       setSubmitErr(e?.message || String(e));
@@ -616,7 +623,7 @@ function TeamJob({ id, go }) {
       const res = await apiFetch(`/api/steward/jobs/${id}`, { method: "PATCH", body: JSON.stringify({ status: "cancelled" }) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      setSubmitInfo("Cancelled");
+      setSubmitInfo(t("team.cancelled"));
       setTimeout(() => go("team"), 1000);
     } catch (e) {
       setSubmitErr(e?.message || String(e));
@@ -627,13 +634,13 @@ function TeamJob({ id, go }) {
 
   /* Decertify — Lead/super_admin pulls a live certification. */
   const decertify = async () => {
-    if (!window.confirm("Decertify this BIO? Production pauses until it is re-certified. Briefing stays available and running jobs finish.")) return;
+    if (!window.confirm(t("team.confirmDecertify"))) return;
     setSubmitting(true); setSubmitErr(null); setSubmitInfo(null);
     try {
       const res = await apiFetch(`/api/steward/decertify`, { method: "POST", body: JSON.stringify({ brandId: job.brand_id, reason_code: "manual_review", notes: notes || null }) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      setSubmitInfo(`Decertified · v${json.decertifiedVersion}. Production paused; a re-review was queued.`);
+      setSubmitInfo(t("team.decertified", { version: json.decertifiedVersion }));
       setTimeout(() => go("team"), 1400);
     } catch (e) {
       setSubmitErr(e?.message || String(e));
@@ -655,8 +662,8 @@ function TeamJob({ id, go }) {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       setSubmitInfo(approve
-        ? `Approved as Lead · v${json.certifiedVersion} now live.`
-        : "Sent back to the Steward for revision."
+        ? t("team.approvedAsLead", { version: json.certifiedVersion })
+        : t("team.sentBackRevision")
       );
       setTimeout(() => go("team"), 1100);
     } catch (e) {
@@ -667,16 +674,16 @@ function TeamJob({ id, go }) {
   };
 
   if (loading) {
-    return <div style={{padding: 40, textAlign:"center", color:"var(--c-faint)"}}>Loading…</div>;
+    return <div style={{padding: 40, textAlign:"center", color:"var(--c-faint)"}}>{t("team.loading")}</div>;
   }
   if (error || !job) {
     return (
       <div style={{padding: 40}}>
         <button onClick={() => go("team")} className="btn btn--link" style={{fontSize: 12, marginBottom: 16}}>
-          <Icon name="arrowLeft" size={13} /> Job queue
+          <Icon name="arrowLeft" size={13} /> {t("team.jobQueue")}
         </button>
         <div className="card" style={{padding: 18, borderLeft:"3px solid var(--pink-500)"}}>
-          <div style={{fontSize: 14}}>{error || "Job not found."}</div>
+          <div style={{fontSize: 14}}>{error || t("team.jobNotFound")}</div>
         </div>
       </div>
     );
@@ -692,6 +699,12 @@ function TeamJob({ id, go }) {
     voice:       sources.filter(s => s.bucket === "voice"),
     other:       sources.filter(s => !s.bucket),
   };
+  const BUCKET_LABEL = {
+    foundations: t("team.bucketFoundations"),
+    visual:      t("team.bucketVisual"),
+    voice:       t("team.bucketVoice"),
+    other:       t("team.bucketOther"),
+  };
   const completed = job.status === "completed";
 
   return (
@@ -701,64 +714,64 @@ function TeamJob({ id, go }) {
         <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom: 18}}>
           <div>
             <button onClick={() => go("team")} className="btn btn--link" style={{fontSize: 12, marginBottom: 8}}>
-              <Icon name="arrowLeft" size={13} /> Steward queue
+              <Icon name="arrowLeft" size={13} /> {t("team.stewardQueue")}
             </button>
             <div style={{display:"flex", alignItems:"baseline", gap: 10, marginBottom: 4}}>
-              <h1 style={{margin: 0, fontSize: 26, letterSpacing:"-0.01em"}}>{job.brand?.name || "(brand)"}</h1>
+              <h1 style={{margin: 0, fontSize: 26, letterSpacing:"-0.01em"}}>{job.brand?.name || t("team.brandFallback")}</h1>
               <span className="pill" style={{height: 22, padding:"0 9px", fontSize: 11}}>{job.kind}</span>
-              {bio.certified && <span className="pill" style={{height: 22, padding:"0 9px", fontSize: 11, background:"var(--green-50, rgba(127,163,122,0.16))", color:"var(--green-600)"}}>certified v{bio.version}</span>}
+              {bio.certified && <span className="pill" style={{height: 22, padding:"0 9px", fontSize: 11, background:"var(--green-50, rgba(127,163,122,0.16))", color:"var(--green-600)"}}>{t("team.certifiedV", { version: bio.version })}</span>}
               {job.override_reason && <span className="pill" style={{height: 22, padding:"0 9px", fontSize: 11, background:"var(--pink-50, rgba(244,143,177,0.16))", color:"var(--pink-500)"}}>{job.override_reason}</span>}
             </div>
             <div style={{fontSize: 12.5, color:"var(--c-dim)", fontFamily:"var(--font-mono)"}}>
-              {job.brand?.url} · queued {relativeTime(job.queued_at)} · BIO v{bio.version}
+              {job.brand?.url} · {t("team.queuedRel", { rel: relativeTime(job.queued_at) })} · {t("team.bioV", { version: bio.version })}
             </div>
           </div>
         </div>
 
         <div className="card" style={{padding: 22}}>
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 14}}>
-            <div className="eyebrow eyebrow--yellow">Candidate BIO · v{bio.version}{isDirty && <span style={{marginLeft: 8, color:"var(--yellow-700)"}}>· edited</span>}</div>
-            {isDirty && <button type="button" onClick={() => setEdited(JSON.parse(JSON.stringify(bio.payload || {})))} className="btn btn--link" style={{fontSize: 11}}>Reset edits</button>}
+            <div className="eyebrow eyebrow--yellow">{t("team.candidateBio", { version: bio.version })}{isDirty && <span style={{marginLeft: 8, color:"var(--yellow-700)"}}>{t("team.editedTag")}</span>}</div>
+            {isDirty && <button type="button" onClick={() => setEdited(JSON.parse(JSON.stringify(bio.payload || {})))} className="btn btn--link" style={{fontSize: 11}}>{t("team.resetEdits")}</button>}
           </div>
 
-          <EditableText  label="Positioning" value={payload.identity?.positioning} onChange={(v) => setPath(["identity","positioning"], v)} placeholder="One sentence — what the brand actually is" />
-          <EditableText  label="Category" value={payload.identity?.category} onChange={(v) => setPath(["identity","category"], v)} multiline={false} />
-          <EditableChipList label="Pillars" value={payload.identity?.pillars} onChange={(v) => setPath(["identity","pillars"], v)} placeholder="+ Add pillar" />
+          <EditableText  label={t("team.fldPositioning")} value={payload.identity?.positioning} onChange={(v) => setPath(["identity","positioning"], v)} placeholder={t("team.phPositioning")} />
+          <EditableText  label={t("team.fldCategory")} value={payload.identity?.category} onChange={(v) => setPath(["identity","category"], v)} multiline={false} />
+          <EditableChipList label={t("team.fldPillars")} value={payload.identity?.pillars} onChange={(v) => setPath(["identity","pillars"], v)} placeholder={t("team.addPillar")} />
 
           <hr style={{border:"none", borderTop:"1px dashed var(--c-line-2)", margin:"18px 0"}} />
 
-          <EditableText  label="Primary audience"   value={payload.audience?.primary}   onChange={(v) => setPath(["audience","primary"], v)} />
-          <EditableText  label="Secondary audience" value={payload.audience?.secondary} onChange={(v) => setPath(["audience","secondary"], v)} />
-          <EditableChipList label="Jobs to be done" value={payload.audience?.jtbd}      onChange={(v) => setPath(["audience","jtbd"], v)} placeholder="+ Add JTBD" />
+          <EditableText  label={t("team.fldPrimaryAudience")}   value={payload.audience?.primary}   onChange={(v) => setPath(["audience","primary"], v)} />
+          <EditableText  label={t("team.fldSecondaryAudience")} value={payload.audience?.secondary} onChange={(v) => setPath(["audience","secondary"], v)} />
+          <EditableChipList label={t("team.fldJtbd")} value={payload.audience?.jtbd}      onChange={(v) => setPath(["audience","jtbd"], v)} placeholder={t("team.addJtbd")} />
 
           <hr style={{border:"none", borderTop:"1px dashed var(--c-line-2)", margin:"18px 0"}} />
 
-          <EditableText label="Voice register" value={payload.voice?.register} onChange={(v) => setPath(["voice","register"], v)} multiline={false} />
-          <EditableText label="Rhythm"          value={payload.voice?.rhythm}   onChange={(v) => setPath(["voice","rhythm"], v)} />
-          <EditableChipList label="Signature moves" value={payload.voice?.signatures} onChange={(v) => setPath(["voice","signatures"], v)} placeholder="+ Add signature" />
-          <EditableChipList label="Forbidden words" value={payload.voice?.forbidden}  onChange={(v) => setPath(["voice","forbidden"], v)} placeholder="+ Add forbidden" strike accent="pink" />
+          <EditableText label={t("team.fldVoiceRegister")} value={payload.voice?.register} onChange={(v) => setPath(["voice","register"], v)} multiline={false} />
+          <EditableText label={t("team.fldRhythm")}          value={payload.voice?.rhythm}   onChange={(v) => setPath(["voice","rhythm"], v)} />
+          <EditableChipList label={t("team.fldSignatureMoves")} value={payload.voice?.signatures} onChange={(v) => setPath(["voice","signatures"], v)} placeholder={t("team.addSignature")} />
+          <EditableChipList label={t("team.fldForbiddenWords")} value={payload.voice?.forbidden}  onChange={(v) => setPath(["voice","forbidden"], v)} placeholder={t("team.addForbidden")} strike accent="pink" />
 
           <hr style={{border:"none", borderTop:"1px dashed var(--c-line-2)", margin:"18px 0"}} />
 
-          <EditableText label="North star"    value={payload.goals?.northStar} onChange={(v) => setPath(["goals","northStar"], v)} />
-          <EditableText label="This quarter"  value={payload.goals?.q2}        onChange={(v) => setPath(["goals","q2"], v)} multiline={false} />
-          <EditableText label="Next quarter"  value={payload.goals?.q3}        onChange={(v) => setPath(["goals","q3"], v)} multiline={false} />
+          <EditableText label={t("team.fldNorthStar")}    value={payload.goals?.northStar} onChange={(v) => setPath(["goals","northStar"], v)} />
+          <EditableText label={t("team.fldThisQuarter")}  value={payload.goals?.q2}        onChange={(v) => setPath(["goals","q2"], v)} multiline={false} />
+          <EditableText label={t("team.fldNextQuarter")}  value={payload.goals?.q3}        onChange={(v) => setPath(["goals","q3"], v)} multiline={false} />
 
           <hr style={{border:"none", borderTop:"1px dashed var(--c-line-2)", margin:"18px 0"}} />
 
-          <EditableChipList label="Strategic watchouts" value={payload.strategic?.watchouts} onChange={(v) => setPath(["strategic","watchouts"], v)} placeholder="+ Add watchout" />
-          <EditableChipList label="What the brand is NOT" value={payload.strategic?.notList}  onChange={(v) => setPath(["strategic","notList"], v)} placeholder="+ Add not-list item" />
+          <EditableChipList label={t("team.fldWatchouts")} value={payload.strategic?.watchouts} onChange={(v) => setPath(["strategic","watchouts"], v)} placeholder={t("team.addWatchout")} />
+          <EditableChipList label={t("team.fldNotList")} value={payload.strategic?.notList}  onChange={(v) => setPath(["strategic","notList"], v)} placeholder={t("team.addNotList")} />
 
           <hr style={{border:"none", borderTop:"1px dashed var(--c-line-2)", margin:"18px 0"}} />
 
           <EditablePalette value={payload.visual?.palette} onChange={(v) => setPath(["visual","palette"], v)} />
           <EditableTypeList value={payload.visual?.type} onChange={(v) => setPath(["visual","type"], v)} />
-          <EditableChipList label="Imagery direction" value={payload.visual?.imagery} onChange={(v) => setPath(["visual","imagery"], v)} placeholder="+ Add imagery cue" />
-          <EditableChipList label="Visual avoid"      value={payload.visual?.avoid}   onChange={(v) => setPath(["visual","avoid"], v)} placeholder="+ Add visual avoid" accent="pink" />
+          <EditableChipList label={t("team.fldImagery")} value={payload.visual?.imagery} onChange={(v) => setPath(["visual","imagery"], v)} placeholder={t("team.addImagery")} />
+          <EditableChipList label={t("team.fldVisualAvoid")}      value={payload.visual?.avoid}   onChange={(v) => setPath(["visual","avoid"], v)} placeholder={t("team.addVisualAvoid")} accent="pink" />
         </div>
 
         <div style={{marginTop: 14, fontSize: 11.5, color:"var(--c-faint)", fontFamily:"var(--font-mono)"}}>
-          Edit any field — changes are tracked locally and sent as a `bioPatch` when you certify (creates a new BIO version). Visual fields will be auto-filled by the vision pass in P5; you can populate them by hand here for now.
+          {t("team.bioEditHint")}
         </div>
       </main>
 
@@ -766,9 +779,9 @@ function TeamJob({ id, go }) {
       <aside className="tjob-right scroll" style={{borderLeft:"1px solid var(--c-line)", background:"var(--c-card)", overflowY:"auto", display:"flex", flexDirection:"column"}}>
         {/* Focus first — where the Steward should look (ranked: gaps, then thin/low-confidence fields) */}
         <div style={{padding: 20, borderBottom:"1px solid var(--c-line)"}}>
-          <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Focus first · {focus.length}</div>
+          <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>{t("team.focusFirst")} · {focus.length}</div>
           {focus.length === 0 ? (
-            <div style={{fontSize: 11.5, color:"var(--c-faint)"}}>Nothing flagged — every field reads through.</div>
+            <div style={{fontSize: 11.5, color:"var(--c-faint)"}}>{t("team.nothingFlagged")}</div>
           ) : (
             <div style={{display:"flex", flexDirection:"column", gap: 8}}>
               {focus.map((f, i) => {
@@ -781,13 +794,13 @@ function TeamJob({ id, go }) {
                     <div style={{display:"flex", alignItems:"center", gap: 6, flexWrap:"wrap", marginBottom: 4}}>
                       <span style={{fontSize: 12.5, color:"var(--c-ink)", fontWeight: 500}}>{f.label || f.field}</span>
                       <span className="pill" style={{height: 18, padding:"0 7px", fontSize: 9.5, letterSpacing:"0.03em", background: pillBg, color: pillCol}}>
-                        {isMissing ? "missing" : "low conf"}
+                        {isMissing ? t("team.statusMissing") : t("team.statusLowConf")}
                       </span>
                       {typeof f.conf === "number" && (
                         <span style={{fontSize: 10.5, color:"var(--c-dim)", fontFamily:"var(--font-mono)"}}>{f.conf}%</span>
                       )}
                       {highStakes && (
-                        <span className="pill" style={{height: 18, padding:"0 7px", fontSize: 9.5, letterSpacing:"0.03em", background:"var(--neutral-50)", color:"var(--c-dim)"}}>high-stakes</span>
+                        <span className="pill" style={{height: 18, padding:"0 7px", fontSize: 9.5, letterSpacing:"0.03em", background:"var(--neutral-50)", color:"var(--c-dim)"}}>{t("team.highStakes")}</span>
                       )}
                     </div>
                     {f.source && (
@@ -803,11 +816,11 @@ function TeamJob({ id, go }) {
           )}
         </div>
         <div style={{padding: 20, borderBottom:"1px solid var(--c-line)"}}>
-          <div className="eyebrow" style={{marginBottom: 12}}>Sources read · {sources.length}</div>
+          <div className="eyebrow" style={{marginBottom: 12}}>{t("team.sourcesRead")} · {sources.length}</div>
           {Object.entries(sourcesByBucket).map(([bucket, list]) => (
             list.length === 0 ? null : (
               <div key={bucket} style={{marginBottom: 14}}>
-                <div className="eyebrow" style={{color:"var(--c-faint)", fontSize: 9.5, marginBottom: 4}}>{bucket}</div>
+                <div className="eyebrow" style={{color:"var(--c-faint)", fontSize: 9.5, marginBottom: 4}}>{BUCKET_LABEL[bucket] || bucket}</div>
                 <div style={{display:"flex", flexDirection:"column", gap: 6}}>
                   {list.map(s => (
                     <div key={s.id} className="card card--inset" style={{padding:"8px 10px"}}>
@@ -816,7 +829,7 @@ function TeamJob({ id, go }) {
                       </div>
                       {s.signals?.title && <div style={{fontSize: 11, color:"var(--c-dim)", marginTop: 2}}>{s.signals.title}</div>}
                       {s.signals?.size && <div style={{fontSize: 10.5, color:"var(--c-faint)", marginTop: 2, fontFamily:"var(--font-mono)"}}>{Math.round(s.signals.size/1024).toLocaleString()} KB · {s.signals.mime || s.signals.ext}</div>}
-                      {s.signals?.markdown_chars && <div style={{fontSize: 10.5, color:"var(--c-faint)", marginTop: 2, fontFamily:"var(--font-mono)"}}>{s.signals.markdown_chars.toLocaleString()} chars scraped</div>}
+                      {s.signals?.markdown_chars && <div style={{fontSize: 10.5, color:"var(--c-faint)", marginTop: 2, fontFamily:"var(--font-mono)"}}>{t("team.charsScraped", { chars: s.signals.markdown_chars.toLocaleString() })}</div>}
                     </div>
                   ))}
                 </div>
@@ -833,22 +846,22 @@ function TeamJob({ id, go }) {
         <div style={{padding: 20, flex: 1, display:"flex", flexDirection:"column"}}>
           {isPendingLead && (
             <div style={{marginBottom: 14, padding:"10px 12px", background:"var(--purple-50, rgba(160,140,210,0.10))", borderLeft:"3px solid var(--purple-500)", borderRadius: 6, fontSize: 12.5, color:"var(--c-ink)", lineHeight: 1.5}}>
-              <strong>Pending Lead review</strong> · {isLead
-                ? "You're a Lead — approve to finalize the cert, or send it back to the original Steward."
-                : "A Lead Steward will approve this cert before it lands."}
+              <strong>{t("team.pendingLeadReview")}</strong> · {isLead
+                ? t("team.pendingLeadIsLead")
+                : t("team.pendingLeadNotLead")}
             </div>
           )}
 
           <div className="eyebrow" style={{marginBottom: 8}}>
-            {isPendingLead && isLead ? "Lead notes (private)" : "Cert notes (visible to client)"}
+            {isPendingLead && isLead ? t("team.leadNotesPrivate") : t("team.certNotesClient")}
           </div>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             disabled={submitting || completed}
             placeholder={isPendingLead && isLead
-              ? "Optional. If sending back, explain what needs revision."
-              : "e.g. Voice + audience read true. Pillars trimmed — 'origin-traceable' is the strongest."}
+              ? t("team.notesPlaceholderLead")
+              : t("team.notesPlaceholderCert")}
             rows={6}
             className="input"
             style={{resize:"vertical", fontSize: 13, lineHeight: 1.45, padding: 10}}
@@ -856,22 +869,22 @@ function TeamJob({ id, go }) {
 
           {!isPendingLead && !completed && (
             <>
-              <div className="eyebrow" style={{margin:"14px 0 6px"}}>Conditions / required changes (one per line)</div>
+              <div className="eyebrow" style={{margin:"14px 0 6px"}}>{t("team.conditionsLabel")}</div>
               <textarea
                 value={actionItems}
                 onChange={(e) => setActionItems(e.target.value)}
                 disabled={submitting}
-                placeholder={"Used when the decision is approve-with-conditions or return-for-changes.\ne.g. Replace the placeholder logo before Visual runs."}
+                placeholder={t("team.conditionsPlaceholder")}
                 rows={3}
                 className="input"
                 style={{resize:"vertical", fontSize: 12.5, lineHeight: 1.4, padding: 9}}
               />
-              <div className="eyebrow" style={{margin:"12px 0 6px"}}>Reject reason code (only if rejecting)</div>
+              <div className="eyebrow" style={{margin:"12px 0 6px"}}>{t("team.rejectReasonLabel")}</div>
               <input
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 disabled={submitting}
-                placeholder="e.g. unverifiable_authority"
+                placeholder={t("team.rejectReasonPlaceholder")}
                 className="input"
                 style={{fontSize: 12.5, padding: 9}}
               />
@@ -886,16 +899,16 @@ function TeamJob({ id, go }) {
             isLead ? (
               <div style={{marginTop: 16, display:"flex", gap: 8}}>
                 <button onClick={() => leadReview(true)} disabled={submitting} className="btn btn--primary" style={{flex: 1}}>
-                  {submitting ? "…" : <>Approve as Lead <Icon name="check" size={13} /></>}
+                  {submitting ? "…" : <>{t("team.approveAsLead")} <Icon name="check" size={13} /></>}
                 </button>
-                <button onClick={() => { if (window.confirm("Send this back to the Steward for revision?")) leadReview(false); }}
+                <button onClick={() => { if (window.confirm(t("team.confirmSendBack"))) leadReview(false); }}
                   disabled={submitting} className="btn btn--ghost btn--sm">
-                  Send back
+                  {t("team.sendBack")}
                 </button>
               </div>
             ) : (
               <div style={{marginTop: 16, padding:"10px 12px", background:"var(--c-bg)", borderRadius: 6, fontSize: 12.5, color:"var(--c-dim)", textAlign:"center"}}>
-                Awaiting Lead Steward approval — you submitted this cert; a Lead will finalize.
+                {t("team.awaitingLead")}
               </div>
             )
           ) : (
@@ -906,36 +919,36 @@ function TeamJob({ id, go }) {
                   disabled={submitting || completed || !allScored}
                   className="btn btn--primary"
                   style={{flex: 1}}>
-                  {submitting ? "…" : completed ? "Already reviewed" : isDirty ? <>Save edits & submit review <Icon name="check" size={13} /></> : <>Submit review <Icon name="check" size={13} /></>}
+                  {submitting ? "…" : completed ? t("team.alreadyReviewed") : isDirty ? <>{t("team.saveEditsSubmit")} <Icon name="check" size={13} /></> : <>{t("team.submitReview")} <Icon name="check" size={13} /></>}
                 </button>
                 <button
-                  onClick={() => { if (window.confirm("Cancel this certification job?")) cancel(); }}
+                  onClick={() => { if (window.confirm(t("team.confirmCancelJob"))) cancel(); }}
                   disabled={submitting || completed}
                   className="btn btn--ghost btn--sm">
-                  Cancel
+                  {t("team.cancel")}
                 </button>
               </div>
               {!allScored && !completed && (
-                <div style={{marginTop: 8, fontSize: 11, color:"var(--c-faint)"}}>Score every rubric criterion above to submit.</div>
+                <div style={{marginTop: 8, fontSize: 11, color:"var(--c-faint)"}}>{t("team.scoreAllToSubmit")}</div>
               )}
             </div>
           )}
 
           <div style={{marginTop: 12, fontSize: 11, color:"var(--c-faint)", lineHeight: 1.5}}>
             {isLead && isPendingLead
-              ? <>Approving finalizes the cert and writes <code>lead_reviewed_by</code>. The original Steward stays as <code>certified_by</code> (four-eyes: you can't approve your own).</>
-              : <>The rubric decides the outcome from your scores; every decision is recorded to <code>cert_decisions</code> for defensibility. Under calibration a Lead approves before an approval finalizes.</>}
+              ? <>{t("team.leadHelpA1")}<code>lead_reviewed_by</code>{t("team.leadHelpA2")}<code>certified_by</code>{t("team.leadHelpA3")}</>
+              : <>{t("team.rubricHelpB1")}<code>cert_decisions</code>{t("team.rubricHelpB2")}</>}
           </div>
 
           {bio.certified && isLead && (
             <div style={{marginTop: 18, paddingTop: 14, borderTop:"1px solid var(--c-line)"}}>
-              <div className="eyebrow" style={{marginBottom: 6, color:"var(--pink-500)"}}>Decertify</div>
+              <div className="eyebrow" style={{marginBottom: 6, color:"var(--pink-500)"}}>{t("team.decertify")}</div>
               <button onClick={decertify} disabled={submitting} className="btn btn--ghost btn--sm"
                 style={{color:"var(--pink-500)", borderColor:"var(--pink-300, rgba(244,143,177,0.4))"}}>
-                Decertify this BIO
+                {t("team.decertifyThisBio")}
               </button>
               <div style={{marginTop: 6, fontSize: 11, color:"var(--c-faint)", lineHeight: 1.5}}>
-                Pulls certification. New/queued production blocks immediately; running jobs finish; completed outputs keep their chip; briefing stays up. A re-review is queued.
+                {t("team.decertifyHint")}
               </div>
             </div>
           )}
@@ -950,14 +963,15 @@ function TeamJob({ id, go }) {
 /* CAPACITY & SLA DASHBOARD                                          */
 
 function TeamCapacity() {
-  const days = ["Mon","Tue","Wed","Thu","Fri"];
+  const { t } = useLocale();
+  const days = [t("team.dayMon"), t("team.dayTue"), t("team.dayWed"), t("team.dayThu"), t("team.dayFri")];
   return (
     <div style={{padding:"24px 36px 60px"}}>
-      <PageHeader eyebrow="Team lead" title="Capacity & SLA" sub="Where the team is loaded, where SLA is at risk, where the next job should land." />
+      <PageHeader eyebrow={t("team.capEyebrow")} title={t("team.capTitle")} sub={t("team.capSub")} />
 
       <div style={{display:"grid", gridTemplateColumns:"2fr 1fr", gap: 22, marginBottom: 30}}>
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 16}}>Team load · this week</div>
+          <div className="eyebrow" style={{marginBottom: 16}}>{t("team.teamLoadWeek")}</div>
           <div style={{display:"grid", gridTemplateColumns:"180px repeat(5, 1fr)", gap: 6}}>
             <div></div>
             {days.map(d => <div key={d} className="eyebrow" style={{textAlign:"center"}}>{d}</div>)}
@@ -988,7 +1002,7 @@ function TeamCapacity() {
         </div>
 
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14, color:"var(--pink-500)"}}>SLA risk · 3 jobs</div>
+          <div className="eyebrow" style={{marginBottom: 14, color:"var(--pink-500)"}}>{t("team.slaRiskJobs")}</div>
           <div style={{display:"flex", flexDirection:"column", gap: 10}}>
             {window.CI_JOBS.filter(j => /overdue/.test(j.sla) || (/^\d+h/.test(j.sla) && parseInt(j.sla) <= 8)).map(j => (
               <div key={j.id} style={{padding: 12, border:"1px solid var(--c-line)", borderRadius: 8, borderLeft:"3px solid var(--pink-500)"}}>
@@ -999,7 +1013,7 @@ function TeamCapacity() {
                   </div>
                   <SlaHeat text={j.sla} />
                 </div>
-                <button className="btn btn--ghost btn--sm" style={{marginTop: 10, fontSize: 11}}>Reassign</button>
+                <button className="btn btn--ghost btn--sm" style={{marginTop: 10, fontSize: 11}}>{t("team.reassign")}</button>
               </div>
             ))}
           </div>
@@ -1008,28 +1022,28 @@ function TeamCapacity() {
 
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 22}}>
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14}}>Daily throughput · last 14 days</div>
+          <div className="eyebrow" style={{marginBottom: 14}}>{t("team.dailyThroughput")}</div>
           <div style={{display:"flex", alignItems:"flex-end", gap: 6, height: 140}}>
             {[6,8,5,9,11,4,7,9,12,8,10,9,11,14].map((n, i) => (
-              <div key={i} style={{flex:1, height: `${(n/14)*100}%`, background: i >= 12 ? "var(--yellow-500)" : "var(--purple-200)", borderRadius:"3px 3px 0 0"}} title={`${n} jobs`} />
+              <div key={i} style={{flex:1, height: `${(n/14)*100}%`, background: i >= 12 ? "var(--yellow-500)" : "var(--purple-200)", borderRadius:"3px 3px 0 0"}} title={t("team.jobsCount", { count: n })} />
             ))}
           </div>
           <div style={{display:"flex", justifyContent:"space-between", marginTop: 8, fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>
-            <span>2 weeks ago</span>
-            <span>today</span>
+            <span>{t("team.twoWeeksAgo")}</span>
+            <span>{t("team.today")}</span>
           </div>
         </div>
 
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14}}>Backlog · oldest unstarted</div>
+          <div className="eyebrow" style={{marginBottom: 14}}>{t("team.backlog")}</div>
           <div style={{display:"flex", flexDirection:"column", gap: 8}}>
             {window.CI_JOBS.filter(j => j.status === "unassigned").map(j => (
               <div key={j.id} style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", border:"1px solid var(--c-line)", borderRadius: 8}}>
                 <div>
                   <div style={{fontSize: 13, fontWeight: 500}}>{j.client}</div>
-                  <div style={{fontSize: 12, color:"var(--c-dim)"}}>{j.type} · submitted {j.submitted}</div>
+                  <div style={{fontSize: 12, color:"var(--c-dim)"}}>{j.type} · {t("team.submittedAt", { when: j.submitted })}</div>
                 </div>
-                <button className="btn btn--primary btn--sm">Assign</button>
+                <button className="btn btn--primary btn--sm">{t("team.assign")}</button>
               </div>
             ))}
           </div>
@@ -1043,6 +1057,7 @@ function TeamCapacity() {
 /* CLIENT ROSTER                                                     */
 
 function TeamClients() {
+  const { t } = useLocale();
   const clients = [
     { name:"Vinilo Coffee",   bio: 91, tier:"02", active: 4, lifetime: 38, last:"2h ago",   primary:"Marina Reyes" },
     { name:"Plaza Hortelana", bio: 78, tier:"03", active: 2, lifetime: 22, last:"yesterday", primary:"Pere Sallés" },
@@ -1053,13 +1068,13 @@ function TeamClients() {
   ];
   return (
     <div style={{padding:"24px 36px 60px"}}>
-      <PageHeader eyebrow="Team portal" title="Clients · 6" sub="The workspaces the team serves. Useful when you're picking up multiple jobs from the same brand." />
+      <PageHeader eyebrow={t("team.clientsEyebrow")} title={t("team.clientsCount", { count: clients.length })} sub={t("team.clientsSub")} />
       <div className="card" style={{padding: 0, overflow:"hidden"}}>
         <table style={{width:"100%", borderCollapse:"collapse", fontSize: 13}}>
           <thead>
             <tr style={{background:"var(--c-bg)", borderBottom:"1px solid var(--c-line)"}}>
-              {["Brand","BIO","Tier","Active jobs","Lifetime","Last activity","Primary contact"].map(h => (
-                <th key={h} style={{textAlign:"left", padding:"12px 18px", fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight: 500}}>{h}</th>
+              {[t("team.colBrand"),t("team.colBio"),t("team.colTier"),t("team.colActiveJobs"),t("team.colLifetime"),t("team.colLastActivity"),t("team.colPrimaryContact")].map((h, hi) => (
+                <th key={hi} style={{textAlign:"left", padding:"12px 18px", fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight: 500}}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -1073,7 +1088,7 @@ function TeamClients() {
                   </div>
                 </td>
                 <td style={{padding:"14px 18px"}}><Confidence value={c.bio} /></td>
-                <td style={{padding:"14px 18px"}}><span className="pill pill--yellow">Tier {c.tier}</span></td>
+                <td style={{padding:"14px 18px"}}><span className="pill pill--yellow">{t("team.tierN", { tier: c.tier })}</span></td>
                 <td style={{padding:"14px 18px", fontFamily:"var(--font-mono)"}}>{c.active}</td>
                 <td style={{padding:"14px 18px", fontFamily:"var(--font-mono)", color:"var(--c-dim)"}}>{c.lifetime}</td>
                 <td style={{padding:"14px 18px", color:"var(--c-faint)"}}>{c.last}</td>
@@ -1091,16 +1106,17 @@ function TeamClients() {
 /* MY EARNINGS                                                       */
 
 function TeamMe() {
+  const { t } = useLocale();
   const [scope, setScope] = useTState("month");
   return (
     <div style={{padding:"24px 36px 60px"}}>
       <PageHeader
-        eyebrow="My desk"
-        title="Aitana V. · Senior designer"
-        sub="Hours, jobs, satisfaction. La Mesa pays on a separate rail — this is the visibility, not the pay slip."
+        eyebrow={t("team.meEyebrow")}
+        title={t("team.meTitle", { name: "Aitana V." })}
+        sub={t("team.meSub")}
         right={
           <div style={{display:"flex", gap: 6}}>
-            {[["month","Month"],["quarter","Quarter"],["lifetime","Lifetime"]].map(([k, l]) => (
+            {[["month",t("team.scopeMonth")],["quarter",t("team.scopeQuarter")],["lifetime",t("team.scopeLifetime")]].map(([k, l]) => (
               <button key={k} onClick={() => setScope(k)} className={"pill" + (scope === k ? " pill--dark" : "")} style={{cursor:"pointer", height:28, padding:"0 12px"}}>{l}</button>
             ))}
           </div>
@@ -1109,10 +1125,10 @@ function TeamMe() {
 
       <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap: 14, marginBottom: 28}}>
         {[
-          { label:"Jobs delivered", v: 14 },
-          { label:"Hours logged",   v: 38 },
-          { label:"Avg satisfaction", v:"4.7" },
-          { label:"Credits earned", v:"€1,847" },
+          { label:t("team.statJobsDelivered"), v: 14 },
+          { label:t("team.statHoursLogged"),   v: 38 },
+          { label:t("team.statAvgSatisfaction"), v:"4.7" },
+          { label:t("team.statCreditsEarned"), v:"€1,847" },
         ].map((s, i) => (
           <div key={i} className="card" style={{padding: 20}}>
             <div className="eyebrow" style={{marginBottom: 6}}>{s.label}</div>
@@ -1125,7 +1141,7 @@ function TeamMe() {
 
       <div style={{display:"grid", gridTemplateColumns:"2fr 1fr", gap: 22, marginBottom: 28}}>
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14}}>Hours logged · this month</div>
+          <div className="eyebrow" style={{marginBottom: 14}}>{t("team.hoursLoggedMonth")}</div>
           <div style={{display:"flex", alignItems:"flex-end", gap: 4, height: 160}}>
             {Array.from({length: 28}, (_, i) => 2 + Math.sin(i * 0.4) * 1.5 + Math.random() * 3).map((h, i) => (
               <div key={i} style={{flex:1, height: `${(h/8)*100}%`, background:"var(--yellow-500)", opacity: 0.3 + (i / 28) * 0.7, borderRadius:"2px 2px 0 0"}} />
@@ -1133,7 +1149,7 @@ function TeamMe() {
           </div>
         </div>
         <div className="card" style={{padding: 22}}>
-          <div className="eyebrow" style={{marginBottom: 14}}>Top clients · this month</div>
+          <div className="eyebrow" style={{marginBottom: 14}}>{t("team.topClientsMonth")}</div>
           <div style={{display:"flex", flexDirection:"column", gap: 12}}>
             {[
               { name:"Vinilo Coffee", hrs: 14 },
@@ -1156,7 +1172,7 @@ function TeamMe() {
       </div>
 
       <div className="card" style={{padding: 22}}>
-        <div className="eyebrow" style={{marginBottom: 14}}>Recent deliveries</div>
+        <div className="eyebrow" style={{marginBottom: 14}}>{t("team.recentDeliveries")}</div>
         <div style={{display:"flex", flexDirection:"column", gap: 6}}>
           {[
             { title:"Hero KV finish · Vinilo pricing", state:"delivered", time:"38m ago", cr: 220 },
@@ -1186,6 +1202,7 @@ function TeamMe() {
    ("Send to human") with a polish brief. The crafter refines the copy and
    delivers it back onto the card. Pulls /api/craft/queue. */
 function CraftQueue() {
+  const { t } = useLocale();
   const [data, setData] = useTState({ jobs: null, error: null, loading: true });
   const [drafts, setDrafts] = useTState({});
   const [busy, setBusy] = useTState(null);
@@ -1215,16 +1232,16 @@ function CraftQueue() {
   const jobs = data.jobs || [];
   return (
     <div style={{ padding: "24px 28px", maxWidth: 1100, margin: "0 auto" }}>
-      <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 6 }}>Human craft · polish queue</div>
-      <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 6, color: "var(--c-ink)" }}>Pieces awaiting human polish</h1>
+      <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 6 }}>{t("team.craftEyebrow")}</div>
+      <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 6, color: "var(--c-ink)" }}>{t("team.craftTitle")}</h1>
       <p style={{ color: "var(--c-dim)", fontSize: 13.5, marginBottom: 20 }}>
-        Each piece was sent from a brand's canvas with a polish brief. Refine the copy and deliver it back onto their card.
+        {t("team.craftSub")}
       </p>
-      {data.loading && <div style={{ color: "var(--c-faint)" }}>Loading queue…</div>}
+      {data.loading && <div style={{ color: "var(--c-faint)" }}>{t("team.loadingQueue")}</div>}
       {data.error && <div style={{ color: "var(--pink-500)", marginBottom: 16 }}>{data.error}</div>}
       {!data.loading && jobs.length === 0 && (
         <div className="card" style={{ padding: 28, textAlign: "center", color: "var(--c-dim)" }}>
-          Nothing in the polish queue. Pieces land here when a brand hits "Send to human".
+          {t("team.craftEmpty")}
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -1235,18 +1252,18 @@ function CraftQueue() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div className="eyebrow" style={{ marginBottom: 2 }}>{job.brand} · {(job.platform || "").toUpperCase()}</div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "var(--c-ink)" }}>{job.title || "Untitled"}</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "var(--c-ink)" }}>{job.title || t("team.untitled")}</div>
                   <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--c-faint)" }}>{job.briefTitle}</div>
                 </div>
                 <span className="pill" style={{ height: 22, padding: "0 10px", fontSize: 11 }}>{job.credits} cr</span>
               </div>
               {job.notes && (
                 <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 8, background: "var(--c-bg)", border: "1px solid var(--c-line)" }}>
-                  <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 4 }}>Polish brief from the operator</div>
+                  <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 4 }}>{t("team.polishBrief")}</div>
                   <div style={{ fontSize: 13, color: "var(--c-ink)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{job.notes}</div>
                 </div>
               )}
-              <div className="eyebrow" style={{ marginBottom: 4 }}>The piece — refine it</div>
+              <div className="eyebrow" style={{ marginBottom: 4 }}>{t("team.refineIt")}</div>
               <textarea
                 value={drafts[key] ?? job.body}
                 onChange={(e) => setDrafts((p) => ({ ...p, [key]: e.target.value }))}
@@ -1255,7 +1272,7 @@ function CraftQueue() {
               />
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
                 <button className="btn btn--primary btn--sm" disabled={busy === key} onClick={() => deliver(job)}>
-                  {busy === key ? "Delivering…" : "Deliver polished version →"}
+                  {busy === key ? t("team.delivering") : t("team.deliverPolished")}
                 </button>
               </div>
             </div>

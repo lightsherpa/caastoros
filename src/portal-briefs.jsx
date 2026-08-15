@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale, t as tt } from "./lib/i18n.js";
 import { apiFetch, supabase } from "./lib/supabase-browser.js";
 const { AgentCard, BrandolphDot, Drawer, Icon, ModelChip, OutputCard, PageHeader, Reveal, StatusPill, useIsTeam, PinButton, usePins } = window;
 const { useState: useBrState, useEffect: useBrEffect } = React;
@@ -48,7 +49,7 @@ function useLiveBriefs() {
         .order("version", { ascending: false }).limit(1).maybeSingle();
       let cert = null;
       if (bio) {
-        let byName = "your Brand Steward";
+        let byName = tt("briefs.misc.yourBrandSteward");
         if (bio.certified_by) {
           const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
           byName = tm?.first_name || byName;
@@ -134,7 +135,7 @@ function extractOriginalRequest(composedText) {
      5. briefs.title column (last-resort fallback).
    Never returns ## headings or the multi-paragraph composedBrief. */
 function briefTitle(brief) {
-  if (!brief) return "(untitled)";
+  if (!brief) return tt("briefs.misc.untitled");
   const p = brief.payload || {};
 
   // 1. Sharpener-emitted title (new briefs after the title-field rollout)
@@ -152,7 +153,7 @@ function briefTitle(brief) {
     const cleaned = humanize(String(c)).split("\n")[0].trim();
     if (cleaned && cleaned.length >= 3) return shorten(cleaned);
   }
-  return "(untitled brief)";
+  return tt("briefs.misc.untitledBrief");
 }
 
 function shorten(s, max = 72) {
@@ -235,13 +236,13 @@ function dayGroupKey(iso) {
   return d && !isNaN(d) ? d.toLocaleDateString("en-CA") : "0000-00-00";  /* local-day YYYY-MM-DD */
 }
 function dayGroupLabel(iso) {
-  if (!iso) return "Undated";
+  if (!iso) return tt("briefs.date.undated");
   const d = new Date(iso);
-  if (isNaN(d)) return "Undated";
+  if (isNaN(d)) return tt("briefs.date.undated");
   const now = new Date();
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  if (d.getTime() >= startToday) return "Today";
-  if (d.getTime() >= startToday - 86_400_000) return "Yesterday";
+  if (d.getTime() >= startToday) return tt("briefs.date.today");
+  if (d.getTime() >= startToday - 86_400_000) return tt("briefs.date.yesterday");
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
@@ -267,6 +268,7 @@ function briefStatusStyle(flagged) {
 }
 
 function BriefsLibrary({ go }) {
+  const { t } = useLocale();
   const { briefs, cert, brand, loading, error, reload } = useLiveBriefs();
   const [query, setQuery]     = useBrState("");
   const [statusF, setStatusF] = useBrState("all");        /* all | approved | flagged */
@@ -333,12 +335,12 @@ function BriefsLibrary({ go }) {
   return (
     <div style={{padding:"24px 36px 60px"}}>
       <PageHeader
-        eyebrow={brand ? `Workspace · ${brand.name}` : "Workspace"}
-        title="Briefs"
-        sub={`Every specialist run on this brand — auditable against the certified BIO. ${totalRuns} run${totalRuns === 1 ? "" : "s"} on record · ${totalCredits} cr spent.`}
+        eyebrow={brand ? t("briefs.lib.eyebrowBrand", { name: brand.name }) : t("briefs.lib.eyebrow")}
+        title={t("briefs.lib.title")}
+        sub={t("briefs.lib.sub", { runs: t("briefs.runsCount", { count: totalRuns }), credits: totalCredits })}
         right={<>
-          <button className="btn btn--ghost btn--sm" onClick={reload}><Icon name="refresh" size={13} /> Reload</button>
-          <a href="#/specialists" className="btn btn--primary">Run a specialist <Icon name="plus" size={14} /></a>
+          <button className="btn btn--ghost btn--sm" onClick={reload}><Icon name="refresh" size={13} /> {t("briefs.lib.reload")}</button>
+          <a href="#/specialists" className="btn btn--primary">{t("briefs.lib.runSpecialist")} <Icon name="plus" size={14} /></a>
         </>}
       />
 
@@ -354,7 +356,7 @@ function BriefsLibrary({ go }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search briefs…"
+            placeholder={t("briefs.lib.searchPlaceholder")}
             style={{
               width:"100%", height: 32, padding:"0 10px 0 32px",
               border:"1px solid var(--c-line)", borderRadius: 8,
@@ -368,7 +370,7 @@ function BriefsLibrary({ go }) {
           </span>
         </div>
         <div style={{display:"flex", gap: 4}}>
-          {[["all","All"],["approved","Approved"],["flagged","Flagged"]].map(([k, l]) => (
+          {[["all",t("briefs.filter.all")],["approved",t("briefs.filter.approved")],["flagged",t("briefs.filter.flagged")]].map(([k, l]) => (
             <button key={k} onClick={() => setStatusF(k)}
               className={"pill" + (statusF === k ? " pill--dark" : "")}
               style={{cursor:"pointer", height: 28, padding:"0 12px"}}>{l}</button>
@@ -377,12 +379,12 @@ function BriefsLibrary({ go }) {
         {specialistsInUse.length > 0 && (
           <select value={specF} onChange={(e) => setSpecF(e.target.value)}
             style={{height: 30, padding:"0 10px", border:"1px solid var(--c-line)", borderRadius: 8, fontSize: 12.5, fontFamily:"inherit", background:"var(--c-bg)", color:"var(--c-ink)"}}>
-            <option value="all">All specialists</option>
+            <option value="all">{t("briefs.filter.allSpecialists")}</option>
             {specialistsInUse.map((id) => <option key={id} value={id}>{specialistName(id)}</option>)}
           </select>
         )}
         <span style={{marginLeft:"auto", fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>
-          {filtered.length} of {briefs.length}
+          {t("briefs.lib.countOf", { shown: filtered.length, total: briefs.length })}
         </span>
       </div>
 
@@ -392,16 +394,16 @@ function BriefsLibrary({ go }) {
             margin:"0 0 14px", fontFamily:"Georgia, serif", fontStyle:"italic",
             fontSize: 28, lineHeight: 1.2, letterSpacing:"-0.005em", fontWeight: 400, color:"var(--c-ink)",
           }}>
-            No briefs on the table yet.
+            {t("briefs.lib.emptyTitle")}
           </h2>
           <p style={{margin:"0 0 22px", fontSize: 14, color:"var(--c-dim)", lineHeight: 1.6}}>
-            Brandolph is waiting on the first one. Type what you need into the launchpad — even a sentence — and he'll sharpen it, name the tension, and assemble the smallest crew that earns it.
+            {t("briefs.lib.emptyBody")}
           </p>
           <div style={{display:"flex", gap: 10, justifyContent:"center"}}>
             <a href="#/home" className="btn btn--primary">
-              <Icon name="sparkles" size={13} /> Start the first brief
+              <Icon name="sparkles" size={13} /> {t("briefs.lib.startFirst")}
             </a>
-            <a href="#/specialists" className="btn btn--ghost btn--sm">Browse specialists</a>
+            <a href="#/specialists" className="btn btn--ghost btn--sm">{t("briefs.lib.browseSpecialists")}</a>
           </div>
         </div>
       )}
@@ -459,9 +461,9 @@ function BriefsLibrary({ go }) {
                         )}
                       </div>
                       <div style={{display:"flex", gap: 10, marginTop: 4, fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.04em", alignItems:"center"}}>
-                        <span>{b.mode || "auto"}</span>
+                        <span>{b.mode || t("briefs.mode.auto")}</span>
                         <span>·</span>
-                        <span>{runs.length} run{runs.length === 1 ? "" : "s"}</span>
+                        <span>{t("briefs.runsCount", { count: runs.length })}</span>
                         <span>·</span>
                         <span>{credits} cr</span>
                         {specs.length > 0 && (<>
@@ -473,7 +475,7 @@ function BriefsLibrary({ go }) {
                     <span className="pill" style={{
                       height: 20, padding:"0 9px", fontSize: 10,
                       background: st.bg, color: st.fg,
-                    }}>{st.label}</span>
+                    }}>{t("briefs.status." + st.label)}</span>
                     <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", minWidth: 50, textAlign:"right"}}>
                       {shortDate(b.created_at)}
                     </span>
@@ -486,7 +488,7 @@ function BriefsLibrary({ go }) {
         ))}
         {!loading && grouped.length === 0 && briefs.length > 0 && (
           <div style={{padding: 28, textAlign:"center", color:"var(--c-faint)", fontSize: 13}}>
-            No briefs match the current filters.
+            {t("briefs.lib.noMatch")}
           </div>
         )}
       </div>
@@ -498,12 +500,13 @@ function BriefsLibrary({ go }) {
 /* BRIEF DETAIL                                                      */
 
 function BriefDetail({ id, go }) {
+  const { t } = useLocale();
   const brief = window.CI_BRIEFS.find(b => b.id === id) || window.CI_BRIEFS[0];
   const outputs = window.CI_OUTPUTS.filter(o => o.briefId === brief.id);
   const [win, setWin] = useBrState(null);   // "overview" | "recommendation" | null — open as floating windows
   const depts = [...new Set(brief.agents.map(aid => window.CI_AGENTS.find(a => a.id === aid)?.dept))].filter(Boolean).length;
 
-  const TABS = [["overview","Overview"],["recommendation","Recommendation"],["delivery","Delivery"]];
+  const TABS = [["overview",t("briefs.detail.tabOverview")],["recommendation",t("briefs.detail.tabRecommendation")],["delivery",t("briefs.detail.tabDelivery")]];
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") setWin(null); };
     window.addEventListener("keydown", onKey);
@@ -513,21 +516,21 @@ function BriefDetail({ id, go }) {
   return (
     <div style={{padding:"22px 36px 60px", maxWidth: 1100, margin: "0 auto"}}>
       <button onClick={() => go("briefs")} className="btn btn--link" style={{fontSize: 12, marginBottom: 14}}>
-        <Icon name="arrowLeft" size={13} /> All briefs
+        <Icon name="arrowLeft" size={13} /> {t("briefs.detail.allBriefs")}
       </button>
 
       {/* Persistent header */}
       <div style={{display:"grid", gridTemplateColumns:"1fr auto", gap: 24, alignItems:"start", marginBottom: 18}}>
         <div>
-          <div className="eyebrow" style={{marginBottom: 8}}>{brief.type} · {brief.createdAt} · {brief.credits} cr · {brief.agents.length} specialists</div>
+          <div className="eyebrow" style={{marginBottom: 8}}>{brief.type} · {brief.createdAt} · {brief.credits} cr · {t("briefs.detail.specialistsCount", { count: brief.agents.length })}</div>
           <h1 style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 36, letterSpacing:"-0.015em", lineHeight: 1.1, margin: 0, color:"var(--c-ink)", fontWeight: 500}}>{brief.title}</h1>
         </div>
         <div style={{display:"flex", flexDirection:"column", gap: 10, alignItems:"flex-end"}}>
           <StatusPill status={brief.status} />
           <div style={{display:"flex", gap: 8}}>
-            {brief.status === "draft" && <button className="btn btn--primary btn--sm">Approve <Icon name="check" size={13} /></button>}
-            <button className="btn btn--ghost btn--sm">Revise with Brandolph</button>
-            <button className="btn btn--ghost btn--icon" aria-label="Export PDF"><Icon name="download" size={14} /></button>
+            {brief.status === "draft" && <button className="btn btn--primary btn--sm">{t("briefs.detail.approve")} <Icon name="check" size={13} /></button>}
+            <button className="btn btn--ghost btn--sm">{t("briefs.detail.reviseWithBrandolph")}</button>
+            <button className="btn btn--ghost btn--icon" aria-label={t("briefs.detail.exportPdf")}><Icon name="download" size={14} /></button>
           </div>
         </div>
       </div>
@@ -548,14 +551,14 @@ function BriefDetail({ id, go }) {
       {/* Base — calm proposition summary; the detail lives in the windows / board */}
       <div style={{maxWidth: 900}}>
         <div style={{background:"var(--yellow-500)", borderRadius: 14, padding:"30px 36px", marginBottom: 22, position:"relative", overflow:"hidden"}}>
-          <div style={{position:"absolute", top: 16, right: 20, fontFamily:"var(--font-mono)", fontSize: 10, letterSpacing:"0.18em", color:"rgba(48,48,48,0.6)", textTransform:"uppercase", fontWeight:500}}>Single-minded proposition</div>
+          <div style={{position:"absolute", top: 16, right: 20, fontFamily:"var(--font-mono)", fontSize: 10, letterSpacing:"0.18em", color:"rgba(48,48,48,0.6)", textTransform:"uppercase", fontWeight:500}}>{t("briefs.detail.smpLabel")}</div>
           <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 28, letterSpacing:"-0.005em", lineHeight: 1.25, margin: 0, color:"#1a1f36", fontWeight: 500, maxWidth: 820}}>"{brief.smp}"</p>
         </div>
         <div style={{display:"flex", gap:12, flexWrap:"wrap", alignItems:"center"}}>
-          <button className="btn btn--primary" onClick={() => go("board/" + brief.id)}><Icon name="canvas" size={14} /> Open the board</button>
-          <button className="btn btn--ghost btn--sm" onClick={() => setWin("overview")}>Overview</button>
-          <button className="btn btn--ghost btn--sm" onClick={() => setWin("recommendation")}>Recommendation</button>
-          <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.06em"}}>{outputs.length} outputs · {depts} departments · {brief.credits} cr</span>
+          <button className="btn btn--primary" onClick={() => go("board/" + brief.id)}><Icon name="canvas" size={14} /> {t("briefs.detail.openBoard")}</button>
+          <button className="btn btn--ghost btn--sm" onClick={() => setWin("overview")}>{t("briefs.detail.tabOverview")}</button>
+          <button className="btn btn--ghost btn--sm" onClick={() => setWin("recommendation")}>{t("briefs.detail.tabRecommendation")}</button>
+          <span style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.06em"}}>{t("briefs.detail.outputsCount", { count: outputs.length })} · {t("briefs.detail.departmentsCount", { count: depts })} · {brief.credits} cr</span>
         </div>
       </div>
 
@@ -565,20 +568,20 @@ function BriefDetail({ id, go }) {
           <div onClick={() => setWin(null)} style={{position:"fixed", inset:0, zIndex:60}} />
           <div className="card" style={{position:"fixed", top:170, left:284, width:440, maxHeight:"calc(100vh - 200px)", overflowY:"auto", zIndex:61, boxShadow:"var(--shadow-xl)", animation:"cvPopIn 180ms cubic-bezier(.2,.8,.2,1)"}}>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:"1px solid var(--c-line)", position:"sticky", top:0, background:"var(--c-card)"}}>
-              <h3 style={{margin:0, fontSize:17}}>{win === "overview" ? "Overview" : "Recommendation"}</h3>
-              <button onClick={() => setWin(null)} className="btn btn--icon btn--ghost" aria-label="Close"><Icon name="close" size={15} /></button>
+              <h3 style={{margin:0, fontSize:17}}>{win === "overview" ? t("briefs.detail.tabOverview") : t("briefs.detail.tabRecommendation")}</h3>
+              <button onClick={() => setWin(null)} className="btn btn--icon btn--ghost" aria-label={t("briefs.common.close")}><Icon name="close" size={15} /></button>
             </div>
             <div style={{padding:"20px 22px"}}>
               {win === "overview" ? (
                 <>
                   <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14, marginBottom: 18}}>
-                    <BriefSection title="Background"          body={brief.background} />
-                    <BriefSection title="Objective"           body={brief.objective} />
-                    <BriefSection title="Audience"            body={brief.audience} />
-                    <BriefSection title="Metrics that matter" body={brief.metrics} />
+                    <BriefSection title={t("briefs.detail.background")}          body={brief.background} />
+                    <BriefSection title={t("briefs.detail.objective")}           body={brief.objective} />
+                    <BriefSection title={t("briefs.detail.audience")}            body={brief.audience} />
+                    <BriefSection title={t("briefs.detail.metricsThatMatter")} body={brief.metrics} />
                   </div>
                   <div className="card card--inset" style={{padding: 18}}>
-                    <div className="eyebrow" style={{marginBottom: 12}}>Deliverables · {brief.deliverables.length}</div>
+                    <div className="eyebrow" style={{marginBottom: 12}}>{t("briefs.detail.deliverables")} · {brief.deliverables.length}</div>
                     <div style={{display:"flex", gap: 8, flexWrap:"wrap"}}>
                       {brief.deliverables.map((d, i) => <span key={i} className="pill" style={{height: 28, padding:"0 14px", fontSize:11.5}}>{d}</span>)}
                     </div>
@@ -587,24 +590,24 @@ function BriefDetail({ id, go }) {
               ) : (
                 <>
                   <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14, marginBottom: 18}}>
-                    <BriefSection title="Creative strategy" body={brief.strategy} />
-                    <BriefSection title="Tone"              body={brief.tone} />
-                    <BriefSection title="Direction"         body={brief.direction} />
-                    <BriefSection title="Mandatories"       body={brief.mandatories} />
+                    <BriefSection title={t("briefs.detail.creativeStrategy")} body={brief.strategy} />
+                    <BriefSection title={t("briefs.detail.tone")}              body={brief.tone} />
+                    <BriefSection title={t("briefs.detail.direction")}         body={brief.direction} />
+                    <BriefSection title={t("briefs.detail.mandatories")}       body={brief.mandatories} />
                   </div>
                   <div style={{background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius: 12, padding: 18, marginBottom: 18}}>
-                    <div className="eyebrow eyebrow--pink" style={{marginBottom: 12}}>What this brief is NOT doing</div>
+                    <div className="eyebrow eyebrow--pink" style={{marginBottom: 12}}>{t("briefs.detail.notDoing")}</div>
                     <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 16, lineHeight: 1.55, color:"var(--c-ink)", margin: 0}}>"{brief.notDoing}"</p>
                   </div>
                   <div style={{display:"grid", gridTemplateColumns:"1fr", gap: 14}}>
                     <div className="card card--inset" style={{padding: 18, borderLeft: "3px solid var(--yellow-500)"}}>
-                      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>Strategic assumptions</div>
+                      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 12}}>{t("briefs.detail.strategicAssumptions")}</div>
                       <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
                         {brief.assumptions.map((a, i) => <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}</li>)}
                       </ul>
                     </div>
                     <div className="card card--inset" style={{padding: 18, borderLeft: "3px solid var(--orange-500)"}}>
-                      <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom: 12}}>Production watchouts</div>
+                      <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom: 12}}>{t("briefs.detail.productionWatchouts")}</div>
                       <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
                         {brief.watchouts.map((w, i) => <li key={i} style={{fontSize: 13.5, color:"var(--c-ink)", display:"flex", gap: 8, lineHeight: 1.5}}><span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}</li>)}
                       </ul>
@@ -633,6 +636,7 @@ function BriefSection({ title, body }) {
 /* SPECIALISTS DIRECTORY (L2)                                        */
 
 function SpecialistsDirectory({ go }) {
+  const { t } = useLocale();
   const [dept, setDept] = useBrState("all");
   const [openId, setOpenId] = useBrState(null);
   const [query, setQuery] = useBrState("");
@@ -686,19 +690,19 @@ function SpecialistsDirectory({ go }) {
   return (
     <div style={{padding:"24px 36px 60px"}}>
       <PageHeader
-        eyebrow="L2 · 33 senior specialists"
-        title="The department, on shift."
-        sub="Brandolph reads the brief. The specialists do the work. Each one routes to the model best suited to the job — visible, auditable, paid out of the same credit pool."
+        eyebrow={t("briefs.spec.eyebrow")}
+        title={t("briefs.spec.title")}
+        sub={t("briefs.spec.sub")}
         right={<>
-          <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{live} live · {soon} coming soon</span>
-          <button className="btn btn--primary btn--sm" onClick={() => go && go("specialist-new")}><Icon name="plus" size={13} /> New specialist</button>
+          <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{t("briefs.spec.liveCount", { live, soon })}</span>
+          <button className="btn btn--primary btn--sm" onClick={() => go && go("specialist-new")}><Icon name="plus" size={13} /> {t("briefs.spec.newSpecialist")}</button>
         </>}
       />
 
       {/* Pinned specialists */}
       {pinned.length > 0 && !q && (
         <section style={{marginBottom: 26}}>
-          <div className="eyebrow eyebrow--yellow" style={{marginBottom: 10}}>★ Pinned · your preferred specialists</div>
+          <div className="eyebrow eyebrow--yellow" style={{marginBottom: 10}}>{t("briefs.spec.pinned")}</div>
           <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap: 10}}>
             {pinned.map(a => (
               <button key={a.id} onClick={() => setOpenId(a.id)} className="card"
@@ -718,7 +722,7 @@ function SpecialistsDirectory({ go }) {
       {/* Most used for this brand */}
       {mostUsed.length > 0 && !q && (
         <section style={{marginBottom: 26}}>
-          <div className="eyebrow" style={{marginBottom: 10}}>Most used for Vinilo</div>
+          <div className="eyebrow" style={{marginBottom: 10}}>{t("briefs.spec.mostUsedFor")} Vinilo</div>
           <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap: 10}}>
             {mostUsed.map(a => (
               <button key={a.id} onClick={() => setOpenId(a.id)} className="card"
@@ -741,12 +745,12 @@ function SpecialistsDirectory({ go }) {
           background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:10}}>
           <Icon name="search" size={15} />
           <input value={query} onChange={e => setQuery(e.target.value)}
-            placeholder="Search specialists, departments, capabilities…"
+            placeholder={t("briefs.spec.searchPlaceholder")}
             style={{flex:1, border:0, outline:0, background:"transparent", color:"var(--c-ink)", fontFamily:"inherit", fontSize:13.5, height:"100%"}} />
           {query && <button onClick={() => setQuery("")} style={{border:0, background:"transparent", cursor:"pointer", color:"var(--c-faint)", padding:0}}><Icon name="close" size={14} /></button>}
         </div>
-        <Toggle val={sort} set={setSort} options={[{v:"dept",l:"Department"},{v:"credits",l:"Credits"},{v:"used",l:"Most used"}]} />
-        <Toggle val={view} set={setView} options={[{v:"grid",l:"Grid"},{v:"list",l:"List"}]} />
+        <Toggle val={sort} set={setSort} options={[{v:"dept",l:t("briefs.spec.sortDepartment")},{v:"credits",l:t("briefs.spec.sortCredits")},{v:"used",l:t("briefs.spec.sortMostUsed")}]} />
+        <Toggle val={view} set={setView} options={[{v:"grid",l:t("briefs.spec.viewGrid")},{v:"list",l:t("briefs.spec.viewList")}]} />
       </div>
 
       {/* Department filter */}
@@ -755,13 +759,13 @@ function SpecialistsDirectory({ go }) {
           <button key={d} onClick={() => setDept(d)}
             className={"pill" + (dept === d ? " pill--dark" : "")}
             style={{height: 30, padding:"0 14px", cursor:"pointer", fontSize: 11}}>
-            {d === "all" ? "All departments" : d}
+            {d === "all" ? t("briefs.spec.allDepartments") : d}
             {d !== "all" && <span style={{marginLeft: 6, opacity: 0.6}}>· {all.filter(a => a.dept === d).length}</span>}
           </button>
         ))}
       </div>
 
-      {q && <div className="eyebrow" style={{marginBottom: 14}}>{flat.length} {flat.length === 1 ? "result" : "results"}</div>}
+      {q && <div className="eyebrow" style={{marginBottom: 14}}>{t("briefs.spec.resultsCount", { count: flat.length })}</div>}
 
       {/* Results */}
       {grouped ? (
@@ -778,7 +782,7 @@ function SpecialistsDirectory({ go }) {
                   <span style={{width: 7, height: 7, borderRadius: "50%", background: window.CI_DEPT_COLORS?.[d] || "var(--neutral-400)", flexShrink: 0}} />
                   {d}
                 </h3>
-                <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-dim)", letterSpacing:"0.08em", textTransform:"uppercase"}}>{list.length} specialists · {list.filter(a => a.status === "live").length} live</span>
+                <span style={{fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-dim)", letterSpacing:"0.08em", textTransform:"uppercase"}}>{t("briefs.spec.deptCount", { specialists: list.length, live: list.filter(a => a.status === "live").length })}</span>
               </div>
               <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap: 12}}>
                 {list.map(a => <AgentCard key={a.id} agentId={a.id} showCaps onClick={() => setOpenId(a.id)} />)}
@@ -791,12 +795,12 @@ function SpecialistsDirectory({ go }) {
           {flat.map((a, i) => (
             <SpecialistRow key={a.id} a={a} usage={usage[a.id] || 0} last={i === flat.length - 1} onClick={() => setOpenId(a.id)} />
           ))}
-          {!flat.length && <div style={{padding: 28, textAlign:"center", color:"var(--c-faint)", fontSize:13}}>No specialists match “{query}”.</div>}
+          {!flat.length && <div style={{padding: 28, textAlign:"center", color:"var(--c-faint)", fontSize:13}}>{t("briefs.spec.noMatch", { query })}</div>}
         </div>
       ) : (
         <div className="stagger" style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap: 12}}>
           {flat.map(a => <AgentCard key={a.id} agentId={a.id} showCaps onClick={() => setOpenId(a.id)} />)}
-          {!flat.length && <div style={{gridColumn:"1/-1", padding: 28, textAlign:"center", color:"var(--c-faint)", fontSize:13}}>No specialists match “{query}”.</div>}
+          {!flat.length && <div style={{gridColumn:"1/-1", padding: 28, textAlign:"center", color:"var(--c-faint)", fontSize:13}}>{t("briefs.spec.noMatch", { query })}</div>}
         </div>
       )}
 
@@ -807,6 +811,7 @@ function SpecialistsDirectory({ go }) {
 
 /* Compact list row (List view) */
 function SpecialistRow({ a, usage, last, onClick }) {
+  const { t } = useLocale();
   const isTeam = useIsTeam();
   const accent = isTeam ? window.CI_MODELS[a.model].color : (window.CI_DEPT_COLORS[a.dept] || "var(--neutral-400)");
   const soon = a.status === "soon";
@@ -825,7 +830,7 @@ function SpecialistRow({ a, usage, last, onClick }) {
       {isTeam && <ModelChip modelKey={a.model} />}
       {usage > 0 && <span style={{fontFamily:"var(--font-mono)", fontSize:10.5, color:"var(--c-faint)"}}>{usage}×</span>}
       <span className="credit credit--pending" style={{fontSize:11}}>{a.cr} cr</span>
-      {soon ? <span className="pill" style={{height:18, padding:"0 8px", fontSize:9.5}}>Soon</span> : <Icon name="arrow" size={14} />}
+      {soon ? <span className="pill" style={{height:18, padding:"0 8px", fontSize:9.5}}>{t("briefs.spec.soon")}</span> : <Icon name="arrow" size={14} />}
     </div>
   );
 }
@@ -875,6 +880,7 @@ function composeSpecialistPrompt(a, isTeam, specArg) {
    renders streaming output + QA verdict + the moat-defining cert
    attribution footer. Used inline at the top of SpecialistDrawer. */
 function TryPanel({ agent, onClose }) {
+  const { t } = useLocale();
   const [brief, setBrief]       = useBrState("");
   const [running, setRunning]   = useBrState(false);
   const [output, setOutput]     = useBrState("");
@@ -905,9 +911,9 @@ function TryPanel({ agent, onClose }) {
       borderRadius: 12, padding: 16, marginBottom: 18,
     }}>
       <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 10}}>
-        <div className="eyebrow eyebrow--yellow">Try {agent.name}</div>
+        <div className="eyebrow eyebrow--yellow">{t("briefs.try.tryAgent", { name: agent.name })}</div>
         {(output || done || error) && (
-          <button type="button" className="btn btn--link" style={{fontSize:11}} onClick={reset}>Reset</button>
+          <button type="button" className="btn btn--link" style={{fontSize:11}} onClick={reset}>{t("briefs.try.reset")}</button>
         )}
       </div>
 
@@ -918,7 +924,7 @@ function TryPanel({ agent, onClose }) {
         onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run(); e.stopPropagation(); }}
         disabled={running || !!done}
         rows={3}
-        placeholder={`Write a brief for ${agent.name}. ${agent.job}`}
+        placeholder={t("briefs.try.placeholder", { name: agent.name, job: agent.job })}
         style={{
           width: "100%", padding: "10px 12px", borderRadius: 8,
           border: "1px solid var(--c-line)", background: "var(--c-card)",
@@ -930,13 +936,13 @@ function TryPanel({ agent, onClose }) {
 
       <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginTop: 10}}>
         <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>
-          {running ? "Running…" : done ? "Done" : `~${agent.cr} cr · ⌘+↵ to run`}
+          {running ? t("briefs.try.running") : done ? t("briefs.try.done") : t("briefs.try.runHint", { cr: agent.cr })}
         </span>
         <button
           onClick={run}
           disabled={!brief.trim() || running || !!done}
           className="btn btn--primary btn--sm">
-          {running ? <><BrandolphDot state="thinking" size={11} /> Streaming…</> : done ? "Ran" : <>Run <Icon name="arrow" size={13} /></>}
+          {running ? <><BrandolphDot state="thinking" size={11} /> {t("briefs.try.streaming")}</> : done ? t("briefs.try.ran") : <>{t("briefs.try.run")} <Icon name="arrow" size={13} /></>}
         </button>
       </div>
 
@@ -964,11 +970,11 @@ function TryPanel({ agent, onClose }) {
               letterSpacing: "0.04em",
             }}>
               <span>
-                Composed by <span style={{color:"var(--c-ink)"}}>{done.spec?.name || agent.name}</span> ·
+                {t("briefs.try.composedBy")} <span style={{color:"var(--c-ink)"}}>{done.spec?.name || agent.name}</span> ·
                 BIO v{done.brand?.bioVersion}
                 {done.brand?.certifiedBy
-                  ? <> · <span style={{color:"var(--green-600)"}}>certified</span></>
-                  : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+                  ? <> · <span style={{color:"var(--green-600)"}}>{t("briefs.try.certified")}</span></>
+                  : <> · <span style={{color:"var(--yellow-700)"}}>{t("briefs.try.uncertified")}</span></>}
               </span>
               <span>{agent.cr ?? "?"} cr</span>
             </div>
@@ -984,7 +990,7 @@ function TryPanel({ agent, onClose }) {
           color: qa.passed ? "var(--green-600)" : "var(--pink-700, var(--pink-500))",
           fontSize: 12, display:"flex", justifyContent:"space-between", alignItems:"center", gap: 10,
         }}>
-          <span><strong>Voice QA</strong> · {qa.passed ? "passed" : "flagged"} · {qa.voice_match}/100</span>
+          <span><strong>{t("briefs.try.voiceQa")}</strong> · {qa.passed ? t("briefs.try.passed") : t("briefs.try.flagged")} · {qa.voice_match}/100</span>
           {qa.violations?.length > 0 && <span style={{fontStyle:"italic", textAlign:"right"}}>{qa.violations.join(" · ")}</span>}
         </div>
       )}
@@ -999,6 +1005,7 @@ function TryPanel({ agent, onClose }) {
 }
 
 function SpecialistDrawer({ open, agent, onClose }) {
+  const { t } = useLocale();
   const [showPrompt, setShowPrompt] = useBrState(false);
   const [showTry, setShowTry] = useBrState(false);
   /* Reset try-panel state when the drawer closes or specialist changes */
@@ -1015,10 +1022,10 @@ function SpecialistDrawer({ open, agent, onClose }) {
     <Drawer open={open} onClose={onClose} title={agent.name} eyebrow={`${agent.code} · ${agent.dept}`}
       footer={<>
         <PinButton kind="specialists" id={agent.id} size={18} style={{marginRight:"auto"}} />
-        <button className="btn btn--ghost" onClick={onClose}>Close</button>
+        <button className="btn btn--ghost" onClick={onClose}>{t("briefs.common.close")}</button>
         {agent.status === "live" && !showTry && (
           <button className="btn btn--primary" onClick={() => setShowTry(true)}>
-            Try {agent.name} · {agent.cr} cr <Icon name="arrow" size={13} />
+            {t("briefs.drawer.tryAgentCr", { name: agent.name, cr: agent.cr })} <Icon name="arrow" size={13} />
           </button>
         )}
       </>}>
@@ -1030,15 +1037,15 @@ function SpecialistDrawer({ open, agent, onClose }) {
         {isTeam ? <ModelChip modelKey={agent.model} /> : (
           <span className="eyebrow" style={{color:"var(--c-dim)"}}>L2 · {agent.dept}</span>
         )}
-        <span className="credit credit--pending" style={{fontSize: 13}}>{agent.cr} cr · per run</span>
+        <span className="credit credit--pending" style={{fontSize: 13}}>{agent.cr} cr · {t("briefs.drawer.perRun")}</span>
       </div>
 
-      <div className="eyebrow" style={{marginBottom: 8}}>The job</div>
+      <div className="eyebrow" style={{marginBottom: 8}}>{t("briefs.drawer.theJob")}</div>
       <p style={{fontSize:14.5, color:"var(--c-ink)", lineHeight: 1.55, marginBottom: 18}}>{agent.job}</p>
 
       {meta.capabilities && (
         <>
-          <div className="eyebrow" style={{marginBottom: 8}}>Capabilities</div>
+          <div className="eyebrow" style={{marginBottom: 8}}>{t("briefs.drawer.capabilities")}</div>
           <div style={{display:"flex", flexWrap:"wrap", gap:6, marginBottom: 18}}>
             {meta.capabilities.map(c => (
               <span key={c} style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)",
@@ -1051,24 +1058,24 @@ function SpecialistDrawer({ open, agent, onClose }) {
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom: 18}}>
         {meta.bestFor && (
           <div className="card card--inset" style={{padding:"12px 14px", gridColumn:"1/-1"}}>
-            <div className="eyebrow" style={{marginBottom:4}}>Brandolph picks this for</div>
+            <div className="eyebrow" style={{marginBottom:4}}>{t("briefs.drawer.picksThisFor")}</div>
             <div style={{fontSize:13.5, color:"var(--c-ink)", lineHeight:1.45}}>{meta.bestFor}</div>
           </div>
         )}
         <div className="card card--inset" style={{padding:"12px 14px"}}>
-          <div className="eyebrow" style={{marginBottom:4}}>Turnaround</div>
+          <div className="eyebrow" style={{marginBottom:4}}>{t("briefs.drawer.turnaround")}</div>
           <div style={{fontSize:14, color:"var(--c-ink)"}}>{meta.turnaround || "—"}</div>
         </div>
         <div className="card card--inset" style={{padding:"12px 14px"}}>
-          <div className="eyebrow" style={{marginBottom:4}}>Unlocks from</div>
-          <div style={{fontSize:14, color:"var(--c-ink)"}}>Tier {meta.tierFrom} · {tierLabel}</div>
+          <div className="eyebrow" style={{marginBottom:4}}>{t("briefs.drawer.unlocksFrom")}</div>
+          <div style={{fontSize:14, color:"var(--c-ink)"}}>{t("briefs.drawer.tier")} {meta.tierFrom} · {tierLabel}</div>
         </div>
       </div>
 
       {/* Refusals — visible to everyone; the "shape not produce" guarantee */}
       {refusals.length > 0 && (
         <>
-          <div className="eyebrow" style={{marginBottom: 8}}>Refusals · won't do</div>
+          <div className="eyebrow" style={{marginBottom: 8}}>{t("briefs.drawer.refusals")}</div>
           <div className="card card--inset" style={{padding:"12px 14px", marginBottom: 18, display:"flex", flexDirection:"column", gap:7}}>
             {refusals.slice(0, 5).map((r, i) => (
               <div key={i} style={{display:"flex", gap:8, fontSize:12.5, lineHeight:1.45, color:"var(--c-dim)"}}>
@@ -1082,9 +1089,9 @@ function SpecialistDrawer({ open, agent, onClose }) {
 
       {/* How Brandolph briefs this specialist — composed prompt (transparency). */}
       <div className="eyebrow" style={{marginBottom: 8, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-        <span>How Brandolph briefs this specialist</span>
+        <span>{t("briefs.drawer.howBriefs")}</span>
         <button className="btn btn--link" style={{fontSize:11}} onClick={() => setShowPrompt(p => !p)}>
-          {showPrompt ? "Hide" : "View composed prompt"}
+          {showPrompt ? t("briefs.drawer.hide") : t("briefs.drawer.viewPrompt")}
         </button>
       </div>
       <div className="card card--inset" style={{padding: 14, marginBottom: 22}}>
@@ -1096,20 +1103,20 @@ function SpecialistDrawer({ open, agent, onClose }) {
           }}>{composeSpecialistPrompt(agent, isTeam)}</pre>
         ) : (
           <p style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.55, margin: 0, fontFamily:"var(--font-mono)"}}>
-            {agent.name} reads the BIO before responding, follows {spec.role ? "their method as " + spec.role : "their method"}, and refuses anything that breaks the brand rules. {spec.objective || ""}
+            {t("briefs.drawer.briefsFallback", { name: agent.name, method: spec.role ? t("briefs.drawer.methodAs", { role: spec.role }) : t("briefs.drawer.methodPlain"), objective: spec.objective || "" })}
           </p>
         )}
         <div style={{marginTop:10, paddingTop:10, borderTop:"1px dashed var(--c-line-2)", fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
-          Composed from PLATFORM + BIO + SPEC + TASK{isTeam && m ? ` · routed to ${m.label}` : ""}
+          {t("briefs.drawer.composedFrom")}{isTeam && m ? t("briefs.drawer.routedTo", { model: m.label }) : ""}
         </div>
       </div>
 
-      <div className="eyebrow" style={{marginBottom: 8}}>Recent usage · 30 days</div>
+      <div className="eyebrow" style={{marginBottom: 8}}>{t("briefs.drawer.recentUsage")}</div>
       <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 10, marginBottom: 22}}>
         {[
-          { label:"Jobs run",        v:"14" },
-          { label:"Credits spent",   v: agent.cr * 14 },
-          { label:"Success rate",    v:"94%" },
+          { label:t("briefs.drawer.jobsRun"),      v:"14" },
+          { label:t("briefs.drawer.creditsSpent"), v: agent.cr * 14 },
+          { label:t("briefs.drawer.successRate"),  v:"94%" },
         ].map((s, i) => (
           <div key={i} className="card card--inset" style={{padding:"12px 14px"}}>
             <div className="eyebrow" style={{marginBottom: 4}}>{s.label}</div>
@@ -1118,12 +1125,12 @@ function SpecialistDrawer({ open, agent, onClose }) {
         ))}
       </div>
 
-      <div className="eyebrow" style={{marginBottom: 8}}>Example outputs · for Vinilo</div>
+      <div className="eyebrow" style={{marginBottom: 8}}>{t("briefs.drawer.exampleOutputs")} Vinilo</div>
       <div style={{display:"flex", flexDirection:"column", gap: 12}}>
         {window.CI_OUTPUTS.filter(o => o.agentId === agent.id).slice(0,2).map(o => <OutputCard key={o.id} output={o} />)}
         {window.CI_OUTPUTS.filter(o => o.agentId === agent.id).length === 0 && (
           <div className="card card--inset" style={{padding: 18, textAlign:"center", color:"var(--c-faint)", fontSize: 13}}>
-            <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>You haven't used this specialist yet.</em>
+            <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>{t("briefs.drawer.noOutputs")}</em>
           </div>
         )}
       </div>
@@ -1171,6 +1178,7 @@ const SCALE_MIN = 0.4, SCALE_MAX = 2;
 /* Reusable pan/zoom/drag canvas. Renders nodeData + edges; clicking a
    node (without dragging) fires onNodeClick(node). */
 function InteractiveCanvas({ nodeData, edges, onNodeClick, renderNode, height = "calc(100vh - 56px)", controls = true, helper, exportName = "canvas", toolbarExtra }) {
+  const { t } = useLocale();
   const [nodes, setNodes] = React.useState(() => nodeData.map(n => ({ ...n })));
   const [view, setView]   = React.useState({ x: 24, y: 28, scale: 1 });
   const [sizes, setSizes] = React.useState({});      // id -> measured height
@@ -1342,7 +1350,7 @@ function InteractiveCanvas({ nodeData, edges, onNodeClick, renderNode, height = 
           }}>
             <button className="btn btn--ghost btn--icon"
               onClick={() => setView((v) => ({ ...v, scale: Math.max(0.25, v.scale * 0.85) }))}
-              aria-label="Zoom out" title="Zoom out"
+              aria-label={t("briefs.canvas.zoomOut")} title={t("briefs.canvas.zoomOut")}
               style={{height: 26, width: 26, borderRadius: 999}}>
               <span style={{fontFamily:"var(--font-mono)", fontSize: 14, lineHeight: 1, color:"var(--c-ink)"}}>−</span>
             </button>
@@ -1351,21 +1359,21 @@ function InteractiveCanvas({ nodeData, edges, onNodeClick, renderNode, height = 
             </span>
             <button className="btn btn--ghost btn--icon"
               onClick={() => setView((v) => ({ ...v, scale: Math.min(3, v.scale * 1.18) }))}
-              aria-label="Zoom in" title="Zoom in"
+              aria-label={t("briefs.canvas.zoomIn")} title={t("briefs.canvas.zoomIn")}
               style={{height: 26, width: 26, borderRadius: 999}}>
               <span style={{fontFamily:"var(--font-mono)", fontSize: 14, lineHeight: 1, color:"var(--c-ink)"}}>+</span>
             </button>
             <span style={{width: 1, height: 16, background:"var(--c-line)", margin:"0 2px"}} aria-hidden="true" />
             <button className="btn btn--ghost btn--sm" onClick={fitView}
-              title="Fit all nodes in view"
+              title={t("briefs.canvas.fitTitle")}
               style={{height: 26, padding:"0 10px", borderRadius: 999, fontSize: 11.5}}>
-              Fit
+              {t("briefs.canvas.fit")}
             </button>
           </div>
         )}
         {controls && (
           <button className="btn btn--ghost btn--icon" onClick={exportLayout}
-            aria-label="Export canvas as image" title="Export canvas as image"
+            aria-label={t("briefs.canvas.exportImage")} title={t("briefs.canvas.exportImage")}
             style={{height: 30, width: 30}}>
             <Icon name="download" size={13} />
           </button>
@@ -1432,7 +1440,7 @@ function InteractiveCanvas({ nodeData, edges, onNodeClick, renderNode, height = 
           <div className="card" style={{padding:"9px 16px", display:"flex", alignItems:"center", gap: 12}}>
             <BrandolphDot />
             <span style={{fontSize: 12.5, color:"var(--c-dim)"}}>
-              {helper || <>Drag to pan · scroll to zoom · <strong style={{color:"var(--c-ink)", fontWeight:600}}>click any node</strong> for the detail and rationale.</>}
+              {helper || <>{t("briefs.canvas.helperA")} <strong style={{color:"var(--c-ink)", fontWeight:600}}>{t("briefs.canvas.helperClick")}</strong> {t("briefs.canvas.helperB")}</>}
             </span>
           </div>
         </div>
@@ -1467,9 +1475,10 @@ function InteractiveCanvas({ nodeData, edges, onNodeClick, renderNode, height = 
    by department, and the refusals as small badges. Designed to feel
    like the brief, not a status bar. */
 function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreakdown = [], totalCr, completed, running }) {
+  const { t } = useLocale();
   const [expanded, setExpanded] = useBrState(false);
   const stateColor = completed ? "var(--green-600)" : running ? "var(--yellow-700)" : "var(--neutral-500)";
-  const stateLabel = completed ? "Run complete" : running ? "Running" : "Crew assembled";
+  const stateLabel = completed ? t("briefs.canvas.runComplete") : running ? t("briefs.canvas.running") : t("briefs.canvas.crewAssembled");
   return (
     <div style={{
       padding:"14px 36px 12px", borderBottom:"1px solid var(--c-line)",
@@ -1492,13 +1501,13 @@ function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreak
             margin: 0, fontFamily:"Georgia, serif", fontStyle:"italic",
             fontSize: 22, lineHeight: 1.2, letterSpacing:"-0.005em", fontWeight: 400, color:"var(--c-ink)",
             overflow:"hidden", textOverflow:"ellipsis", display:"-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient:"vertical",
-          }}>{title || "(untitled brief)"}</h1>
+          }}>{title || t("briefs.canvas.untitled")}</h1>
           {tension && (
             <p style={{
               margin:"6px 0 0", fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5,
               overflow:"hidden", textOverflow:"ellipsis", display:"-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient:"vertical",
             }}>
-              <span style={{color:"var(--c-faint)", fontFamily:"var(--font-mono)", fontSize: 10, marginRight: 6, letterSpacing:"0.08em", textTransform:"uppercase"}}>Tension</span>
+              <span style={{color:"var(--c-faint)", fontFamily:"var(--font-mono)", fontSize: 10, marginRight: 6, letterSpacing:"0.08em", textTransform:"uppercase"}}>{t("briefs.canvas.tension")}</span>
               {tension}
             </p>
           )}
@@ -1524,7 +1533,7 @@ function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreak
             <button onClick={() => setExpanded((e) => !e)}
               className="btn btn--ghost btn--sm"
               style={{height: 22, padding:"0 8px", fontSize: 10.5, fontFamily:"var(--font-mono)", letterSpacing:"0.04em"}}>
-              {expanded ? "Hide brief" : "Show brief"}
+              {expanded ? t("briefs.canvas.hideBrief") : t("briefs.canvas.showBrief")}
               <span style={{display:"inline-block", marginLeft: 4, transform: expanded ? "rotate(180deg)" : "none", transition:"transform 160ms ease"}}>▾</span>
             </button>
           )}
@@ -1540,7 +1549,7 @@ function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreak
         }}>
           {sharpenedBrief && (
             <div>
-              <div className="eyebrow" style={{marginBottom: 6}}>Brandolph's sharpened brief</div>
+              <div className="eyebrow" style={{marginBottom: 6}}>{t("briefs.canvas.sharpenedBrief")}</div>
               <p style={{margin: 0, fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 13.5, lineHeight: 1.6, color:"var(--c-ink)"}}>
                 {sharpenedBrief}
               </p>
@@ -1548,7 +1557,7 @@ function CanvasHeader({ title, tension, sharpenedBrief, refusals = [], deptBreak
           )}
           {refusals.length > 0 && (
             <div>
-              <div className="eyebrow" style={{marginBottom: 6}}>Hard refusals for this brief</div>
+              <div className="eyebrow" style={{marginBottom: 6}}>{t("briefs.canvas.hardRefusals")}</div>
               <div style={{display:"flex", flexDirection:"column", gap: 4}}>
                 {refusals.slice(0, 6).map((r, i) => (
                   <div key={i} style={{fontSize: 11.5, color:"var(--c-dim)", lineHeight: 1.45, paddingLeft: 12, position:"relative"}}>
@@ -1603,6 +1612,7 @@ function MoodBoardCard({ tiles = [], bioVisual = null }) {
 }
 
 function BriefRunCanvas({ context, onClear, go }) {
+  const { t } = useLocale();
   const [nodes, setNodes]         = useBrState(() => buildInitialRunNodes(context));
   const [edges, setEdges]         = useBrState(() => buildInitialRunEdges(context));
   const [running, setRunning]     = useBrState(false);
@@ -1632,7 +1642,7 @@ function BriefRunCanvas({ context, onClear, go }) {
           .eq("brand_id", brandId).eq("certified", true).order("version", { ascending: false }).limit(1).maybeSingle();
         if (bio?.certified_by) {
           const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
-          setCert({ byName: tm?.first_name || "your Steward", at: bio.certified_at });
+          setCert({ byName: tm?.first_name || t("briefs.misc.yourSteward"), at: bio.certified_at });
         }
       } catch (e) { /* non-fatal */ }
     })();
@@ -1655,7 +1665,7 @@ function BriefRunCanvas({ context, onClear, go }) {
             padding: "8px 14px", fontFamily: "var(--font-mono)", fontSize: 10,
             letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--c-faint)",
           }}>
-            {node.label} · {node.count} deliverable{node.count > 1 ? "s" : ""}
+            {node.label} · {t("briefs.run.deliverableCount", { count: node.count })}
           </div>
         </div>
       );
@@ -1689,9 +1699,9 @@ function BriefRunCanvas({ context, onClear, go }) {
           <div style={{ padding: "10px 12px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
               <span className="eyebrow" style={{ fontSize: 9, color: stateColor, letterSpacing: "0.04em" }}>
-                {(node.platform || "generic").toUpperCase()} · {flagged ? "FLAGGED" : "READY"}
+                {(node.platform || t("briefs.run.generic")).toUpperCase()} · {flagged ? t("briefs.run.flagged") : t("briefs.run.ready")}
               </span>
-              {node.humanCraft && <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing:"0.06em", color:"var(--purple-600, #6b46c1)" }}>✦ IN HUMAN CRAFT</span>}
+              {node.humanCraft && <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing:"0.06em", color:"var(--purple-600, #6b46c1)" }}>{t("briefs.run.inHumanCraft")}</span>}
               {node.qa?.voice_match != null && (
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--c-faint)" }}>{node.qa.voice_match}/100</span>
               )}
@@ -1700,7 +1710,7 @@ function BriefRunCanvas({ context, onClear, go }) {
             <div style={{ fontSize: 12, lineHeight: 1.45, color: "var(--c-dim)", flex: 1, maxHeight: "none", overflow: "hidden", whiteSpace: "pre-wrap" }}>{node.body}</div>
             {node.specialistName && (
               <div style={{ marginTop: 8, fontSize: 9.5, color: "var(--c-faint)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
-                by {node.specialistName}
+                {t("briefs.run.byName", { name: node.specialistName })}
               </div>
             )}
           </div>
@@ -1752,10 +1762,10 @@ function BriefRunCanvas({ context, onClear, go }) {
         <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 4}}>
           <div className="eyebrow" style={{fontSize: 9, color: stateColor}}>
             {(node.eyebrow || node.kind).toUpperCase()}
-            {state === "running" && " · streaming"}
-            {state === "done"    && " · done"}
-            {state === "flagged" && " · flagged"}
-            {state === "failed"  && " · failed"}
+            {state === "running" && ` · ${t("briefs.run.statusStreaming")}`}
+            {state === "done"    && ` · ${t("briefs.run.statusDone")}`}
+            {state === "flagged" && ` · ${t("briefs.run.statusFlagged")}`}
+            {state === "failed"  && ` · ${t("briefs.run.statusFailed")}`}
           </div>
           {isSpecialist && state !== "queued" && (
             <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>{node.cr ?? "?"} cr</span>
@@ -1789,7 +1799,7 @@ function BriefRunCanvas({ context, onClear, go }) {
             <div style={{display:"flex", justifyContent:"space-between", fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
               <span>{node.sub}</span>
               {clickable
-                ? <span style={{color:"var(--c-dim)"}}>open ↗</span>
+                ? <span style={{color:"var(--c-dim)"}}>{t("briefs.run.open")} ↗</span>
                 : <span>{state === "queued" ? `${node.cr || "?"} cr` : ""}</span>}
             </div>
           </>
@@ -1834,7 +1844,7 @@ function BriefRunCanvas({ context, onClear, go }) {
            cluster (handled when the copy specialist completes). Mark it waiting
            and skip the standalone single-image run. */
         setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
-          ? { ...n, state: "queued", sub: "pairs with the copy cluster" } : n));
+          ? { ...n, state: "queued", sub: t("briefs.run.subPairsCopy") } : n));
         continue;
       }
       // Mood board: fan into cohesive imagery tiles, then compose a board.
@@ -1865,7 +1875,7 @@ function BriefRunCanvas({ context, onClear, go }) {
       }
 
       setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
-        ? { ...n, state: "running", tokenCount: 0, outputText: "", sub: "streaming…" } : n));
+        ? { ...n, state: "running", tokenCount: 0, outputText: "", sub: t("briefs.run.subStreaming") } : n));
 
       let text = "";
       let qa   = null;
@@ -1903,7 +1913,7 @@ function BriefRunCanvas({ context, onClear, go }) {
              affordance works for both text and image runs. */
           const p = Math.max(0, Math.min(100, Number(pct) || 0));
           setNodes((prev) => prev.map((n) => n.id === "spec-" + agent.id
-            ? { ...n, sub: stage || "rendering…", tokenCount: Math.round((p / 100) * (n.cr || 14) * 100) }
+            ? { ...n, sub: stage || t("briefs.run.subRendering"), tokenCount: Math.round((p / 100) * (n.cr || 14) * 100) }
             : n));
         },
         onQa:    (data) => { qa = data; },
@@ -1933,8 +1943,8 @@ function BriefRunCanvas({ context, onClear, go }) {
             qa,
             done,
             sub: assetUrl
-              ? `${qa?.brand_match ?? "?"}/100 · ${passed ? "approved" : "flagged"}`
-              : `${qa?.voice_match ?? "?"}/100 · ${passed ? "approved" : "flagged"}`,
+              ? `${qa?.brand_match ?? "?"}/100 · ${passed ? t("briefs.status.approved") : t("briefs.status.flagged")}`
+              : `${qa?.voice_match ?? "?"}/100 · ${passed ? t("briefs.status.approved") : t("briefs.status.flagged")}`,
           }
         : n));
 
@@ -1974,7 +1984,7 @@ function BriefRunCanvas({ context, onClear, go }) {
         if (visualId) {
           const platform = group.platforms?.[0] || "generic";
           setNodes((prev) => prev.map((n) => n.id === "spec-" + visualId
-            ? { ...n, state: "running", sub: "rendering images…" } : n));
+            ? { ...n, state: "running", sub: t("briefs.run.subRenderingImages") } : n));
           const items = done.output.deliverables;
           for (let i = 0; i < items.length; i++) {
             const cardId = `spec-${agent.id}-d${i}`;
@@ -2054,9 +2064,9 @@ function BriefRunCanvas({ context, onClear, go }) {
           if (st === "running" || st === "done" || st === "flagged") setOpenId(node.specId);
         }}
         helper={
-          running     ? "Running the crew… each card streams its progress. Click any to open the full output."
-          : completed ? `Run complete · ${context.totalCr} cr spent. Click any specialist to verify, edit, or copy its output.`
-          : "Crew assembled. Hit Run when you're ready."
+          running     ? t("briefs.run.helperRunning")
+          : completed ? t("briefs.run.helperComplete", { cr: context.totalCr })
+          : t("briefs.run.helperAssembled")
         }
         toolbarExtra={
           <>
@@ -2070,14 +2080,14 @@ function BriefRunCanvas({ context, onClear, go }) {
                   color:"var(--green-600)", fontFamily:"var(--font-mono)", fontSize: 10.5,
                   letterSpacing:"0.08em", textTransform:"uppercase", fontWeight: 600,
                 }}>
-                  <Icon name="check" size={11} /> Run complete
+                  <Icon name="check" size={11} /> {t("briefs.run.runComplete")}
                 </span>
                 {/* Actions — clearly buttons, not state */}
                 <a href="#/library" className="btn btn--primary btn--sm" style={{height: 28}}>
-                  Open Library <Icon name="arrow" size={12} />
+                  {t("briefs.run.openLibrary")} <Icon name="arrow" size={12} />
                 </a>
                 <button className="btn btn--ghost btn--sm" onClick={() => { onClear(); go("home"); }} style={{height: 28}}>
-                  <Icon name="plus" size={12} /> New brief
+                  <Icon name="plus" size={12} /> {t("briefs.run.newBrief")}
                 </button>
               </>
             )}
@@ -2109,9 +2119,9 @@ function BriefRunCanvas({ context, onClear, go }) {
           onMouseLeave={(e) => { if (!running) { e.currentTarget.style.transform = "translateX(-50%)"; e.currentTarget.style.boxShadow = "0 16px 36px rgba(0,0,0,0.18), 0 4px 10px rgba(0,0,0,0.08)"; } }}
         >
           {running ? (
-            <><BrandolphDot state="thinking" size={11} /> &nbsp;Running the crew…</>
+            <><BrandolphDot state="thinking" size={11} /> &nbsp;{t("briefs.run.runningCrew")}</>
           ) : (
-            <><span style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17}}>Run</span> the assembly · {context.totalCr} cr <Icon name="arrow" size={16} /></>
+            <><span style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17}}>{t("briefs.run.runWord")}</span> {t("briefs.run.theAssembly")} · {context.totalCr} cr <Icon name="arrow" size={16} /></>
           )}
         </button>
       )}
@@ -2161,45 +2171,46 @@ function BriefRunCanvas({ context, onClear, go }) {
    specialists get image models. The cost-default already picked the
    right one — these are for "escalate to premium" or "try cheaper". */
 const TEXT_RERUN_OPTIONS = [
-  { route: "anthropic/claude-opus-4-7",            label: "Opus 4.7",            note: "Premium — deepest reasoning" },
-  { route: "anthropic/claude-sonnet-4-6",          label: "Sonnet 4.6",          note: "Balanced workhorse" },
-  { route: "anthropic/claude-haiku-4-5-20251001",  label: "Haiku 4.5",           note: "Fast + cheap" },
-  { route: "openrouter/google/gemini-2.5-pro",     label: "Gemini Pro",          note: "Long-context synthesis" },
-  { route: "openrouter/google/gemini-2.5-flash",   label: "Gemini Flash",        note: "Cheapest" },
+  { route: "anthropic/claude-opus-4-7",            label: "Opus 4.7",            noteKey: "noteOpus" },
+  { route: "anthropic/claude-sonnet-4-6",          label: "Sonnet 4.6",          noteKey: "noteSonnet" },
+  { route: "anthropic/claude-haiku-4-5-20251001",  label: "Haiku 4.5",           noteKey: "noteHaiku" },
+  { route: "openrouter/google/gemini-2.5-pro",     label: "Gemini Pro",          noteKey: "noteGeminiPro" },
+  { route: "openrouter/google/gemini-2.5-flash",   label: "Gemini Flash",        noteKey: "noteGeminiFlash" },
 ];
 const IMAGE_RERUN_OPTIONS = [
-  { route: "vendor/fal/flux-1.1-pro",  label: "Flux 1.1 Pro",   note: "Premium hero quality" },
-  { route: "vendor/fal/flux-schnell",  label: "Flux Schnell",   note: "Fast draft (13× cheaper)" },
-  { route: "vendor/fal/recraft-v3",    label: "Recraft V3",     note: "Vector / illustration" },
+  { route: "vendor/fal/flux-1.1-pro",  label: "Flux 1.1 Pro",   noteKey: "noteFluxPro" },
+  { route: "vendor/fal/flux-schnell",  label: "Flux Schnell",   noteKey: "noteFluxSchnell" },
+  { route: "vendor/fal/recraft-v3",    label: "Recraft V3",     noteKey: "noteRecraft" },
 ];
 
 /* The brief + Brandolph's recommendations — opened by clicking the Brief node. */
 function BriefDrawer({ brief, onClose }) {
+  const { t } = useLocale();
   const groups = brief.deliveryPlan?.deliverableGroups || [];
   return (
-    <Drawer open={true} onClose={onClose} title={brief.title || "Brief"} eyebrow="BRANDOLPH · BRIEF & RECOMMENDATIONS" width={620}
-      footer={<button className="btn btn--ghost" onClick={onClose}>Close</button>}>
+    <Drawer open={true} onClose={onClose} title={brief.title || t("briefs.briefDrawer.titleFallback")} eyebrow={t("briefs.briefDrawer.eyebrow")} width={620}
+      footer={<button className="btn btn--ghost" onClick={onClose}>{t("briefs.common.close")}</button>}>
       {brief.tension && (
         <div style={{ marginBottom: 18 }}>
-          <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 6 }}>The tension Brandolph named</div>
+          <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 6 }}>{t("briefs.briefDrawer.tensionNamed")}</div>
           <p style={{ margin: 0, fontFamily: "Georgia, serif", fontStyle: "italic", fontSize: 16, lineHeight: 1.5, color: "var(--c-ink)" }}>{brief.tension}</p>
         </div>
       )}
       {brief.sharpenedBrief && (
         <div style={{ marginBottom: 18 }}>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>How a CMO would write this</div>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>{t("briefs.briefDrawer.howCmo")}</div>
           <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "var(--c-ink)" }}>{brief.sharpenedBrief}</p>
         </div>
       )}
       {brief.rawBrief && (
         <div style={{ marginBottom: 18 }}>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>Your original request</div>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>{t("briefs.briefDrawer.yourRequest")}</div>
           <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: "var(--c-dim)" }}>{brief.rawBrief}</p>
         </div>
       )}
       {(brief.refusals || []).length > 0 && (
         <div style={{ marginBottom: 18 }}>
-          <div className="eyebrow" style={{ marginBottom: 6, color: "var(--pink-500)" }}>Brandolph's recommendations — what we will NOT do</div>
+          <div className="eyebrow" style={{ marginBottom: 6, color: "var(--pink-500)" }}>{t("briefs.briefDrawer.recommendations")}</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {brief.refusals.map((r, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--c-ink)", marginBottom: 4 }}>{r}</li>)}
           </ul>
@@ -2207,7 +2218,7 @@ function BriefDrawer({ brief, onClose }) {
       )}
       {groups.length > 0 && (
         <div>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>What Brandolph is producing</div>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>{t("briefs.briefDrawer.producing")}</div>
           {groups.map((g, i) => (
             <div key={i} style={{ fontSize: 13.5, color: "var(--c-ink)", marginBottom: 4 }}>
               {g.count}× {String(g.type || "").replace(/_/g, " ")}{g.platforms?.length ? ` · ${g.platforms.join(", ")}` : ""}
@@ -2223,6 +2234,7 @@ function BriefDrawer({ brief, onClose }) {
    Copy / Export. Opened by clicking a deliverable card on the canvas. */
 const HUMAN_POLISH_CR = 40;   /* credits to contract a human to polish one deliverable */
 function DeliverableDrawer({ node, onClose, onSendToHuman }) {
+  const { t } = useLocale();
   const [copied, setCopied] = useBrState(false);
   const flagged = node.status === "flagged";
   const stateColor = flagged ? "var(--pink-500)" : "var(--green-500)";
@@ -2244,50 +2256,50 @@ function DeliverableDrawer({ node, onClose, onSendToHuman }) {
       open={true}
       onClose={onClose}
       title={node.title}
-      eyebrow={`${(node.platform || "generic").toUpperCase()} · ${flagged ? "FLAGGED" : "READY"}${node.qa?.voice_match != null ? ` · ${node.qa.voice_match}/100` : ""}${node.specialistName ? ` · by ${node.specialistName}` : ""}`}
+      eyebrow={`${(node.platform || t("briefs.run.generic")).toUpperCase()} · ${flagged ? t("briefs.run.flagged") : t("briefs.run.ready")}${node.qa?.voice_match != null ? ` · ${node.qa.voice_match}/100` : ""}${node.specialistName ? ` · ${t("briefs.run.byName", { name: node.specialistName })}` : ""}`}
       width={560}
       footer={
         inCraft ? (
           <>
-            <button className="btn btn--ghost" onClick={onClose}>Close</button>
-            <span style={{ display:"inline-flex", alignItems:"center", gap: 6, height: 28, padding:"0 12px", borderRadius: 999, background:"var(--purple-50, rgba(124,92,255,0.12))", color:"var(--purple-600, #6b46c1)", fontSize: 12, fontWeight: 600 }}>✦ In human craft</span>
+            <button className="btn btn--ghost" onClick={onClose}>{t("briefs.common.close")}</button>
+            <span style={{ display:"inline-flex", alignItems:"center", gap: 6, height: 28, padding:"0 12px", borderRadius: 999, background:"var(--purple-50, rgba(124,92,255,0.12))", color:"var(--purple-600, #6b46c1)", fontSize: 12, fontWeight: 600 }}>{t("briefs.deliverable.inCraftBadge")}</span>
           </>
         ) : polishMode ? (
           <>
-            <button className="btn btn--ghost" onClick={() => setPolishMode(false)}>Cancel</button>
+            <button className="btn btn--ghost" onClick={() => setPolishMode(false)}>{t("briefs.deliverable.cancel")}</button>
             <button className="btn btn--primary btn--sm" onClick={() => { onSendToHuman && onSendToHuman(node, polishNotes.trim()); setPolishMode(false); }}>
-              Confirm — send to human · {HUMAN_POLISH_CR} cr
+              {t("briefs.deliverable.confirmSend", { cr: HUMAN_POLISH_CR })}
             </button>
           </>
         ) : (
           <>
-            <button className="btn btn--ghost" onClick={onClose}>Close</button>
-            <button className="btn btn--ghost btn--sm" onClick={exportOne}>Export</button>
-            <button className="btn btn--ghost btn--sm" onClick={copy}>{copied ? "Copied ✓" : "Copy"}</button>
-            {onSendToHuman && <button className="btn btn--primary btn--sm" onClick={() => setPolishMode(true)}>Send to human · {HUMAN_POLISH_CR} cr</button>}
+            <button className="btn btn--ghost" onClick={onClose}>{t("briefs.common.close")}</button>
+            <button className="btn btn--ghost btn--sm" onClick={exportOne}>{t("briefs.deliverable.export")}</button>
+            <button className="btn btn--ghost btn--sm" onClick={copy}>{copied ? t("briefs.deliverable.copied") : t("briefs.deliverable.copy")}</button>
+            {onSendToHuman && <button className="btn btn--primary btn--sm" onClick={() => setPolishMode(true)}>{t("briefs.deliverable.sendToHuman", { cr: HUMAN_POLISH_CR })}</button>}
           </>
         )
       }
     >
       {inCraft && (
         <div style={{ marginBottom: 14, padding:"10px 12px", borderRadius: 10, background:"var(--purple-50, rgba(124,92,255,0.10))", border:"1px solid var(--purple-200, rgba(124,92,255,0.3))", fontSize: 12.5, color:"var(--c-ink)" }}>
-          ✦ A human is polishing this piece. You'll see the refined version land here when it's done.
-          {node.polishNotes && <div style={{ marginTop: 8, paddingTop: 8, borderTop:"1px solid var(--purple-200, rgba(124,92,255,0.3))", fontStyle:"italic", color:"var(--c-dim)", whiteSpace:"pre-wrap" }}>Your brief to the human:{"\n"}{node.polishNotes}</div>}
+          {t("briefs.deliverable.craftBanner")}
+          {node.polishNotes && <div style={{ marginTop: 8, paddingTop: 8, borderTop:"1px solid var(--purple-200, rgba(124,92,255,0.3))", fontStyle:"italic", color:"var(--c-dim)", whiteSpace:"pre-wrap" }}>{t("briefs.deliverable.yourBriefToHuman")}{"\n"}{node.polishNotes}</div>}
         </div>
       )}
       {polishMode && !inCraft && (
         <div style={{ marginBottom: 16, padding:"14px 16px", borderRadius: 12, background:"var(--c-bg)", border:"1px solid var(--c-line)" }}>
-          <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 8 }}>Brief the human · what to polish</div>
+          <div className="eyebrow eyebrow--yellow" style={{ marginBottom: 8 }}>{t("briefs.deliverable.briefHuman")}</div>
           <textarea
             value={polishNotes}
             onChange={(e) => setPolishNotes(e.target.value)}
             autoFocus
-            placeholder="Specific requests, points to add or edit — e.g. 'tighten the opening', 'make the CTA softer', 'add a line about the Madrid pour-over'."
+            placeholder={t("briefs.deliverable.polishPlaceholder")}
             rows={4}
             style={{ width:"100%", padding:"10px 12px", borderRadius: 8, border:"1px solid var(--c-line)", background:"var(--c-card)", fontFamily:"inherit", fontSize: 13.5, lineHeight: 1.55, resize:"vertical", outline:"none", boxSizing:"border-box" }}
           />
           <div style={{ display:"flex", flexWrap:"wrap", gap: 6, marginTop: 8 }}>
-            {["Tighten it", "More playful", "Fix the CTA", "Match the BIO voice", "Make it shorter"].map((chip) => (
+            {[t("briefs.deliverable.chipTighten"), t("briefs.deliverable.chipPlayful"), t("briefs.deliverable.chipCta"), t("briefs.deliverable.chipBioVoice"), t("briefs.deliverable.chipShorter")].map((chip) => (
               <button key={chip} type="button"
                 onClick={() => setPolishNotes((p) => (p.trim() ? p.replace(/\s*$/, "") + "\n" : "") + "• " + chip)}
                 style={{ height: 24, padding:"0 10px", fontSize: 11.5, cursor:"pointer", borderRadius: 999, border:"1px solid var(--c-line)", background:"var(--c-card)", color:"var(--c-dim)" }}>
@@ -2307,6 +2319,7 @@ function DeliverableDrawer({ node, onClose, onSendToHuman }) {
    land in outputs.body.edited_text (not the original body.text) so the
    AI's original output stays intact for audit. */
 function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onClose, outputId, baselineText, onSaved, briefId, brandId, onRerun }) {
+  const { t } = useLocale();
   const [copied, setCopied]     = useBrState(false);
   const [saving, setSaving]     = useBrState(false);
   const [savedAt, setSavedAt]   = useBrState(null);
@@ -2385,19 +2398,19 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
       eyebrow={`${agent.code} · ${agent.dept}`}
       width={620}
       footer={<>
-        <button className="btn btn--ghost" onClick={onClose}>Close</button>
+        <button className="btn btn--ghost" onClick={onClose}>{t("briefs.common.close")}</button>
         {isImage ? (
           <a className="btn btn--primary btn--sm" href={assetUrl} target="_blank" rel="noreferrer" download>
-            <Icon name="files" size={13} /> Download
+            <Icon name="files" size={13} /> {t("briefs.notepad.download")}
           </a>
         ) : (
           <>
             <button className="btn btn--ghost btn--sm" onClick={copy}>
-              <Icon name="files" size={13} /> {copied ? "Copied" : "Copy"}
+              <Icon name="files" size={13} /> {copied ? t("briefs.notepad.copied") : t("briefs.notepad.copy")}
             </button>
             <button className="btn btn--primary btn--sm" disabled={!outputId || !dirty || saving} onClick={save}
-              title={!outputId ? "Output not persisted yet" : !dirty ? "No changes" : "Save edit to DB"}>
-              {saving ? "Saving…" : savedAt ? `Saved · ${savedAt}` : dirty ? "Save edit" : "Saved"}
+              title={!outputId ? t("briefs.notepad.titleNotPersisted") : !dirty ? t("briefs.notepad.titleNoChanges") : t("briefs.notepad.titleSaveEdit")}>
+              {saving ? t("briefs.notepad.saving") : savedAt ? t("briefs.notepad.savedAt", { time: savedAt }) : dirty ? t("briefs.notepad.saveEdit") : t("briefs.notepad.saved")}
             </button>
           </>
         )}
@@ -2406,13 +2419,13 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
       <div style={{ background: stateColor, height: 4, borderRadius: 4, marginBottom: 14 }} />
 
       {/* Brief context — what the specialist was asked to do */}
-      <div className="eyebrow" style={{marginBottom: 6}}>The brief</div>
+      <div className="eyebrow" style={{marginBottom: 6}}>{t("briefs.notepad.theBrief")}</div>
       <p style={{margin: 0, marginBottom: 18, fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5}}>
         {context.rawBrief}
       </p>
       {context.sharpenedBrief && (
         <>
-          <div className="eyebrow" style={{marginBottom: 6}}>Sharpened (a02)</div>
+          <div className="eyebrow" style={{marginBottom: 6}}>{t("briefs.notepad.sharpened")}</div>
           <p style={{margin: 0, marginBottom: 18, fontSize: 13, color:"var(--c-ink)", lineHeight: 1.55, fontStyle:"italic", fontFamily:"Georgia, serif"}}>
             {context.sharpenedBrief}
           </p>
@@ -2430,11 +2443,11 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
           {/* Image runs use brand_match (a24 vision QA); text runs use voice_match (a18). */}
           {(() => {
             const isImageQa = node.qa.kind === "image_a24" || typeof node.qa.brand_match === "number";
-            const label = isImageQa ? "Brand QA" : "Voice QA";
+            const label = isImageQa ? t("briefs.notepad.brandQa") : t("briefs.notepad.voiceQa");
             const score = isImageQa ? node.qa.brand_match : node.qa.voice_match;
             return (
               <>
-                <strong>{label} · {passed ? "approved" : "flagged"} · {score}/100</strong>
+                <strong>{label} · {passed ? t("briefs.status.approved") : t("briefs.status.flagged")} · {score}/100</strong>
                 {node.qa.violations?.length > 0 && <span style={{fontStyle:"italic", textAlign:"right"}}>{node.qa.violations.join(" · ")}</span>}
               </>
             );
@@ -2447,12 +2460,12 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
           that lands in body.edited_text on save (body.text stays for audit). */}
       <div className="eyebrow" style={{marginBottom: 6, display:"flex", justifyContent:"space-between"}}>
         <span>
-          Output {isImage ? "· image" : "· editable"}
-          {dirty && <span style={{color:"var(--yellow-700)"}}> · unsaved</span>}
+          {t("briefs.notepad.output")} {isImage ? t("briefs.notepad.outputImage") : t("briefs.notepad.outputEditable")}
+          {dirty && <span style={{color:"var(--yellow-700)"}}> {t("briefs.notepad.unsaved")}</span>}
         </span>
         {!isImage && (
           <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>
-            {editedText.length} chars
+            {t("briefs.notepad.chars", { count: editedText.length })}
           </span>
         )}
       </div>
@@ -2493,12 +2506,12 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
             <button className="btn btn--ghost btn--sm"
               onClick={() => { setRerunOpen(o => !o); setReviseOpen(false); }}
               disabled={rerunState?.running}>
-              <Icon name="refresh" size={13} /> Re-run with…
+              <Icon name="refresh" size={13} /> {t("briefs.notepad.rerunWith")}
             </button>
             <button className="btn btn--ghost btn--sm"
               onClick={() => { setReviseOpen(o => !o); setRerunOpen(false); }}
               disabled={rerunState?.running}>
-              <Icon name="edit" size={13} /> Revise with feedback
+              <Icon name="edit" size={13} /> {t("briefs.notepad.reviseFeedback")}
             </button>
           </div>
 
@@ -2521,8 +2534,8 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
                     onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = "var(--neutral-50)"; }}
                     onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
                     <div>
-                      <div style={{fontSize: 13, fontWeight: 500, color:"var(--c-ink)"}}>{opt.label}{isCurrent && <span style={{color:"var(--c-faint)", fontWeight: 400}}> · current</span>}</div>
-                      <div style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>{opt.note}</div>
+                      <div style={{fontSize: 13, fontWeight: 500, color:"var(--c-ink)"}}>{opt.label}{isCurrent && <span style={{color:"var(--c-faint)", fontWeight: 400}}> {t("briefs.notepad.current")}</span>}</div>
+                      <div style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>{t("briefs.rerun." + opt.noteKey)}</div>
                     </div>
                     <Icon name="arrow" size={12} />
                   </button>
@@ -2539,7 +2552,7 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
                 onChange={(e) => setReviseText(e.target.value)}
                 onKeyDown={(e) => e.stopPropagation()}
                 rows={3}
-                placeholder="What's not landing? e.g. 'too clinical — push toward editorial' or 'change the hero from coffee to a single ceramic vessel'"
+                placeholder={t("briefs.notepad.revisePlaceholder")}
                 style={{
                   width:"100%", padding: 10, borderRadius: 8,
                   border: "1px solid var(--c-line)", background: "var(--c-bg)",
@@ -2548,11 +2561,11 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
                 }}
               />
               <div style={{display:"flex", justifyContent:"flex-end", gap: 8, marginTop: 8}}>
-                <button className="btn btn--ghost btn--sm" onClick={() => { setReviseOpen(false); setReviseText(""); }}>Cancel</button>
+                <button className="btn btn--ghost btn--sm" onClick={() => { setReviseOpen(false); setReviseText(""); }}>{t("briefs.notepad.cancel")}</button>
                 <button className="btn btn--primary btn--sm"
                   disabled={!reviseText.trim() || rerunState?.running}
-                  onClick={() => { const fb = reviseText.trim(); setReviseOpen(false); setReviseText(""); fireRerun({ revisionFeedback: fb, label: "with revision" }); }}>
-                  Re-run with feedback
+                  onClick={() => { const fb = reviseText.trim(); setReviseOpen(false); setReviseText(""); fireRerun({ revisionFeedback: fb, label: t("briefs.notepad.withRevision") }); }}>
+                  {t("briefs.notepad.rerunWithFeedback")}
                 </button>
               </div>
             </div>
@@ -2563,13 +2576,13 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
             <div className="card" style={{padding: 12, background: rerunState.error ? "var(--pink-50, rgba(244,143,177,0.08))" : "var(--c-bg)"}}>
               <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 8}}>
                 <div className="eyebrow">
-                  Re-run · {rerunState.model || "?"}
-                  {rerunState.running && <span style={{marginLeft: 6, color:"var(--yellow-700)"}}>· running…</span>}
-                  {!rerunState.running && rerunState.error && <span style={{marginLeft: 6, color:"var(--pink-500)"}}>· failed</span>}
-                  {!rerunState.running && !rerunState.error && <span style={{marginLeft: 6, color:"var(--green-600)"}}>· done</span>}
+                  {t("briefs.notepad.rerunLabel")} · {rerunState.model || "?"}
+                  {rerunState.running && <span style={{marginLeft: 6, color:"var(--yellow-700)"}}>· {t("briefs.notepad.runningSuffix")}</span>}
+                  {!rerunState.running && rerunState.error && <span style={{marginLeft: 6, color:"var(--pink-500)"}}>· {t("briefs.notepad.failedSuffix")}</span>}
+                  {!rerunState.running && !rerunState.error && <span style={{marginLeft: 6, color:"var(--green-600)"}}>· {t("briefs.notepad.doneSuffix")}</span>}
                 </div>
                 {!rerunState.running && (
-                  <button className="btn btn--ghost btn--sm" onClick={() => setRerunState(null)} aria-label="Dismiss"><Icon name="close" size={11} /></button>
+                  <button className="btn btn--ghost btn--sm" onClick={() => setRerunState(null)} aria-label={t("briefs.notepad.dismiss")}><Icon name="close" size={11} /></button>
                 )}
               </div>
               {rerunState.error ? (
@@ -2580,7 +2593,7 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
                   fontSize: 14, lineHeight: 1.55, color:"var(--c-ink)",
                   whiteSpace: "pre-wrap", maxHeight: 200, overflowY:"auto",
                 }}>
-                  {rerunState.output || (rerunState.running ? "Calling…" : "(empty)")}
+                  {rerunState.output || (rerunState.running ? t("briefs.notepad.calling") : t("briefs.notepad.empty"))}
                 </div>
               )}
             </div>
@@ -2595,11 +2608,11 @@ function SpecialistNotepad({ agent, node, cert, context, editedText, onEdit, onC
         fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.04em",
       }}>
         <span>
-          Composed by <span style={{color:"var(--c-ink)"}}>{agent.name}</span> ·
+          {t("briefs.try.composedBy")} <span style={{color:"var(--c-ink)"}}>{agent.name}</span> ·
           BIO v{node.done?.brand?.bioVersion ?? "?"}
           {cert
-            ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span></>
-            : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+            ? <> · {t("briefs.notepad.certifiedBy")} <span style={{color:"var(--green-600)"}}>{cert.byName}</span></>
+            : <> · <span style={{color:"var(--yellow-700)"}}>{t("briefs.try.uncertified")}</span></>}
         </span>
         <span>{agent.cr ?? "?"} cr</span>
       </div>
@@ -2739,6 +2752,7 @@ function CanvasView({ go }) {
    and renders the same node graph as a completed assembly. Reuses the
    notepad drawer for verify/edit/copy. */
 function BriefViewCanvas({ briefId, onClear, go }) {
+  const { t } = useLocale();
   const [state, setState] = useBrState({ loading: true, brief: null, runs: [], cert: null, error: null });
   const [openId, setOpenId]       = useBrState(null);
   const [openDeliverable, setOpenDeliverable] = useBrState(null);   /* clicked deliverable card → drawer */
@@ -2751,7 +2765,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         const { data: brief, error: bErr } = await supabase
           .from("briefs").select("id, title, payload, mode, created_at, brand_id")
           .eq("id", briefId).maybeSingle();
-        if (bErr || !brief) { setState({ loading: false, brief: null, runs: [], cert: null, error: bErr?.message || "Brief not found" }); return; }
+        if (bErr || !brief) { setState({ loading: false, brief: null, runs: [], cert: null, error: bErr?.message || t("briefs.view.notFound") }); return; }
 
         const { data: runs } = await supabase
           .from("runs").select("id, specialist_id, bio_version, status, outputs ( id, kind, body, status, rationale )")
@@ -2764,7 +2778,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
         let cert = null;
         if (bio?.certified_by) {
           const { data: tm } = await supabase.from("team_members").select("first_name").eq("id", bio.certified_by).maybeSingle();
-          cert = { byName: tm?.first_name || "your Steward", at: bio.certified_at, version: bio.version };
+          cert = { byName: tm?.first_name || t("briefs.misc.yourSteward"), at: bio.certified_at, version: bio.version };
         }
 
         setState({ loading: false, brief, runs: runs || [], cert, error: null });
@@ -2775,13 +2789,13 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   }, [briefId]);
 
   if (state.loading) {
-    return <div style={{padding: 60, textAlign:"center", color:"var(--c-faint)"}}>Loading brief…</div>;
+    return <div style={{padding: 60, textAlign:"center", color:"var(--c-faint)"}}>{t("briefs.view.loading")}</div>;
   }
   if (state.error || !state.brief) {
     return (
       <div style={{padding: 60, textAlign:"center"}}>
-        <p style={{color:"var(--c-dim)", marginBottom: 16}}>{state.error || "Brief not found."}</p>
-        <button className="btn btn--primary" onClick={() => { onClear(); go("briefs"); }}>Back to briefs</button>
+        <p style={{color:"var(--c-dim)", marginBottom: 16}}>{state.error || t("briefs.view.notFoundDot")}</p>
+        <button className="btn btn--primary" onClick={() => { onClear(); go("briefs"); }}>{t("briefs.view.backToBriefs")}</button>
       </div>
     );
   }
@@ -2818,8 +2832,8 @@ function BriefViewCanvas({ briefId, onClear, go }) {
       x: 760, y: 40 + i * rowH, w: 340, kind: "specialist",
       eyebrow: s.agent ? `${s.agent.code} · ${s.agent.dept}` : s.id,
       title: s.agent?.name || s.id,
-      sub: imgCount > 1 ? `${imgCount} images · approved`
-           : `${s.passed ? "approved" : "flagged"}${s.output?.kind ? " · " + s.output.kind : ""}`,
+      sub: imgCount > 1 ? `${t("briefs.view.imagesCount", { count: imgCount })} · ${t("briefs.status.approved")}`
+           : `${s.passed ? t("briefs.status.approved") : t("briefs.status.flagged")}${s.output?.kind ? " · " + s.output.kind : ""}`,
       cr: s.agent?.cr || 0,
       state: s.passed ? "done" : "flagged",
       outputText: s.text, assetUrl, tokenCount: 1000, qa: null,
@@ -2854,10 +2868,10 @@ function BriefViewCanvas({ briefId, onClear, go }) {
   const briefY = 40 + (Math.max(specs.length, 1) - 1) * rowH / 2;
   const nodes = [
     { id: "bio",   x: 40,  y: briefY, w: 260, kind: "bio",   eyebrow: "BIO",
-      title: "Brand Intelligence Object", sub: state.cert ? `Certified by ${state.cert.byName}` : "Certified canon" },
+      title: "Brand Intelligence Object", sub: state.cert ? t("briefs.view.certifiedByName", { name: state.cert.byName }) : t("briefs.view.certifiedCanon") },
     { id: "brief", x: 360, y: briefY, w: 280, kind: "brief", eyebrow: "BRIEF",
       title: briefTitle(state.brief),
-      sub: `${state.runs.length} runs · ${shortDate(state.brief.created_at)}` },
+      sub: `${t("briefs.runsCount", { count: state.runs.length })} · ${shortDate(state.brief.created_at)}` },
     ...specNodes,
     ...cardNodes,
   ];
@@ -2877,12 +2891,12 @@ function BriefViewCanvas({ briefId, onClear, go }) {
           {node.assetUrl && <div style={{ height: 90, backgroundImage:`url("${node.assetUrl}")`, backgroundSize:"cover", backgroundPosition:"center" }} />}
           <div style={{ padding:"10px 12px", flex:1, minHeight:0, display:"flex", flexDirection:"column" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 4 }}>
-              <span className="eyebrow" style={{ fontSize: 9, color: sc }}>{(node.platform || "generic").toUpperCase()} · {flagged ? "FLAGGED" : "READY"}</span>
-              {node.humanCraft && <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing:"0.06em", color:"var(--purple-600, #6b46c1)" }}>✦ IN HUMAN CRAFT</span>}
+              <span className="eyebrow" style={{ fontSize: 9, color: sc }}>{(node.platform || t("briefs.run.generic")).toUpperCase()} · {flagged ? t("briefs.run.flagged") : t("briefs.run.ready")}</span>
+              {node.humanCraft && <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing:"0.06em", color:"var(--purple-600, #6b46c1)" }}>{t("briefs.run.inHumanCraft")}</span>}
             </div>
             {node.title && <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 4, color:"var(--c-ink)" }}>{node.title}</div>}
             <div style={{ fontSize: 12, lineHeight: 1.45, color:"var(--c-dim)", flex:1, overflow:"hidden" }}>{node.body}</div>
-            {node.specialistName && <div style={{ marginTop: 8, fontSize: 9.5, color:"var(--c-faint)", fontFamily:"var(--font-mono)" }}>by {node.specialistName}</div>}
+            {node.specialistName && <div style={{ marginTop: 8, fontSize: 9.5, color:"var(--c-faint)", fontFamily:"var(--font-mono)" }}>{t("briefs.run.byName", { name: node.specialistName })}</div>}
           </div>
         </div>
       );
@@ -2903,7 +2917,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
       onClick={(e) => { if (isSpec) { e.stopPropagation(); setOpenId(node.specId); } }}>
         <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 4}}>
           <div className="eyebrow" style={{fontSize: 9, color: stColor}}>
-            {(node.eyebrow || node.kind).toUpperCase()} · {node.state === "flagged" ? "flagged" : "done"}
+            {(node.eyebrow || node.kind).toUpperCase()} · {node.state === "flagged" ? t("briefs.run.statusFlagged") : t("briefs.run.statusDone")}
           </div>
           {isSpec && <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)"}}>{node.cr} cr</span>}
         </div>
@@ -2923,7 +2937,7 @@ function BriefViewCanvas({ briefId, onClear, go }) {
           )}
           <div style={{display:"flex", justifyContent:"space-between", fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>
             <span>{node.sub}</span>
-            <span style={{color:"var(--c-dim)"}}>open ↗</span>
+            <span style={{color:"var(--c-dim)"}}>{t("briefs.run.open")} ↗</span>
           </div>
         </>)}
         {!isSpec && node.sub && (
@@ -2978,14 +2992,14 @@ function BriefViewCanvas({ briefId, onClear, go }) {
           if (node?.kind === "brief") { setOpenBrief(true); return; }
           if (node?.kind === "specialist" && node.specId) setOpenId(node.specId);
         }}
-        helper={`${specs.length} runs on this brief. Click any specialist to verify, edit, or copy its output.`}
+        helper={t("briefs.view.helper", { runs: t("briefs.runsCount", { count: specs.length }) })}
         toolbarExtra={
           <>
             <button className="btn btn--ghost btn--sm" onClick={() => { onClear(); go("briefs"); }} style={{height: 28}}>
-              ← Briefs
+              {t("briefs.view.briefsBack")}
             </button>
             <a href="#/home" className="btn btn--primary btn--sm" style={{height: 28}}>
-              <Icon name="plus" size={12} /> New brief
+              <Icon name="plus" size={12} /> {t("briefs.run.newBrief")}
             </a>
           </>
         }
@@ -3091,6 +3105,7 @@ function outputRationale(o, specialist) {
 
 /* Per-brief Delivery view: the canvas + a node-detail drawer. */
 function BriefDelivery({ brief, outputs }) {
+  const { t } = useLocale();
   const [sel, setSel] = useBrState(null);
   const graph = React.useMemo(() => buildBriefGraph(brief, outputs), [brief.id]);
 
@@ -3103,7 +3118,7 @@ function BriefDelivery({ brief, outputs }) {
 
   let title = "", eyebrow = "", body = null;
   if (ref.type === "bio") {
-    eyebrow = "Source · the canon"; title = "Brand Intelligence Object";
+    eyebrow = t("briefs.board.sourceCanon"); title = "Brand Intelligence Object";
     body = <p style={{fontSize:14.5, color:"var(--c-ink)", lineHeight:1.55}}>Everything downstream is judged against the BIO. <em className="b-voice">{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p>;
   } else if (ref.type === "brief") {
     eyebrow = "L1 · Brandolph"; title = brief.title;
@@ -3113,17 +3128,17 @@ function BriefDelivery({ brief, outputs }) {
     eyebrow = `${specialist.code} · ${specialist.dept}`; title = specialist.name;
     body = <>
       <p style={{fontSize:14, color:"var(--c-ink)", lineHeight:1.5, marginBottom:14}}>{specialist.job}</p>
-      <div className="eyebrow" style={{marginBottom:6}}>Why Brandolph routed this here</div>
-      <p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{spec.objective || "Best fit for this part of the brief."}</p>
+      <div className="eyebrow" style={{marginBottom:6}}>{t("briefs.board.whyRouted")}</div>
+      <p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5}}>{spec.objective || t("briefs.board.bestFit")}</p>
     </>;
   } else if (output) {
-    eyebrow = `${output.type}${specialist ? " · " + specialist.name : ""}`; title = "Output";
+    eyebrow = `${output.type}${specialist ? " · " + specialist.name : ""}`; title = t("briefs.notepad.output");
     body = <>
       {output.status && <div style={{marginBottom:12}}><StatusPill status={output.status} /></div>}
       <p style={{fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic", fontSize:16, lineHeight:1.55, color:"var(--c-ink)", marginBottom:14}}>"{output.body}"</p>
       <div style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)", marginBottom:18}}>{output.meta}</div>
       <div className="card card--inset" style={{padding:"14px 16px", borderLeft:"3px solid var(--yellow-500)"}}>
-        <div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>Why this creative choice</div>
+        <div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>{t("briefs.board.whyChoice")}</div>
         <p style={{fontSize:13.5, color:"var(--c-ink)", lineHeight:1.5, margin:0}}>{outputRationale(output, specialist)}</p>
       </div>
     </>;
@@ -3169,6 +3184,7 @@ function boardReply(text) {
 }
 
 function BriefBoard({ id, go }) {
+  const { t } = useLocale();
   const brief = window.CI_BRIEFS.find(b => b.id === id) || window.CI_BRIEFS[0];
   const outputs = window.CI_OUTPUTS.filter(o => o.briefId === brief.id);
   const base = React.useMemo(() => buildBriefGraph(brief, outputs), [brief.id]);
@@ -3250,12 +3266,12 @@ function BriefBoard({ id, go }) {
       return (
         <div style={card({ padding:0, overflow:"hidden" })}>
           <div style={{padding:"12px 14px", background:"var(--yellow-50)", borderBottom:"1px solid var(--c-line)"}}>
-            <div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>The brief · L1 Brandolph</div>
+            <div className="eyebrow eyebrow--yellow" style={{marginBottom:6}}>{t("briefs.board.theBriefL1")}</div>
             <p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:14.5, lineHeight:1.4, color:"var(--c-ink)", margin:0}}>"{brief.smp}"</p>
           </div>
           {brief.clarifications && (
             <div style={{padding:"12px 14px"}}>
-              <div className="eyebrow" style={{marginBottom:8}}>Brandolph asked first</div>
+              <div className="eyebrow" style={{marginBottom:8}}>{t("briefs.board.askedFirst")}</div>
               <div style={{display:"flex", flexDirection:"column", gap:10}}>
                 {brief.clarifications.map((c, i) => (
                   <div key={i}>
@@ -3281,10 +3297,10 @@ function BriefBoard({ id, go }) {
       );
     }
     if (n.kind === "bio") {
-      return <div style={card({ padding:13 })}><div className="eyebrow" style={{marginBottom:4, fontSize:9}}>Source · canon</div><div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{n.title}</div><div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", marginTop:2}}>{n.sub}</div>{handle}</div>;
+      return <div style={card({ padding:13 })}><div className="eyebrow" style={{marginBottom:4, fontSize:9}}>{t("briefs.board.sourceCanonShort")}</div><div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{n.title}</div><div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", marginTop:2}}>{n.sub}</div>{handle}</div>;
     }
     if (n.kind === "specialist") {
-      return <div style={card({ padding:13 })}><div className="eyebrow" style={{marginBottom:4, fontSize:9}}>Specialist · {n.sub}</div><div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{n.title}</div>{handle}</div>;
+      return <div style={card({ padding:13 })}><div className="eyebrow" style={{marginBottom:4, fontSize:9}}>{t("briefs.board.specialistPrefix")} · {n.sub}</div><div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)"}}>{n.title}</div>{handle}</div>;
     }
     const o = window.CI_OUTPUTS.find(x => "out-" + x.id === n.id);
     return (
@@ -3306,16 +3322,16 @@ function BriefBoard({ id, go }) {
   const specialist = ref.type === "specialist" ? window.CI_AGENTS.find(a => a.id === ref.id)
     : output ? window.CI_AGENTS.find(a => a.id === output.agentId) : null;
   let dEye = "", dBody = null;
-  if (ref.type === "bio") { dEye = "Source · the canon"; dBody = <><h3 style={{margin:"0 0 10px", fontSize:18}}>Brand Intelligence Object</h3><p style={{fontSize:14, lineHeight:1.55, color:"var(--c-dim)"}}><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p></>; }
+  if (ref.type === "bio") { dEye = t("briefs.board.sourceCanon"); dBody = <><h3 style={{margin:"0 0 10px", fontSize:18}}>Brand Intelligence Object</h3><p style={{fontSize:14, lineHeight:1.55, color:"var(--c-dim)"}}><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>{window.CI_BRAND.tagline}</em> · {window.CI_BRAND.bioCompleteness}% complete.</p></>; }
   else if (ref.type === "brief") { dEye = "L1 · Brandolph"; dBody = <><p style={{fontFamily:"Georgia,serif", fontStyle:"italic", fontSize:19, lineHeight:1.45, color:"var(--c-ink)", margin:"0 0 12px"}}>"{brief.smp}"</p><p style={{fontSize:13.5, color:"var(--c-dim)", lineHeight:1.5, margin:0}}>{brief.objective}</p></>; }
-  else if (ref.type === "specialist" && specialist) { const sp = specialistSpec(specialist); dEye = `${specialist.code} · ${specialist.dept}`; dBody = <><h3 style={{margin:"0 0 8px", fontSize:18}}>{specialist.name}</h3><p style={{fontSize:14, lineHeight:1.5, color:"var(--c-ink)", margin:"0 0 16px"}}>{specialist.job}</p><div style={{height:1, background:"var(--c-line)", margin:"0 -16px 12px"}} /><div className="eyebrow" style={{marginBottom:6, color:"var(--c-faint)"}}>Why Brandolph routes here</div><p style={{fontSize:12.5, color:"var(--c-dim)", lineHeight:1.5, margin:0}}>{sp.objective}</p></>; }
+  else if (ref.type === "specialist" && specialist) { const sp = specialistSpec(specialist); dEye = `${specialist.code} · ${specialist.dept}`; dBody = <><h3 style={{margin:"0 0 8px", fontSize:18}}>{specialist.name}</h3><p style={{fontSize:14, lineHeight:1.5, color:"var(--c-ink)", margin:"0 0 16px"}}>{specialist.job}</p><div style={{height:1, background:"var(--c-line)", margin:"0 -16px 12px"}} /><div className="eyebrow" style={{marginBottom:6, color:"var(--c-faint)"}}>{t("briefs.board.whyRoutes")}</div><p style={{fontSize:12.5, color:"var(--c-dim)", lineHeight:1.5, margin:0}}>{sp.objective}</p></>; }
   else if (output) {
     dEye = `${output.type}${specialist ? " · " + specialist.name : ""}`;
     dBody = (
       <>
         {output.status && <div style={{marginBottom:14}}><StatusPill status={output.status} /></div>}
         {/* THE OUTPUT — the hero of the card: big, italic, roomy */}
-        <div className="eyebrow" style={{marginBottom:10}}>The output</div>
+        <div className="eyebrow" style={{marginBottom:10}}>{t("briefs.board.theOutput")}</div>
         <p style={{
           fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic",
           fontSize:21, lineHeight:1.5, letterSpacing:"-0.005em", color:"var(--c-ink)", margin:"0 0 12px",
@@ -3324,7 +3340,7 @@ function BriefBoard({ id, go }) {
         {/* divider — clearly separates output from rationale */}
         <div style={{height:1, background:"var(--c-line)", margin:"16px -16px 14px"}} />
         {/* THE RATIONALE — clearly secondary */}
-        <div className="eyebrow" style={{marginBottom:6, color:"var(--c-faint)"}}>Why this choice</div>
+        <div className="eyebrow" style={{marginBottom:6, color:"var(--c-faint)"}}>{t("briefs.board.whyChoiceShort")}</div>
         <p style={{fontSize:12.5, lineHeight:1.5, color:"var(--c-dim)", margin:0}}>{outputRationale(output, specialist)}</p>
       </>
     );
@@ -3332,12 +3348,12 @@ function BriefBoard({ id, go }) {
 
   const addMenu = (
     <div style={{position:"relative"}}>
-      <button className="btn btn--primary btn--sm" onClick={() => setAddOpen(o => !o)}><Icon name="plus" size={13} /> Add specialist</button>
+      <button className="btn btn--primary btn--sm" onClick={() => setAddOpen(o => !o)}><Icon name="plus" size={13} /> {t("briefs.board.addSpecialist")}</button>
       {addOpen && (
         <>
           <div onClick={() => setAddOpen(false)} style={{position:"fixed", inset:0, zIndex:40}} />
           <div style={{position:"absolute", top:"calc(100% + 6px)", right:0, zIndex:41, width:240, background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:12, boxShadow:"var(--shadow-lg)", padding:6}}>
-            <div className="eyebrow" style={{padding:"6px 10px 4px"}}>Drop a specialist, then connect it</div>
+            <div className="eyebrow" style={{padding:"6px 10px 4px"}}>{t("briefs.board.dropSpecialist")}</div>
             <div style={{maxHeight:240, overflowY:"auto"}}>
               {window.CI_AGENTS.filter(a => a.status === "live").slice(0, 10).map(a => (
                 <button key={a.id} onClick={() => addSpecialist(a)} style={{display:"block", width:"100%", textAlign:"left", border:"none", background:"transparent", padding:"7px 10px", borderRadius:8, cursor:"pointer", fontSize:12.5, color:"var(--c-ink)"}}
@@ -3357,22 +3373,22 @@ function BriefBoard({ id, go }) {
     <div style={{display:"flex", flexDirection:"column", height:"calc(100vh - 56px)", minHeight:0}}>
       {/* Brief header — integrated into the flow page (one page) */}
       <div style={{padding:"18px 32px 0", flexShrink:0}}>
-        <button onClick={() => go("briefs")} className="btn btn--link" style={{fontSize:12, marginBottom:10}}><Icon name="arrowLeft" size={13} /> All briefs</button>
+        <button onClick={() => go("briefs")} className="btn btn--link" style={{fontSize:12, marginBottom:10}}><Icon name="arrowLeft" size={13} /> {t("briefs.detail.allBriefs")}</button>
         <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:24, marginBottom:12}}>
           <div>
-            <div className="eyebrow" style={{marginBottom:6}}>{brief.type} · {brief.createdAt} · {brief.credits} cr · {brief.agents.length} specialists</div>
+            <div className="eyebrow" style={{marginBottom:6}}>{brief.type} · {brief.createdAt} · {brief.credits} cr · {t("briefs.detail.specialistsCount", { count: brief.agents.length })}</div>
             <h1 style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:30, letterSpacing:"-0.015em", lineHeight:1.05, margin:0, color:"var(--c-ink)", fontWeight:500}}>{brief.title}</h1>
           </div>
           <div style={{display:"flex", flexDirection:"column", gap:8, alignItems:"flex-end"}}>
             <StatusPill status={brief.status} />
             <div style={{display:"flex", gap:8}}>
-              <button className="btn btn--ghost btn--sm">Revise with Brandolph</button>
-              <button className="btn btn--ghost btn--icon" aria-label="Export"><Icon name="download" size={14} /></button>
+              <button className="btn btn--ghost btn--sm">{t("briefs.detail.reviseWithBrandolph")}</button>
+              <button className="btn btn--ghost btn--icon" aria-label={t("briefs.board.export")}><Icon name="download" size={14} /></button>
             </div>
           </div>
         </div>
         <div style={{display:"flex", gap:2, borderBottom:"1px solid var(--c-line)"}}>
-          {[["overview","Overview"],["recommendation","Recommendation"],["delivery","Delivery"]].map(([k, l]) => (
+          {[["overview",t("briefs.detail.tabOverview")],["recommendation",t("briefs.detail.tabRecommendation")],["delivery",t("briefs.detail.tabDelivery")]].map(([k, l]) => (
             <button key={k} onClick={() => k === "delivery" ? setWin(null) : setWin(w => w === k ? null : k)} style={{
               border:"none", background:"transparent", cursor:"pointer", padding:"10px 16px",
               fontFamily:"var(--font-sans)", fontSize:14, fontWeight: tabActive(k) ? 600 : 500,
@@ -3389,8 +3405,8 @@ function BriefBoard({ id, go }) {
         {connectFrom && (
           <div style={{position:"absolute", bottom:64, left:"50%", transform:"translateX(-50%)", zIndex:20}}>
             <div className="card" style={{padding:"9px 14px", display:"flex", alignItems:"center", gap:12, border:"1px solid var(--accent)"}}>
-              <span style={{fontSize:13, color:"var(--c-ink)"}}>Connecting from <strong>{nodeName(connectFrom)}</strong> — click a node to link.</span>
-              <button className="btn btn--ghost btn--sm" onClick={() => setConnectFrom(null)}>Cancel</button>
+              <span style={{fontSize:13, color:"var(--c-ink)"}}>{t("briefs.board.connectingFromA")} <strong>{nodeName(connectFrom)}</strong> {t("briefs.board.connectingFromB")}</span>
+              <button className="btn btn--ghost btn--sm" onClick={() => setConnectFrom(null)}>{t("briefs.notepad.cancel")}</button>
             </div>
           </div>
         )}
@@ -3403,7 +3419,7 @@ function BriefBoard({ id, go }) {
           height="100%"
           exportName={brief.id + "-board"}
           toolbarExtra={addMenu}
-          helper={connectFrom ? <>Click a node to connect · Esc to cancel.</> : <>Drag to pan · scroll to zoom · <strong style={{color:"var(--c-ink)", fontWeight:600}}>+</strong> on a node to connect it · click a result for the rationale.</>}
+          helper={connectFrom ? <>{t("briefs.board.helperConnect")}</> : <>{t("briefs.canvas.helperA")} <strong style={{color:"var(--c-ink)", fontWeight:600}}>+</strong> {t("briefs.board.helperDefaultB")}</>}
         />
       </div>
 
@@ -3413,43 +3429,43 @@ function BriefBoard({ id, go }) {
           <div onClick={() => setWin(null)} style={{position:"fixed", inset:0, zIndex:55}} />
           <div className="card" style={{position:"fixed", top:120, right:36, width:440, maxHeight:"calc(100vh - 160px)", overflowY:"auto", zIndex:56, boxShadow:"var(--shadow-xl)", animation:"cvPopIn 180ms cubic-bezier(.2,.8,.2,1)"}}>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", borderBottom:"1px solid var(--c-line)", position:"sticky", top:0, background:"var(--c-card)"}}>
-              <h3 style={{margin:0, fontSize:17}}>{win === "overview" ? "Overview" : "Recommendation"}</h3>
-              <button onClick={() => setWin(null)} className="btn btn--icon btn--ghost" aria-label="Close"><Icon name="close" size={15} /></button>
+              <h3 style={{margin:0, fontSize:17}}>{win === "overview" ? t("briefs.detail.tabOverview") : t("briefs.detail.tabRecommendation")}</h3>
+              <button onClick={() => setWin(null)} className="btn btn--icon btn--ghost" aria-label={t("briefs.common.close")}><Icon name="close" size={15} /></button>
             </div>
             <div style={{padding:"18px"}}>
               {win === "overview" ? (
                 <div style={{display:"flex", flexDirection:"column", gap:14}}>
                   <div style={{background:"var(--yellow-500)", borderRadius:12, padding:"18px 20px"}}>
-                    <div className="eyebrow" style={{marginBottom:8, color:"rgba(48,48,48,0.6)"}}>Single-minded proposition</div>
+                    <div className="eyebrow" style={{marginBottom:8, color:"rgba(48,48,48,0.6)"}}>{t("briefs.detail.smpLabel")}</div>
                     <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:18, lineHeight:1.35, margin:0, color:"#1a1f36", fontWeight:500}}>"{brief.smp}"</p>
                   </div>
-                  <BriefSection title="Background"          body={brief.background} />
-                  <BriefSection title="Objective"           body={brief.objective} />
-                  <BriefSection title="Audience"            body={brief.audience} />
-                  <BriefSection title="Metrics that matter" body={brief.metrics} />
+                  <BriefSection title={t("briefs.detail.background")}          body={brief.background} />
+                  <BriefSection title={t("briefs.detail.objective")}           body={brief.objective} />
+                  <BriefSection title={t("briefs.detail.audience")}            body={brief.audience} />
+                  <BriefSection title={t("briefs.detail.metricsThatMatter")} body={brief.metrics} />
                   <div className="card card--inset" style={{padding:16}}>
-                    <div className="eyebrow" style={{marginBottom:10}}>Deliverables · {brief.deliverables.length}</div>
+                    <div className="eyebrow" style={{marginBottom:10}}>{t("briefs.detail.deliverables")} · {brief.deliverables.length}</div>
                     <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>{brief.deliverables.map((d, i) => <span key={i} className="pill" style={{height:28, padding:"0 14px", fontSize:11.5}}>{d}</span>)}</div>
                   </div>
                 </div>
               ) : (
                 <div style={{display:"flex", flexDirection:"column", gap:14}}>
-                  <BriefSection title="Creative strategy" body={brief.strategy} />
-                  <BriefSection title="Tone"              body={brief.tone} />
-                  <BriefSection title="Direction"         body={brief.direction} />
-                  <BriefSection title="Mandatories"       body={brief.mandatories} />
+                  <BriefSection title={t("briefs.detail.creativeStrategy")} body={brief.strategy} />
+                  <BriefSection title={t("briefs.detail.tone")}              body={brief.tone} />
+                  <BriefSection title={t("briefs.detail.direction")}         body={brief.direction} />
+                  <BriefSection title={t("briefs.detail.mandatories")}       body={brief.mandatories} />
                   <div style={{background:"var(--pink-50)", border:"1px solid var(--pink-200)", borderRadius:12, padding:16}}>
-                    <div className="eyebrow eyebrow--pink" style={{marginBottom:10}}>What this brief is NOT doing</div>
+                    <div className="eyebrow eyebrow--pink" style={{marginBottom:10}}>{t("briefs.detail.notDoing")}</div>
                     <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:15, lineHeight:1.5, color:"var(--c-ink)", margin:0}}>"{brief.notDoing}"</p>
                   </div>
                   <div className="card card--inset" style={{padding:16, borderLeft:"3px solid var(--yellow-500)"}}>
-                    <div className="eyebrow eyebrow--yellow" style={{marginBottom:10}}>Strategic assumptions</div>
+                    <div className="eyebrow eyebrow--yellow" style={{marginBottom:10}}>{t("briefs.detail.strategicAssumptions")}</div>
                     <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8}}>
                       {brief.assumptions.map((a, i) => <li key={i} style={{fontSize:13, color:"var(--c-ink)", display:"flex", gap:8, lineHeight:1.5}}><span style={{color:"var(--yellow-700)", fontFamily:"var(--font-mono)"}}>~</span> {a}</li>)}
                     </ul>
                   </div>
                   <div className="card card--inset" style={{padding:16, borderLeft:"3px solid var(--orange-500)"}}>
-                    <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom:10}}>Production watchouts</div>
+                    <div className="eyebrow" style={{color:"var(--orange-600)", marginBottom:10}}>{t("briefs.detail.productionWatchouts")}</div>
                     <ul style={{margin:0, padding:0, listStyle:"none", display:"flex", flexDirection:"column", gap:8}}>
                       {brief.watchouts.map((w, i) => <li key={i} style={{fontSize:13, color:"var(--c-ink)", display:"flex", gap:8, lineHeight:1.5}}><span style={{color:"var(--orange-600)", fontFamily:"var(--font-mono)"}}>!</span> {w}</li>)}
                     </ul>
@@ -3478,7 +3494,7 @@ function BriefBoard({ id, go }) {
                 <div style={{display:"flex", alignItems:"center", gap:2, flexShrink:0}}>
                   {ref.type === "output" && <PinButton kind="outputs" id={ref.id} size={16} />}
                   {ref.type === "specialist" && <PinButton kind="specialists" id={ref.id} size={16} />}
-                  <button onClick={() => setPop(null)} className="btn btn--icon btn--ghost" aria-label="Close" style={{height:26, width:26}}><Icon name="close" size={14} /></button>
+                  <button onClick={() => setPop(null)} className="btn btn--icon btn--ghost" aria-label={t("briefs.common.close")} style={{height:26, width:26}}><Icon name="close" size={14} /></button>
                 </div>
               </div>
               <div style={{padding:"6px 16px 16px"}}>{dBody}</div>
@@ -3542,6 +3558,7 @@ function CanvasNode({ node, color, refCb, active, dim, dragging, index, onPointe
 /* filtered by output type, with per-output actions.                 */
 
 function Library({ go }) {
+  const { t } = useLocale();
   /* Live Library — real outputs flattened from the briefs/runs join.
      Each item carries its brief context, the specialist, the BIO version,
      and the cert state so we can render the moat attribution footer on
@@ -3642,24 +3659,24 @@ function Library({ go }) {
     try {
       const res = await apiFetch(`/api/outputs/${o.id}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.error || "Delete failed");
-      flash("Deleted");
+      if (!res.ok || !data.ok) throw new Error(data.error || t("briefs.library.deleteFailed"));
+      flash(t("briefs.library.deleted"));
       reload();   /* reconcile with the server */
     } catch (e) {
       setDeletedIds((s) => { const n = new Set(s); n.delete(o.id); return n; });   /* rollback */
-      flash(e.message || "Could not delete");
+      flash(e.message || t("briefs.library.couldNotDelete"));
     }
   };
 
   return (
     <div style={{padding:"24px 36px 80px"}}>
       <PageHeader
-        eyebrow={brand ? `Workspace · ${brand.name}` : "Workspace"}
-        title="Library"
-        sub="Every brief your crew has produced, filed as a folder. Open one to browse its assets, read them in full, and put them back to work."
+        eyebrow={brand ? t("briefs.lib.eyebrowBrand", { name: brand.name }) : t("briefs.lib.eyebrow")}
+        title={t("briefs.library.title")}
+        sub={t("briefs.library.sub")}
         right={<>
-          <button className="btn btn--ghost btn--sm" onClick={reload}><Icon name="refresh" size={13} /> Reload</button>
-          <span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-faint)"}}>{items.length} assets · {briefGroups.length} folders</span>
+          <button className="btn btn--ghost btn--sm" onClick={reload}><Icon name="refresh" size={13} /> {t("briefs.lib.reload")}</button>
+          <span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-faint)"}}>{t("briefs.library.assetsCount", { count: items.length })} · {t("briefs.library.foldersCount", { count: briefGroups.length })}</span>
         </>}
       />
 
@@ -3676,14 +3693,14 @@ function Library({ go }) {
             margin:"0 0 14px", fontFamily:"var(--font-serif)", fontStyle:"italic",
             fontSize: 30, lineHeight: 1.2, letterSpacing:"-0.01em", fontWeight: 400, color:"var(--c-ink)",
           }}>
-            The Library is waiting.
+            {t("briefs.library.emptyTitle")}
           </h2>
           <p style={{margin:"0 0 22px", fontSize: 14, color:"var(--c-dim)", lineHeight: 1.6}}>
-            Every output your crew produces lands here — filed under the brief that asked for it, the BIO version it was judged against, and the Steward who signed the canon. Run a brief and watch the shelves fill.
+            {t("briefs.library.emptyBody")}
           </p>
           <div style={{display:"flex", gap: 10, justifyContent:"center"}}>
             <a href="#/home" className="btn btn--primary">
-              <Icon name="sparkles" size={13} /> Start a brief
+              <Icon name="sparkles" size={13} /> {t("briefs.library.startBrief")}
             </a>
           </div>
         </div>
@@ -3739,6 +3756,7 @@ function libKindBreakdown(items) {
 
 /* ── LEVEL 1 · folder card — stacked-paper motif, dept-accented ──────── */
 function LibraryFolderCard({ group, onOpen }) {
+  const { t } = useLocale();
   const { brief, items } = group;
   const title   = briefTitle(brief);
   const allOk   = items.every((o) => o.status === "approved");
@@ -3755,7 +3773,7 @@ function LibraryFolderCard({ group, onOpen }) {
           <div>
             <div className="lib-folder__count">{items.length}</div>
             <div className="lib-folder__break">
-              {items.length === 1 ? "asset" : "assets"} · {breakdown.slice(0, 3).join(" · ")}
+              {t("briefs.library.assetWord", { count: items.length })} · {breakdown.slice(0, 3).join(" · ")}
             </div>
           </div>
           <h3 className="lib-folder__title">{title}</h3>
@@ -3765,7 +3783,7 @@ function LibraryFolderCard({ group, onOpen }) {
         <span className="lib-folder__dot" />
         <span>{shortDate(brief.created_at)}</span>
         <span style={{ color: "var(--c-line-2)" }}>·</span>
-        <span style={{ color: allOk ? "var(--green-600)" : "var(--pink-500)" }}>{allOk ? "approved" : "needs review"}</span>
+        <span style={{ color: allOk ? "var(--green-600)" : "var(--pink-500)" }}>{allOk ? t("briefs.status.approved") : t("briefs.library.needsReview")}</span>
       </div>
     </button>
   );
@@ -3773,6 +3791,7 @@ function LibraryFolderCard({ group, onOpen }) {
 
 /* ── LEVEL 2 · folder detail — filter bar + asset grid ──────────────── */
 function LibraryFolderDetail({ group, cert, kind, setKind, statusF, setStatusF, query, setQuery, onBack, onOpenCanvas, onSelect }) {
+  const { t } = useLocale();
   const { brief, items } = group;
   const title = briefTitle(brief);
   const kindsHere = [...new Set(items.map((i) => i.kind))];
@@ -3796,12 +3815,12 @@ function LibraryFolderDetail({ group, cert, kind, setKind, statusF, setStatusF, 
         <div style={{minWidth:0, flex:1}}>
           <button onClick={onBack} className="btn btn--ghost btn--sm"
             style={{height:28, padding:"0 10px", fontSize:11.5, marginBottom:12}}>
-            <Icon name="arrowLeft" size={12} /> Library
+            <Icon name="arrowLeft" size={12} /> {t("briefs.library.title")}
           </button>
           <div className="eyebrow" style={{marginBottom:6, display:"flex", gap:10, alignItems:"center"}}>
             <span>{shortDate(brief.created_at)}</span>
             <span style={{color:"var(--c-faint)"}}>·</span>
-            <span>{items.length} {items.length === 1 ? "asset" : "assets"}</span>
+            <span>{t("briefs.library.assetsCount", { count: items.length })}</span>
           </div>
           <h2 style={{
             margin:"0 0 8px", fontFamily:"var(--font-serif)", fontStyle:"italic", fontWeight:400,
@@ -3813,7 +3832,7 @@ function LibraryFolderDetail({ group, cert, kind, setKind, statusF, setStatusF, 
           )}
         </div>
         <button onClick={onOpenCanvas} className="btn btn--primary btn--sm" style={{flexShrink:0, height:32}}>
-          <Icon name="sparkles" size={13} /> Open in canvas
+          <Icon name="sparkles" size={13} /> {t("briefs.library.openInCanvas")}
         </button>
       </div>
 
@@ -3822,7 +3841,7 @@ function LibraryFolderDetail({ group, cert, kind, setKind, statusF, setStatusF, 
         <div style={{position:"relative", flex:"1 1 200px", minWidth:180}}>
           <input
             value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search this folder…"
+            placeholder={t("briefs.library.searchFolder")}
             onKeyDown={(e) => e.stopPropagation()}
             style={{
               width:"100%", height:32, padding:"0 10px 0 32px",
@@ -3836,7 +3855,7 @@ function LibraryFolderDetail({ group, cert, kind, setKind, statusF, setStatusF, 
         <div style={{display:"flex", gap:4, flexWrap:"wrap"}}>
           <button onClick={() => setKind("all")}
             className={"pill" + (kind === "all" ? " pill--dark" : "")}
-            style={{cursor:"pointer", height:28, padding:"0 12px"}}>All · {items.length}</button>
+            style={{cursor:"pointer", height:28, padding:"0 12px"}}>{t("briefs.filter.all")} · {items.length}</button>
           {kindsHere.map((k) => (
             <button key={k} onClick={() => setKind(k)}
               className={"pill" + (kind === k ? " pill--dark" : "")}
@@ -3849,7 +3868,7 @@ function LibraryFolderDetail({ group, cert, kind, setKind, statusF, setStatusF, 
           {["all", "approved", "flagged"].map((s) => (
             <button key={s} onClick={() => setStatusF(s)}
               className={"pill" + (statusF === s ? " pill--dark" : "")}
-              style={{cursor:"pointer", height:28, padding:"0 12px", textTransform:"capitalize"}}>{s}</button>
+              style={{cursor:"pointer", height:28, padding:"0 12px", textTransform:"capitalize"}}>{t("briefs.filter." + s)}</button>
           ))}
         </div>
       </div>
@@ -3857,7 +3876,7 @@ function LibraryFolderDetail({ group, cert, kind, setKind, statusF, setStatusF, 
       {/* Asset grid — sheets for text, thumbnails for images */}
       {filtered.length === 0 ? (
         <div className="card" style={{padding:"40px 32px", textAlign:"center", color:"var(--c-faint)"}}>
-          {items.length === 0 ? "This folder is empty." : "No assets match the current filter."}
+          {items.length === 0 ? t("briefs.library.folderEmpty") : t("briefs.library.noAssetsMatch")}
         </div>
       ) : (
         <div className="lib-assets">
@@ -3870,6 +3889,7 @@ function LibraryFolderDetail({ group, cert, kind, setKind, statusF, setStatusF, 
 
 /* One asset card — "sheet of paper" for text, thumbnail for image. */
 function LibraryAssetCard({ o, onSelect }) {
+  const { t } = useLocale();
   const passed = o.status === "approved";
   const agent  = window.CI_AGENTS?.find((a) => a.id === o.run.specialist_id);
   const dotCls = "lib-status-dot" + (passed ? "" : " lib-status-dot--flag");
@@ -3883,18 +3903,18 @@ function LibraryAssetCard({ o, onSelect }) {
         ) : (
           <div className="lib-thumb__placeholder">
             <div className="lib-sheet__eyebrow" style={{marginBottom:2}}>
-              <span className={dotCls} /> Visual direction
+              <span className={dotCls} /> {t("briefs.library.visualDirection")}
             </div>
             <p style={{
               margin:0, fontFamily:"var(--font-serif)", fontSize:14, lineHeight:1.5, color:"var(--c-ink)",
               display:"-webkit-box", WebkitLineClamp:5, WebkitBoxOrient:"vertical", overflow:"hidden",
-            }}>{humanize(o.text) || "(no direction)"}</p>
+            }}>{humanize(o.text) || t("briefs.library.noDirection")}</p>
           </div>
         )}
         <div className="lib-thumb__foot">
           <span className={dotCls} />
           <span>{o.kind}</span>
-          {o.edited && <span style={{color:"var(--yellow-700)"}}>· edited</span>}
+          {o.edited && <span style={{color:"var(--yellow-700)"}}>{t("briefs.library.editedSuffix")}</span>}
           <span style={{marginLeft:"auto"}}>{agent?.name || specialistName(o.run.specialist_id)}</span>
         </div>
       </button>
@@ -3910,7 +3930,7 @@ function LibraryAssetCard({ o, onSelect }) {
         <span>{o.kind}</span>
         {o.edited && <span style={{color:"var(--yellow-700)"}}>· edited</span>}
       </div>
-      <p className="lib-sheet__body">{cleaned || <span style={{color:"var(--c-faint)"}}>(empty)</span>}</p>
+      <p className="lib-sheet__body">{cleaned || <span style={{color:"var(--c-faint)"}}>{t("briefs.notepad.empty")}</span>}</p>
       <div className="lib-sheet__foot">
         <span>{agent?.name || specialistName(o.run.specialist_id)}</span>
         <span style={{marginLeft:"auto"}}>BIO v{o.run.bio_version}</span>
@@ -3921,6 +3941,7 @@ function LibraryAssetCard({ o, onSelect }) {
 
 /* ── LEVEL 3 · forefront viewer — large asset + 4-action bar ─────────── */
 function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
+  const { t } = useLocale();
   const [confirmDel, setConfirmDel] = useBrState(false);
   const passed  = o.status === "approved";
   const agent   = window.CI_AGENTS?.find((a) => a.id === o.run.specialist_id);
@@ -3943,8 +3964,8 @@ function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
     const prompt = isImage
       ? (o.text || "")
       : (o.brief.request || "") + (o.rationale ? "\n\n" + o.rationale : "");
-    try { await navigator.clipboard?.writeText(prompt); flash("Prompt copied"); }
-    catch { flash("Could not copy"); }
+    try { await navigator.clipboard?.writeText(prompt); flash(t("briefs.library.promptCopied")); }
+    catch { flash(t("briefs.library.couldNotCopy")); }
   };
 
   const download = () => {
@@ -3953,7 +3974,7 @@ function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
       const a = document.createElement("a");
       a.href = o.assetUrl; a.download = base; a.target = "_blank"; a.rel = "noreferrer";
       a.click();
-      flash("Downloading");
+      flash(t("briefs.library.downloading"));
       return;
     }
     const blob = new Blob([o.text || ""], { type: "text/plain" });
@@ -3962,7 +3983,7 @@ function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
     a.href = url; a.download = base + ".txt";
     a.click();
     URL.revokeObjectURL(url);
-    flash("Downloaded");
+    flash(t("briefs.library.downloaded"));
   };
 
   return (
@@ -3975,14 +3996,14 @@ function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
               <span className={"lib-status-dot" + (passed ? "" : " lib-status-dot--flag")} />
               <span>{o.kind}</span>
               <span style={{color:"var(--c-faint)"}}>·</span>
-              <span style={{color: passed ? "var(--green-600)" : "var(--pink-500)"}}>{passed ? "approved" : "flagged"}</span>
-              {o.edited && <span style={{color:"var(--yellow-700)"}}>· edited</span>}
+              <span style={{color: passed ? "var(--green-600)" : "var(--pink-500)"}}>{passed ? t("briefs.status.approved") : t("briefs.status.flagged")}</span>
+              {o.edited && <span style={{color:"var(--yellow-700)"}}>{t("briefs.library.editedSuffix")}</span>}
             </div>
             <h2 style={{margin:0, fontFamily:"var(--font-serif)", fontStyle:"italic", fontWeight:400, fontSize:24, lineHeight:1.2, color:"var(--c-ink)"}}>
               {agent?.name || specialistName(o.run.specialist_id)}
             </h2>
           </div>
-          <button onClick={onClose} className="btn btn--ghost btn--sm" style={{flexShrink:0, height:30, width:30, padding:0, justifyContent:"center"}} aria-label="Close">
+          <button onClick={onClose} className="btn btn--ghost btn--sm" style={{flexShrink:0, height:30, width:30, padding:0, justifyContent:"center"}} aria-label={t("briefs.common.close")}>
             <Icon name="close" size={14} />
           </button>
         </div>
@@ -4001,8 +4022,8 @@ function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
             </div>
           ) : isImage ? (
             <div style={{padding:22, background:"var(--c-yellow-tint)", border:"1px solid var(--yellow-200)", borderRadius:10}}>
-              <div className="eyebrow" style={{marginBottom:8}}>Visual direction</div>
-              <p style={{margin:0, fontFamily:"var(--font-serif)", fontSize:17, lineHeight:1.6, color:"var(--c-ink)", whiteSpace:"pre-wrap"}}>{humanize(o.text) || "(no direction)"}</p>
+              <div className="eyebrow" style={{marginBottom:8}}>{t("briefs.library.visualDirection")}</div>
+              <p style={{margin:0, fontFamily:"var(--font-serif)", fontSize:17, lineHeight:1.6, color:"var(--c-ink)", whiteSpace:"pre-wrap"}}>{humanize(o.text) || t("briefs.library.noDirection")}</p>
             </div>
           ) : (
             /* Full sheet of paper */
@@ -4010,12 +4031,12 @@ function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
               padding:"28px 30px", background:"#FFFFFF", border:"1px solid var(--c-line)", borderRadius:6,
               boxShadow:"var(--shadow-sm)",
               fontFamily:"var(--font-serif)", fontSize:18, lineHeight:1.7, color:"var(--c-ink)", whiteSpace:"pre-wrap",
-            }}>{humanize(o.text) || <span style={{color:"var(--c-faint)"}}>(empty)</span>}</div>
+            }}>{humanize(o.text) || <span style={{color:"var(--c-faint)"}}>{t("briefs.notepad.empty")}</span>}</div>
           )}
 
           {o.rationale && (
             <>
-              <div className="eyebrow" style={{marginTop:16, marginBottom:6}}>QA notes</div>
+              <div className="eyebrow" style={{marginTop:16, marginBottom:6}}>{t("briefs.library.qaNotes")}</div>
               <p style={{margin:0, fontSize:13, color:"var(--c-dim)", lineHeight:1.55, fontStyle:"italic"}}>{o.rationale}</p>
             </>
           )}
@@ -4027,10 +4048,10 @@ function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
             fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)", letterSpacing:"0.04em",
           }}>
             <span>
-              Composed by <span style={{color:"var(--c-ink)"}}>{specialistName(o.run.specialist_id)}</span> · BIO v{o.run.bio_version}
+              {t("briefs.try.composedBy")} <span style={{color:"var(--c-ink)"}}>{specialistName(o.run.specialist_id)}</span> · BIO v{o.run.bio_version}
               {cert
-                ? <> · certified by <span style={{color:"var(--green-600)"}}>{cert.byName}</span></>
-                : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+                ? <> · {t("briefs.notepad.certifiedBy")} <span style={{color:"var(--green-600)"}}>{cert.byName}</span></>
+                : <> · <span style={{color:"var(--yellow-700)"}}>{t("briefs.try.uncertified")}</span></>}
             </span>
             <span>{agent?.cr ?? "?"} cr</span>
           </div>
@@ -4039,24 +4060,24 @@ function LibraryViewer({ o, cert, go, flash, onClose, onDelete }) {
         {/* Action bar — Reuse · Copy prompt · Download · Delete — pinned, always visible */}
         <div style={{flex:"none", display:"flex", gap:8, flexWrap:"wrap", padding:"14px 22px", borderTop:"1px solid var(--c-line)", background:"var(--c-bg)"}}>
           <button className="btn btn--primary btn--sm" onClick={reuse}>
-            <Icon name="refresh" size={13} /> Reuse
+            <Icon name="refresh" size={13} /> {t("briefs.library.reuse")}
           </button>
           <button className="btn btn--ghost btn--sm" onClick={copyPrompt}>
-            <Icon name="files" size={13} /> Copy prompt
+            <Icon name="files" size={13} /> {t("briefs.library.copyPrompt")}
           </button>
           <button className="btn btn--ghost btn--sm" onClick={download}>
-            <Icon name="download" size={13} /> Download
+            <Icon name="download" size={13} /> {t("briefs.notepad.download")}
           </button>
           <div style={{marginLeft:"auto", display:"flex", gap:8, alignItems:"center"}}>
             {confirmDel ? (
               <>
-                <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)"}}>Delete this asset?</span>
-                <button className="btn btn--ghost btn--sm" onClick={() => setConfirmDel(false)}>Cancel</button>
-                <button className="btn btn--danger btn--sm" onClick={() => onDelete(o)}>Delete</button>
+                <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)"}}>{t("briefs.library.confirmDelete")}</span>
+                <button className="btn btn--ghost btn--sm" onClick={() => setConfirmDel(false)}>{t("briefs.notepad.cancel")}</button>
+                <button className="btn btn--danger btn--sm" onClick={() => onDelete(o)}>{t("briefs.library.delete")}</button>
               </>
             ) : (
               <button className="btn btn--danger btn--sm" onClick={() => setConfirmDel(true)}>
-                <Icon name="close" size={13} /> Delete
+                <Icon name="close" size={13} /> {t("briefs.library.delete")}
               </button>
             )}
           </div>
@@ -4112,6 +4133,7 @@ function runQaGate(draft, refusals) {
 }
 
 function SpecialistAuthor({ go }) {
+  const { t } = useLocale();
   const [form, setForm] = useBrState(() => ({
     name:"", dept: window.CI_DEPTS[0], status:"live", job:"",
     role:"", objective:"", method:[""], outputContract:"", voice:"", tools:[""], refusals:[""],
@@ -4119,7 +4141,7 @@ function SpecialistAuthor({ go }) {
   }));
   const [saved, setSaved] = useBrState(false);
   const [tab, setTab] = useBrState("prompt");
-  const [brief, setBrief] = useBrState("Write the annual pricing announcement email for wholesale buyers.");
+  const [brief, setBrief] = useBrState(t("briefs.author.sampleBriefDefault"));
   const [draft, setDraft] = useBrState("");
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -4164,24 +4186,24 @@ function SpecialistAuthor({ go }) {
         <div key={i} style={{display:"flex", gap:6}}>
           <input value={v} placeholder={placeholder} onChange={e => setArr(k, i, e.target.value)} style={AUTHOR_INPUT} />
           {form[k].length > 1 && (
-            <button onClick={() => delArr(k, i)} className="btn btn--ghost btn--icon" style={{flexShrink:0}} aria-label="Remove"><Icon name="close" size={14} /></button>
+            <button onClick={() => delArr(k, i)} className="btn btn--ghost btn--icon" style={{flexShrink:0}} aria-label={t("briefs.author.remove")}><Icon name="close" size={14} /></button>
           )}
         </div>
       ))}
-      <button onClick={() => addArr(k)} className="btn btn--link" style={{fontSize:12, alignSelf:"flex-start"}}><Icon name="plus" size={12} /> Add</button>
+      <button onClick={() => addArr(k)} className="btn btn--link" style={{fontSize:12, alignSelf:"flex-start"}}><Icon name="plus" size={12} /> {t("briefs.author.add")}</button>
     </div>
   );
 
   return (
     <div style={{padding:"24px 36px 80px"}}>
       <PageHeader
-        eyebrow="Capabilities · admin"
-        title="New specialist"
-        sub="Define an L2 specialist. The prompt on the right is the real composed brief — PLATFORM + the live BIO + this spec + the task — assembled as you type."
+        eyebrow={t("briefs.author.eyebrow")}
+        title={t("briefs.author.title")}
+        sub={t("briefs.author.sub")}
         right={<>
-          <button className="btn btn--ghost" onClick={() => go("specialists")}>Cancel</button>
+          <button className="btn btn--ghost" onClick={() => go("specialists")}>{t("briefs.notepad.cancel")}</button>
           <button className="btn btn--primary" disabled={!canSave} onClick={save} style={!canSave ? {opacity:0.5, cursor:"not-allowed"} : undefined}>
-            {saved ? "Saved ✓" : "Save specialist"}
+            {saved ? t("briefs.author.saved") : t("briefs.author.saveSpecialist")}
           </button>
         </>}
       />
@@ -4191,51 +4213,51 @@ function SpecialistAuthor({ go }) {
         <div style={{display:"flex", flexDirection:"column", gap:18}}>
           <div className="card" style={{padding:18, display:"flex", flexDirection:"column", gap:14}}>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-              <div className="eyebrow">Identity</div>
+              <div className="eyebrow">{t("briefs.author.identity")}</div>
               <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{code}</span>
             </div>
-            <div><Label>Name</Label><input value={form.name} placeholder="e.g. The Wholesale Closer" onChange={e => set("name", e.target.value)} style={AUTHOR_INPUT} /></div>
+            <div><Label>{t("briefs.author.name")}</Label><input value={form.name} placeholder={t("briefs.author.namePlaceholder")} onChange={e => set("name", e.target.value)} style={AUTHOR_INPUT} /></div>
             <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12}}>
-              <div><Label>Department</Label>
+              <div><Label>{t("briefs.author.department")}</Label>
                 <select value={form.dept} onChange={e => set("dept", e.target.value)} style={AUTHOR_INPUT}>
                   {window.CI_DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
-              <div><Label>Status</Label>
+              <div><Label>{t("briefs.author.status")}</Label>
                 <select value={form.status} onChange={e => set("status", e.target.value)} style={AUTHOR_INPUT}>
-                  <option value="live">Live</option><option value="soon">Coming soon</option><option value="draft">Draft</option>
+                  <option value="live">{t("briefs.author.statusLive")}</option><option value="soon">{t("briefs.author.statusSoon")}</option><option value="draft">{t("briefs.author.statusDraft")}</option>
                 </select>
               </div>
             </div>
-            <div><Label>The job · one-liner</Label><input value={form.job} placeholder="What this specialist does, in one line." onChange={e => set("job", e.target.value)} style={AUTHOR_INPUT} /></div>
+            <div><Label>{t("briefs.author.jobLabel")}</Label><input value={form.job} placeholder={t("briefs.author.jobPlaceholder")} onChange={e => set("job", e.target.value)} style={AUTHOR_INPUT} /></div>
           </div>
 
           <div className="card" style={{padding:18, display:"flex", flexDirection:"column", gap:14}}>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-              <div className="eyebrow">Prompt spec</div>
-              <button onClick={useTemplate} className="btn btn--link" style={{fontSize:12}}><Icon name="refresh" size={12} /> Prefill from {form.dept} template</button>
+              <div className="eyebrow">{t("briefs.author.promptSpec")}</div>
+              <button onClick={useTemplate} className="btn btn--link" style={{fontSize:12}}><Icon name="refresh" size={12} /> {t("briefs.author.prefillFrom", { dept: form.dept })}</button>
             </div>
-            <div><Label>Role</Label><input value={form.role} placeholder="a conversion copywriter who…" onChange={e => set("role", e.target.value)} style={AUTHOR_INPUT} /></div>
-            <div><Label>Objective</Label><textarea value={form.objective} rows={2} placeholder="What a good run produces." onChange={e => set("objective", e.target.value)} style={{...AUTHOR_INPUT, resize:"vertical", lineHeight:1.5}} /></div>
-            <div><Label>Method · steps</Label><ListEditor k="method" placeholder="A step the specialist follows" /></div>
-            <div><Label>Output contract</Label><textarea value={form.outputContract} rows={2} placeholder="Shape / length / format it must return." onChange={e => set("outputContract", e.target.value)} style={{...AUTHOR_INPUT, resize:"vertical", lineHeight:1.5}} /></div>
-            <div><Label>Voice</Label><input value={form.voice} placeholder="Voice constraints (inherits brand voice)." onChange={e => set("voice", e.target.value)} style={AUTHOR_INPUT} /></div>
-            <div><Label>Tools</Label><ListEditor k="tools" placeholder="e.g. Exa search, image generation" /></div>
-            <div><Label>Refusals · won't do (on top of brand rules)</Label><ListEditor k="refusals" placeholder="A hard rule this specialist won't break" /></div>
+            <div><Label>{t("briefs.author.role")}</Label><input value={form.role} placeholder={t("briefs.author.rolePlaceholder")} onChange={e => set("role", e.target.value)} style={AUTHOR_INPUT} /></div>
+            <div><Label>{t("briefs.author.objective")}</Label><textarea value={form.objective} rows={2} placeholder={t("briefs.author.objectivePlaceholder")} onChange={e => set("objective", e.target.value)} style={{...AUTHOR_INPUT, resize:"vertical", lineHeight:1.5}} /></div>
+            <div><Label>{t("briefs.author.methodSteps")}</Label><ListEditor k="method" placeholder={t("briefs.author.methodPlaceholder")} /></div>
+            <div><Label>{t("briefs.author.outputContract")}</Label><textarea value={form.outputContract} rows={2} placeholder={t("briefs.author.outputContractPlaceholder")} onChange={e => set("outputContract", e.target.value)} style={{...AUTHOR_INPUT, resize:"vertical", lineHeight:1.5}} /></div>
+            <div><Label>{t("briefs.author.voice")}</Label><input value={form.voice} placeholder={t("briefs.author.voicePlaceholder")} onChange={e => set("voice", e.target.value)} style={AUTHOR_INPUT} /></div>
+            <div><Label>{t("briefs.author.tools")}</Label><ListEditor k="tools" placeholder={t("briefs.author.toolsPlaceholder")} /></div>
+            <div><Label>{t("briefs.author.refusalsLabel")}</Label><ListEditor k="refusals" placeholder={t("briefs.author.refusalsPlaceholder")} /></div>
           </div>
 
           <div className="card" style={{padding:18, display:"flex", flexDirection:"column", gap:14}}>
-            <div className="eyebrow">Routing & cost</div>
+            <div className="eyebrow">{t("briefs.author.routingCost")}</div>
             <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12}}>
-              <div><Label>Model</Label>
+              <div><Label>{t("briefs.author.model")}</Label>
                 <select value={form.model} onChange={e => set("model", e.target.value)} style={AUTHOR_INPUT}>
                   {Object.entries(window.CI_MODELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
-              <div><Label>Credits / run</Label><input type="number" min="0" value={form.cr} onChange={e => set("cr", e.target.value)} style={AUTHOR_INPUT} /></div>
-              <div><Label>Unlocks from</Label>
+              <div><Label>{t("briefs.author.creditsPerRun")}</Label><input type="number" min="0" value={form.cr} onChange={e => set("cr", e.target.value)} style={AUTHOR_INPUT} /></div>
+              <div><Label>{t("briefs.drawer.unlocksFrom")}</Label>
                 <select value={form.tier} onChange={e => set("tier", e.target.value)} style={AUTHOR_INPUT}>
-                  {Object.entries(window.CI_TIERS).map(([k, v]) => <option key={k} value={k}>Tier {k} · {v}</option>)}
+                  {Object.entries(window.CI_TIERS).map(([k, v]) => <option key={k} value={k}>{t("briefs.drawer.tier")} {k} · {v}</option>)}
                 </select>
               </div>
             </div>
@@ -4247,10 +4269,10 @@ function SpecialistAuthor({ go }) {
           <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:8}}>
             <div style={{display:"flex", alignItems:"center", gap:8}}>
               <BrandolphDot />
-              <span className="eyebrow eyebrow--yellow">{tab === "prompt" ? "Live composed prompt" : "Test · dry run + QA gate"}</span>
+              <span className="eyebrow eyebrow--yellow">{tab === "prompt" ? t("briefs.author.livePrompt") : t("briefs.author.testTab")}</span>
             </div>
             <div style={{display:"inline-flex", padding:3, gap:2, background:"var(--neutral-50)", borderRadius:9, border:"1px solid var(--c-line)"}}>
-              {[{v:"prompt",l:"Prompt"},{v:"test",l:"Test"}].map(o => (
+              {[{v:"prompt",l:t("briefs.author.tabPrompt")},{v:"test",l:t("briefs.author.tabTest")}].map(o => (
                 <button key={o.v} onClick={() => setTab(o.v)} style={{
                   border:"none", cursor:"pointer", borderRadius:7, padding:"5px 12px",
                   fontFamily:"var(--font-mono)", fontSize:10.5, letterSpacing:"0.04em", textTransform:"uppercase",
@@ -4272,18 +4294,18 @@ function SpecialistAuthor({ go }) {
                 }}>{preview}</pre>
               </div>
               <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em", paddingLeft:2}}>
-                Brand refusals auto-inherit from the BIO · {(window.CI_BRAND_REFUSALS || []).length} rules
+                {t("briefs.author.refusalsInherit", { count: (window.CI_BRAND_REFUSALS || []).length })}
               </div>
             </>
           ) : (
             <div style={{display:"flex", flexDirection:"column", gap:12}}>
               <div className="card" style={{padding:14, display:"flex", flexDirection:"column", gap:10}}>
-                <Label>Sample brief</Label>
+                <Label>{t("briefs.author.sampleBrief")}</Label>
                 <textarea value={brief} rows={2} onChange={e => setBrief(e.target.value)}
                   style={{...AUTHOR_INPUT, resize:"vertical", lineHeight:1.5}} />
                 <button className="btn btn--primary btn--sm" style={{alignSelf:"flex-start"}}
                   onClick={() => setDraft(mockDraft(brief, agentLike, spec))}>
-                  <Icon name="sparkles" size={13} /> Dry run
+                  <Icon name="sparkles" size={13} /> {t("briefs.author.dryRun")}
                 </button>
               </div>
 
@@ -4294,7 +4316,7 @@ function SpecialistAuthor({ go }) {
                 return (
                   <>
                     <div className="card" style={{padding:0, overflow:"hidden"}}>
-                      <div className="eyebrow" style={{padding:"10px 14px 4px"}}>Draft output · editable</div>
+                      <div className="eyebrow" style={{padding:"10px 14px 4px"}}>{t("briefs.author.draftOutput")}</div>
                       <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={6}
                         style={{width:"100%", boxSizing:"border-box", border:"none", borderTop:"1px solid var(--c-line)",
                           padding:"12px 14px", background:"transparent", color:"var(--c-ink)", outline:"none",
@@ -4303,8 +4325,8 @@ function SpecialistAuthor({ go }) {
 
                     <div className="card" style={{padding:14}}>
                       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
-                        <div className="eyebrow">Brand QA gate</div>
-                        <span className={"pill " + (fails ? "pill--pink" : "pill--green")}>{fails ? `${fails} blocking` : "Pass"}</span>
+                        <div className="eyebrow">{t("briefs.author.qaGate")}</div>
+                        <span className={"pill " + (fails ? "pill--pink" : "pill--green")}>{fails ? t("briefs.author.blocking", { count: fails }) : t("briefs.author.pass")}</span>
                       </div>
                       <div style={{display:"flex", flexDirection:"column", gap:8}}>
                         {results.map((r, i) => (
@@ -4319,8 +4341,8 @@ function SpecialistAuthor({ go }) {
                       </div>
                       <div style={{marginTop:12, paddingTop:10, borderTop:"1px dashed var(--c-line-2)", fontSize:12, color:"var(--c-dim)"}}>
                         {fails
-                          ? <><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>Not ready.</em> Fix the flagged rule before setting this specialist live.</>
-                          : <><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>Clears the gate.</em> Safe to set status “Live”.</>}
+                          ? <><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>{t("briefs.author.notReady")}</em> {t("briefs.author.notReadyBody")}</>
+                          : <><em className="b-voice" style={{background:"none", fontStyle:"italic"}}>{t("briefs.author.clearsGate")}</em> {t("briefs.author.clearsGateBody")}</>}
                       </div>
                     </div>
                   </>

@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale } from "./lib/i18n.js";
 import { apiFetch } from "./lib/supabase-browser.js";
 const { Icon, BrandolphDot, StreamedText } = window;
 /* Caastor Intelligence — Floating Brandolph                          */
@@ -129,19 +130,19 @@ function deriveContextFromMemory({ stats, signals, routeId, agentsById }) {
 }
 
 /* Contextual greeting Brandolph says when first opened on each route. */
-function getContextLine(routeId) {
+function getContextLine(routeId, t) {
   switch (routeId) {
-    case "home":         return "*Briefing a new flow lives in the launchpad above.* Use this for status, advice, or anything you'd ask a CMO mid-week.";
-    case "discovery":    return "*You're mid-extraction.* I'm reading the site in another tab. Ask me anything while we wait — including 'what should I check first when it lands'.";
-    case "bio":          return "*The BIO is the canon.* I'll quote it back if you ask me about a field. Ask me what's weak.";
-    case "briefs":       return "*Three briefs in flight, four shipped.* Ask me about any one of them, or ask me which one I'd push first this week.";
-    case "brief-detail": return "*You're inside a brief.* I can take you through the SMP, the refusals, or what I'd do differently if we were writing it tomorrow.";
-    case "specialists":  return "*That's your department.* Ask me who I'd assemble for a specific job, and I'll show you the pick + why.";
-    case "canvas":       return "*This is the workspace.* The map gets denser as you ship. Ask me about any node, or ask me what's downstream of the BIO.";
-    case "craft":        return "*Hand work the team should finish.* I'll match a finishing pack to a job if you describe it.";
-    case "credits":      return "*Spend, not budget.* Ask me where the money went, or what would change if you doubled the cycle.";
-    case "settings":     return "*Workspace governance.* Ask me what the forbidden list should be, or whether your auto-approve threshold is loose.";
-    default:             return "*I'm Brandolph.* Ask me what's running, what's stuck, or what to do next. Free to ask — briefs preview cost.";
+    case "home":         return t("floater.greeting.home");
+    case "discovery":    return t("floater.greeting.discovery");
+    case "bio":          return t("floater.greeting.bio");
+    case "briefs":       return t("floater.greeting.briefs");
+    case "brief-detail": return t("floater.greeting.briefDetail");
+    case "specialists":  return t("floater.greeting.specialists");
+    case "canvas":       return t("floater.greeting.canvas");
+    case "craft":        return t("floater.greeting.craft");
+    case "credits":      return t("floater.greeting.credits");
+    case "settings":     return t("floater.greeting.settings");
+    default:             return t("floater.greeting.default");
   }
 }
 
@@ -252,6 +253,7 @@ function useRouteSubscription() {
 /* Floating Brandolph - the mascot + popover chat */
 function FloatingBrandolph() {
   useRouteSubscription();
+  const { t } = useLocale();
   const [open, setOpen] = useFState(false);
   const [render, setRender] = useFState(false);   // panel stays mounted through its exit animation
   const [input, setInput] = useFState("");
@@ -332,10 +334,10 @@ function FloatingBrandolph() {
     : { line: null, prompts: null };
 
   const prompts = derived.prompts || [
-    { eyebrow: "Status",   text: "What's running and what needs me?" },
-    { eyebrow: "Next",     text: "What should I brief next?" },
-    { eyebrow: "Sharpen",  text: "Read my BIO and tell me what's weak." },
-    { eyebrow: "Refuse",   text: "What should I kill this cycle?" },
+    { eyebrow: t("floater.prompt.statusEyebrow"),  text: t("floater.prompt.statusText") },
+    { eyebrow: t("floater.prompt.nextEyebrow"),    text: t("floater.prompt.nextText") },
+    { eyebrow: t("floater.prompt.sharpenEyebrow"), text: t("floater.prompt.sharpenText") },
+    { eyebrow: t("floater.prompt.refuseEyebrow"),  text: t("floater.prompt.refuseText") },
   ];
 
   const send = async (textArg) => {
@@ -414,16 +416,16 @@ function FloatingBrandolph() {
       {open && <div className="bf-backdrop" onClick={() => setOpen(false)} />}
 
       {render && (
-        <aside className={"bf-panel" + (open ? "" : " bf-panel--out")} role="dialog" aria-label="Ask Brandolph">
+        <aside className={"bf-panel" + (open ? "" : " bf-panel--out")} role="dialog" aria-label={t("floater.ask")}>
           <header className="bf-header">
             <span className="bf-header__mark">
               <MascotIcon size={32} />
             </span>
             <div style={{display:"flex", flexDirection:"column"}}>
               <span className="bf-header__title">Brandolph</span>
-              <span className="bf-header__sub">Your CMO · Free to ask</span>
+              <span className="bf-header__sub">{t("floater.headerSub")}</span>
             </div>
-            <button className="bf-header__close" onClick={() => setOpen(false)} aria-label="Close">
+            <button className="bf-header__close" onClick={() => setOpen(false)} aria-label={t("floater.close")}>
               <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
             </button>
           </header>
@@ -431,8 +433,8 @@ function FloatingBrandolph() {
           <div ref={bodyRef} className="bf-body scroll">
             {messages.length === 0 ? (
               <React.Fragment>
-                <FloaterMessage m={{ role: "brandolph", text: derived.line || getContextLine(routeId) }} />
-                <div className="eyebrow" style={{marginTop: 4, marginBottom: 4}}>Try asking</div>
+                <FloaterMessage m={{ role: "brandolph", text: derived.line || getContextLine(routeId, t) }} />
+                <div className="eyebrow" style={{marginTop: 4, marginBottom: 4}}>{t("floater.tryAsking")}</div>
                 <div style={{display:"flex", flexDirection:"column", gap: 8}}>
                   {prompts.map((p, i) => (
                     <button key={i} className="bf-prompt" onClick={() => send(p.text)}>
@@ -455,7 +457,7 @@ function FloatingBrandolph() {
                 </span>
                 <div className="bf-msg__bubble" style={{display:"flex", alignItems:"center", gap: 4}}>
                   <BrandolphDot state="thinking" />
-                  <span style={{fontSize: 12, color:"var(--c-faint)", marginLeft: 6}}>Brandolph is reading…</span>
+                  <span style={{fontSize: 12, color:"var(--c-faint)", marginLeft: 6}}>{t("floater.reading")}</span>
                 </div>
               </div>
             )}
@@ -468,27 +470,27 @@ function FloatingBrandolph() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKey}
                 rows={1}
-                placeholder={"Ask anything — status, next brief, refusals…"}
+                placeholder={t("floater.placeholder")}
               />
-              <button className="btn btn--primary btn--icon" onClick={() => send()} aria-label="Send"
+              <button className="btn btn--primary btn--icon" onClick={() => send()} aria-label={t("floater.send")}
                 style={{width: 32, height: 32, borderRadius: 8, alignSelf:"center"}}>
                 <Icon name="arrow" size={14} />
               </button>
             </div>
             <div className="bf-meta">
-              <span><strong style={{color:"var(--green-700)", fontWeight:600}}>Free</strong> to ask · Briefing a task previews cost first</span>
+              <span><strong style={{color:"var(--green-700)", fontWeight:600}}>{t("floater.free")}</strong> {t("floater.metaRest")}</span>
               {messages.length > 0 && (
                 <button className="btn btn--link" style={{fontSize: 10, padding: 0}} onClick={() => setMessages([])}>
-                  Clear
+                  {t("floater.clear")}
                 </button>
               )}
             </div>
             <div style={{marginTop: 10, paddingTop: 10, borderTop: "1px dashed var(--c-line-2)", display:"flex", gap: 6}}>
               <a href="#/home" onClick={() => setOpen(false)} className="btn btn--primary btn--sm" style={{flex: 1, justifyContent:"center"}}>
-                Brief a new task <Icon name="arrow" size={12} />
+                {t("floater.briefNewTask")} <Icon name="arrow" size={12} />
               </a>
               <a href="#/briefs" onClick={() => setOpen(false)} className="btn btn--ghost btn--sm" style={{flex: 1, justifyContent:"center"}}>
-                Add to a flow
+                {t("floater.addToFlow")}
               </a>
             </div>
           </footer>
@@ -498,7 +500,7 @@ function FloatingBrandolph() {
       <button
         className={"bf-button" + (open ? " bf-button--open" : "")}
         onClick={() => setOpen(o => !o)}
-        aria-label="Ask Brandolph"
+        aria-label={t("floater.ask")}
         aria-expanded={open}
         style={onListRoute && !open ? { bottom: "var(--space-13, 80px)" } : undefined}
       >
@@ -507,8 +509,8 @@ function FloatingBrandolph() {
           <span
             className="bf-button__ping"
             role="status"
-            aria-label="Brandolph has 1 suggestion for you"
-            title="Brandolph has a suggestion for you"
+            aria-label={t("floater.pingLabel")}
+            title={t("floater.pingTitle")}
           >1</span>
         )}
       </button>

@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale } from "./lib/i18n.js";
 import { apiFetch } from "./lib/supabase-browser.js";
 const { BrandolphAvatar, BrandolphDot, Icon, LayerTag, Reveal, StatusPill, StreamedText, useIsTeam } = window;
 
@@ -686,6 +687,7 @@ function WorkspaceBar() {
 
 /* Mini analytics — credits · campaigns + success · library peek + in-flight. */
 function HomeDashboard({ go }) {
+  const { t } = useLocale();
   const briefs = window.CI_BRIEFS;
   const credits = window.CI_CREDITS;
   const shipped = briefs.filter(b => ["shipped","delivered","approved"].includes(b.status)).length;
@@ -700,8 +702,8 @@ function HomeDashboard({ go }) {
       <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:14, marginBottom:18, alignItems:"stretch"}}>
         <Reveal>
           <div className="card" style={cardStyle}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">Credits this cycle</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("credits")}>Ledger →</button></div>
-            <div style={{display:"flex", alignItems:"baseline", gap:8}}><span style={big()}>{credits.balance}</span><span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>/ {credits.monthly} · {credits.resetsInDays}d left</span></div>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">{t("brandolph.creditsThisCycle")}</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("credits")}>{t("brandolph.ledger")} →</button></div>
+            <div style={{display:"flex", alignItems:"baseline", gap:8}}><span style={big()}>{credits.balance}</span><span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{t("brandolph.creditsMeter", { monthly: credits.monthly, days: credits.resetsInDays })}</span></div>
             <div style={{height:6, background:"var(--neutral-50)", borderRadius:999, overflow:"hidden", display:"flex"}}>
               {credits.split.filter(s => s.credits > 0).map((s, i) => <div key={i} style={{flex: s.pct || 1, background: s.color}} />)}
             </div>
@@ -709,17 +711,17 @@ function HomeDashboard({ go }) {
         </Reveal>
         <Reveal delay={80}>
           <div className="card" style={cardStyle}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">Campaigns</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("briefs")}>All briefs →</button></div>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">{t("brandolph.campaigns")}</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("briefs")}>{t("brandolph.allBriefs")} →</button></div>
             <div style={{display:"flex", alignItems:"baseline", gap:20}}>
-              <div><div style={big()}>{briefs.length}</div><div className="eyebrow" style={{marginTop:5}}>created</div></div>
-              <div><div style={big("var(--green-600)")}>{successRate}%</div><div className="eyebrow" style={{marginTop:5}}>success rate</div></div>
+              <div><div style={big()}>{briefs.length}</div><div className="eyebrow" style={{marginTop:5}}>{t("brandolph.created")}</div></div>
+              <div><div style={big("var(--green-600)")}>{successRate}%</div><div className="eyebrow" style={{marginTop:5}}>{t("brandolph.successRate")}</div></div>
             </div>
-            <div style={{fontSize:12, color:"var(--c-faint)"}}>{inFlight.length} in flight · {shipped} shipped</div>
+            <div style={{fontSize:12, color:"var(--c-faint)"}}>{t("brandolph.inFlightShipped", { inFlight: inFlight.length, shipped })}</div>
           </div>
         </Reveal>
         <Reveal delay={160}>
           <div className="card" style={cardStyle}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">Library</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("library")}>Open →</button></div>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}><span className="eyebrow">{t("brandolph.library")}</span><button className="btn btn--link" style={{fontSize:11.5}} onClick={() => go("library")}>{t("brandolph.open")} →</button></div>
             <div style={{display:"flex", flexDirection:"column", gap:7, marginTop:2}}>
               {recent.map(o => (
                 <div key={o.id} style={{display:"flex", alignItems:"center", gap:8, fontSize:12.5}}>
@@ -736,8 +738,8 @@ function HomeDashboard({ go }) {
       {inFlight.length > 0 && (
         <Reveal>
           <div style={{display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:12}}>
-            <h3 style={{fontSize:16, margin:0, letterSpacing:"-0.005em"}}>In flight · {inFlight.length}</h3>
-            <button className="btn btn--link" style={{fontSize:12}} onClick={() => go("briefs")}>View all →</button>
+            <h3 style={{fontSize:16, margin:0, letterSpacing:"-0.005em"}}>{t("brandolph.inFlightHeading", { count: inFlight.length })}</h3>
+            <button className="btn btn--link" style={{fontSize:12}} onClick={() => go("briefs")}>{t("brandolph.viewAll")} →</button>
           </div>
           <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap:12}}>
             {inFlight.map(b => (
@@ -760,6 +762,7 @@ function HomeDashboard({ go }) {
 }
 
 function HomeCreate({ tweaks, go }) {
+  const { t } = useLocale();
   const [scope, setScope] = useBState("all");
   const [mode, setMode]   = useBState("flow");
   const [input, setInput] = useBState(() => {
@@ -992,18 +995,22 @@ function HomeCreate({ tweaks, go }) {
               fontSize: 56, lineHeight: 1.08, letterSpacing:"-0.015em",
               margin: 0, color:"var(--c-ink)", fontWeight: 500,
             }}>
-              What do you want to <em style={{background:"var(--yellow-300)", padding:"0 6px", fontStyle:"italic"}}>create</em>?
+              {(() => {
+                const word = t("brandolph.heroWord");
+                const parts = t("brandolph.hero", { word }).split(word);
+                return (<>{parts[0]}<em style={{background:"var(--yellow-300)", padding:"0 6px", fontStyle:"italic"}}>{word}</em>{parts.slice(1).join(word)}</>);
+              })()}
             </h1>
             <p style={{
               fontSize: 16, color:"var(--c-dim)", lineHeight: 1.55,
               margin: "16px auto 0", maxWidth: 520,
             }}>
-              Describe the change you want made — not the deliverable. Brandolph reads the BIO, sharpens the brief, assembles the team, and shows you the cost before anything runs.
+              {t("brandolph.subcopy")}
             </p>
 
             {/* Brand scope pills */}
             <div style={{display:"flex", alignItems:"center", justifyContent:"center", gap: 8, marginTop: 28, flexWrap:"wrap"}}>
-              <span className="eyebrow" style={{marginRight: 4}}>Scope</span>
+              <span className="eyebrow" style={{marginRight: 4}}>{t("brandolph.scope")}</span>
               {[
                 {k:"all",          l:"All Vinilo"},
                 {k:"subscription", l:"Subscription"},
@@ -1036,7 +1043,7 @@ function HomeCreate({ tweaks, go }) {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); if (phase !== "idle") setPhase("idle"); }}
                 onKeyDown={handleKeyDown}
-                placeholder="e.g. Make the Summer Tuesdays campaign earn the slow afternoon back — café-first, no discount, lift Tuesday footfall by 18%."
+                placeholder={t("brandolph.promptPlaceholder")}
                 rows={3}
                 style={{
                   width:"100%", border:"none", outline:"none", resize:"none",
@@ -1051,10 +1058,10 @@ function HomeCreate({ tweaks, go }) {
               }}>
                 <div style={{display:"flex", gap: 6}}>
                   {[
-                    {k:"flow",   l:"Full flow",   icon:"sparkles"},
-                    {k:"words",  l:"Words only",  icon:"brief"},
-                    {k:"visual", l:"Visual only", icon:"canvas"},
-                    {k:"polish", l:"Polish",      icon:"edit"},
+                    {k:"flow",   l:t("brandolph.modeFlow"),   icon:"sparkles"},
+                    {k:"words",  l:t("brandolph.modeWords"),  icon:"brief"},
+                    {k:"visual", l:t("brandolph.modeVisual"), icon:"canvas"},
+                    {k:"polish", l:t("brandolph.modePolish"), icon:"edit"},
                   ].map(m => (
                     <button key={m.k} onClick={() => setMode(m.k)}
                       style={{
@@ -1078,14 +1085,14 @@ function HomeCreate({ tweaks, go }) {
                     <kbd style={{background:"var(--c-bg)", padding:"2px 6px", borderRadius: 4, border:"1px solid var(--c-line)"}}>↵</kbd>
                   </span>
                   <button className="btn btn--primary" disabled={!input.trim()} onClick={handleStart}>
-                    {isActive ? "Re-brief" : "Start"} <Icon name="arrow" size={14} />
+                    {isActive ? t("brandolph.reBrief") : t("brandolph.start")} <Icon name="arrow" size={14} />
                   </button>
                 </div>
               </div>
             </div>
 
             <div style={{marginTop: 16, fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.06em"}}>
-              <BrandolphDot /> &nbsp;BIO 91% · Brandolph will sharpen your brief before assembly · Asking is free
+              <BrandolphDot /> &nbsp;{t("brandolph.assemblyNote", { score: 91 })}
             </div>
           </div>
 
@@ -1107,25 +1114,25 @@ function HomeCreate({ tweaks, go }) {
                     <div style={{display:"flex", alignItems:"center", gap: 12, padding:"12px 0"}}>
                       <BrandolphDot state="thinking" size={11} />
                       <div>
-                        <div className="eyebrow eyebrow--yellow" style={{marginBottom: 2}}>Brandolph · sharpening</div>
-                        <p style={{margin: 0, fontSize: 13.5, color:"var(--c-dim)", lineHeight: 1.5}}>Reading your BIO. Pressuring the brief. Picking the smallest crew.</p>
+                        <div className="eyebrow eyebrow--yellow" style={{marginBottom: 2}}>{t("brandolph.sharpeningEyebrow")}</div>
+                        <p style={{margin: 0, fontSize: 13.5, color:"var(--c-dim)", lineHeight: 1.5}}>{t("brandolph.sharpeningLoading")}</p>
                       </div>
                     </div>
                   )}
 
                   {!sharp.loading && sharp.error && (
                     <>
-                      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 8}}>Brandolph · sharpening failed</div>
+                      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 8}}>{t("brandolph.sharpeningFailedEyebrow")}</div>
                       <p style={{margin: 0, fontSize: 13.5, color:"var(--c-dim)", marginBottom: 14, lineHeight: 1.5}}>
-                        {sharp.error}. You can run the brief as-written.
+                        {t("brandolph.sharpeningFailedBody", { error: sharp.error })}
                       </p>
-                      <button className="btn btn--primary" onClick={handleProceed}>Proceed with raw brief →</button>
+                      <button className="btn btn--primary" onClick={handleProceed}>{t("brandolph.proceedRaw")} →</button>
                     </>
                   )}
 
                   {!sharp.loading && sharp.data && (
                     <>
-                      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 8}}>Brandolph · sharpening</div>
+                      <div className="eyebrow eyebrow--yellow" style={{marginBottom: 8}}>{t("brandolph.sharpeningEyebrow")}</div>
                       {sharp.data.tension && (
                         <p style={{margin: 0, fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 17, color:"var(--c-ink)", lineHeight: 1.45, marginBottom: 12}}>
                           {sharp.data.tension}
@@ -1133,7 +1140,7 @@ function HomeCreate({ tweaks, go }) {
                       )}
                       {sharp.data.sharpenedBrief && (
                         <div style={{padding: 12, background:"var(--c-bg)", borderRadius: 10, marginBottom: 20}}>
-                          <div className="eyebrow" style={{marginBottom: 4}}>How a CMO would write this</div>
+                          <div className="eyebrow" style={{marginBottom: 4}}>{t("brandolph.cmoRewrite")}</div>
                           <p style={{margin: 0, fontSize: 13.5, color:"var(--c-ink)", lineHeight: 1.55}}>{sharp.data.sharpenedBrief}</p>
                         </div>
                       )}
@@ -1153,7 +1160,7 @@ function HomeCreate({ tweaks, go }) {
                                 value={answers[i] || ""}
                                 onChange={(e) => setAnswers((p) => ({ ...p, [i]: e.target.value }))}
                                 onKeyDown={(e) => e.stopPropagation()}
-                                placeholder="Answer in a sentence — or skip."
+                                placeholder={t("brandolph.answerPlaceholder")}
                                 rows={2}
                                 style={{width:"100%", padding:"9px 12px", borderRadius: 8,
                                   border:"1px solid var(--c-line)", background:"var(--c-bg)",
@@ -1167,7 +1174,7 @@ function HomeCreate({ tweaks, go }) {
 
                       {(sharp.data.proposedSpecialists || []).length > 0 && (
                         <div style={{padding: 12, background:"var(--c-bg)", borderRadius: 10, marginBottom: 18}}>
-                          <div className="eyebrow" style={{marginBottom: 6}}>Proposed crew</div>
+                          <div className="eyebrow" style={{marginBottom: 6}}>{t("brandolph.proposedCrew")}</div>
                           <div style={{display:"flex", flexWrap:"wrap", gap: 6}}>
                             {sharp.data.proposedSpecialists.map((id) => {
                               const a = window.CI_AGENTS.find((x) => x.id === id);
@@ -1184,9 +1191,9 @@ function HomeCreate({ tweaks, go }) {
                       )}
 
                       <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", paddingTop: 12, borderTop:"1px dashed var(--c-line)"}}>
-                        <button className="btn btn--link" style={{fontSize: 12}} onClick={handleReset}>← Re-brief</button>
+                        <button className="btn btn--link" style={{fontSize: 12}} onClick={handleReset}>← {t("brandolph.reBrief")}</button>
                         <button className="btn btn--primary" onClick={handleProceed}>
-                          Proceed to assembly <Icon name="arrow" size={14} />
+                          {t("brandolph.proceedAssembly")} <Icon name="arrow" size={14} />
                         </button>
                       </div>
                     </>
@@ -1203,10 +1210,10 @@ function HomeCreate({ tweaks, go }) {
                     <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom: 16}}>
                       <div>
                         <div className="eyebrow eyebrow--yellow" style={{marginBottom: 4}}>
-                          {phase === "done" ? "Assembly · complete" : "Assembly · ready to run"}
+                          {phase === "done" ? t("brandolph.assemblyComplete") : t("brandolph.assemblyReady")}
                         </div>
                         <div style={{fontSize: 15, fontWeight: 500, color:"var(--c-ink)"}}>
-                          {realAssembly.agents.length} specialists · {realAssembly.totalCr} credits
+                          {t("brandolph.specialists", { count: realAssembly.agents.length })} · {t("brandolph.creditsCount", { count: realAssembly.totalCr })}
                         </div>
                         <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginTop: 3, letterSpacing:"0.04em"}}>
                           {[...new Set(realAssembly.agents.map(a => a.dept))].join(" · ")}
@@ -1215,7 +1222,7 @@ function HomeCreate({ tweaks, go }) {
                       {phase !== "running" && (
                         <button className="btn btn--ghost btn--sm" onClick={handleReset}
                           style={{fontFamily:"var(--font-mono)", fontSize: 10.5, letterSpacing:"0.08em", textTransform:"uppercase"}}>
-                          {phase === "done" ? "← New brief" : "← Re-brief"}
+                          ← {phase === "done" ? t("brandolph.newBrief") : t("brandolph.reBrief")}
                         </button>
                       )}
                     </div>
@@ -1266,24 +1273,24 @@ function HomeCreate({ tweaks, go }) {
                       display:"flex", justifyContent:"space-between", alignItems:"center", gap: 12,
                     }}>
                       <div style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-dim)"}}>
-                        Total{" "}
+                        {t("brandolph.total")}{" "}
                         <strong style={{color:"var(--c-ink)"}}>{realAssembly.totalCr} cr</strong>
                         <span style={{color:"var(--c-faint)", margin:"0 8px"}}>·</span>
-                        {window.CI_CREDITS.balance - (phase === "done" ? realAssembly.totalCr : 0)} remaining after
+                        {t("brandolph.remainingAfter", { n: window.CI_CREDITS.balance - (phase === "done" ? realAssembly.totalCr : 0) })}
                       </div>
                       {phase === "proposing" && (
                         <button className="btn btn--primary" onClick={handleRun}>
-                          Run — {realAssembly.totalCr} credits <Icon name="arrow" size={14} />
+                          {t("brandolph.runCredits", { count: realAssembly.totalCr })} <Icon name="arrow" size={14} />
                         </button>
                       )}
                       {phase === "running" && (
                         <button className="btn btn--ghost" disabled style={{minWidth:140, justifyContent:"center"}}>
-                          <BrandolphDot state="thinking" />&nbsp;&nbsp;Assembling…
+                          <BrandolphDot state="thinking" />&nbsp;&nbsp;{t("brandolph.assembling")}
                         </button>
                       )}
                       {phase === "done" && (
                         <a href="#/library" className="btn btn--primary">
-                          <Icon name="check" size={14} /> Open in Library
+                          <Icon name="check" size={14} /> {t("brandolph.openInLibrary")}
                         </a>
                       )}
                     </div>
@@ -1315,9 +1322,9 @@ function HomeCreate({ tweaks, go }) {
                       }}>
                         <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: 10}}>
                           <div className="eyebrow eyebrow--yellow">{a.name} · {a.dept}</div>
-                          {state === "running" && <span style={{display:"inline-flex", alignItems:"center", gap: 6, fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--yellow-700)"}}><BrandolphDot state="thinking" size={9} /> streaming</span>}
-                          {state === "ok"      && qa && <span className="pill" style={{height: 20, padding:"0 9px", fontSize: 10, background: passed ? "var(--green-50, rgba(127,163,122,0.16))" : "var(--pink-50, rgba(244,143,177,0.12))", color: passed ? "var(--green-600)" : "var(--pink-700, var(--pink-500))"}}>{passed ? "approved" : "flagged"} · {qa.voice_match}/100</span>}
-                          {state === "failed"  && <span className="pill" style={{height: 20, padding:"0 9px", fontSize: 10, background: "var(--pink-50, rgba(244,143,177,0.12))", color: "var(--pink-700, var(--pink-500))"}}>failed</span>}
+                          {state === "running" && <span style={{display:"inline-flex", alignItems:"center", gap: 6, fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--yellow-700)"}}><BrandolphDot state="thinking" size={9} /> {t("brandolph.streaming")}</span>}
+                          {state === "ok"      && qa && <span className="pill" style={{height: 20, padding:"0 9px", fontSize: 10, background: passed ? "var(--green-50, rgba(127,163,122,0.16))" : "var(--pink-50, rgba(244,143,177,0.12))", color: passed ? "var(--green-600)" : "var(--pink-700, var(--pink-500))"}}>{passed ? t("brandolph.approved") : t("brandolph.flagged")} · {qa.voice_match}/100</span>}
+                          {state === "failed"  && <span className="pill" style={{height: 20, padding:"0 9px", fontSize: 10, background: "var(--pink-50, rgba(244,143,177,0.12))", color: "var(--pink-700, var(--pink-500))"}}>{t("brandolph.failed")}</span>}
                         </div>
                         <p style={{margin: 0, fontFamily:"Georgia, 'Times New Roman', serif", fontStyle:"italic", color:"var(--c-ink)", fontSize: 15.5, lineHeight: 1.6, whiteSpace:"pre-wrap"}}>
                           {text}{state === "running" ? <span style={{opacity: 0.4}}>▎</span> : null}
@@ -1329,11 +1336,11 @@ function HomeCreate({ tweaks, go }) {
                             fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-faint)", letterSpacing:"0.04em",
                           }}>
                             <span>
-                              Composed by <span style={{color:"var(--c-ink)"}}>{done.spec?.name || a.name}</span> ·
+                              {t("brandolph.composedBy")} <span style={{color:"var(--c-ink)"}}>{done.spec?.name || a.name}</span> ·
                               BIO v{done.brand?.bioVersion}
                               {done.brand?.certifiedBy
-                                ? <> · <span style={{color:"var(--green-600)"}}>certified</span></>
-                                : <> · <span style={{color:"var(--yellow-700)"}}>uncertified</span></>}
+                                ? <> · <span style={{color:"var(--green-600)"}}>{t("brandolph.certified")}</span></>
+                                : <> · <span style={{color:"var(--yellow-700)"}}>{t("brandolph.uncertified")}</span></>}
                             </span>
                             <span>{a.cr ?? "?"} cr</span>
                           </div>

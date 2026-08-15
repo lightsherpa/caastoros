@@ -23,7 +23,200 @@
     "craftPolish": "Craft polish",
     "capacity": "Capacity",
     "clients": "Clients",
-    "myEarnings": "My earnings"
+    "myEarnings": "My earnings",
+    "queued": "Queued",
+    "inReview": "In review",
+    "yoursOpen": "Yours · open",
+    "capacityOverrides": "Capacity overrides",
+    "stewardQueue": "Steward queue",
+    "filterAll": "All",
+    "filterPendingLead": "Pending Lead",
+    "unassigned": "Unassigned",
+    "filterMine": "Mine",
+    "reload": "Reload",
+    "colBrand": "Brand",
+    "colKind": "Kind",
+    "colStatus": "Status",
+    "colAssignee": "Assignee",
+    "queueEmpty": "No jobs match this filter. Fire a Discovery run to create one:",
+    "you": "You",
+    "assigned": "Assigned",
+    "notSteward": "Not a Steward — run ",
+    "aboutJobs": "About these jobs",
+    "aboutJobsBody": "Each row is a brand awaiting BIO certification — a senior human review before any specialist run reads from it. The moat: every output ships ",
+    "certifiedByName": "certified by {name}",
+    "addGeneric": "+ Add",
+    "removeItem": "Remove {item}",
+    "palette": "Palette",
+    "namePlaceholder": "name",
+    "removeColor": "Remove color",
+    "addColor": "+ Add color",
+    "addedUrlTo": "Added URL to {bucket}",
+    "uploadedTo": "Uploaded \"{name}\" to {bucket}",
+    "addReference": "Add reference",
+    "bucketFoundations": "Foundations",
+    "bucketVisual": "Visual",
+    "bucketVoice": "Voice",
+    "bucketOther": "Other",
+    "pasteUrl": "Paste a URL…",
+    "addUrl": "Add URL",
+    "fileHint": "Max 50MB · PDF, image, .doc, .txt, .md",
+    "typography": "Typography",
+    "typeKindPlaceholder": "Kind (e.g. Display)",
+    "typeFamilyPlaceholder": "Family (e.g. Söhne Breit)",
+    "removeTypeface": "Remove typeface",
+    "addTypeface": "+ Add typeface",
+    "anchorAbsent": "Absent",
+    "anchorWeak": "Weak",
+    "anchorAdequate": "Adequate",
+    "anchorStrong": "Strong",
+    "anchorExemplary": "Exemplary",
+    "confLow": "Low",
+    "confMed": "Med",
+    "confHigh": "High",
+    "rubricScore": "Rubric · score each criterion",
+    "autoPct": "auto · {pct}%",
+    "gateFloor": "gate ≥{floor}",
+    "notScored": "not scored",
+    "confidence": "confidence",
+    "scoreEveryCriterion": "Score every criterion: {list}",
+    "gateSuffix": " · gate: {ids}",
+    "submittedForLead": "Submitted for Lead review — proposed {decision}, {composite}/100{gate}.",
+    "decisionResult": "Decision: {decision} · {composite}/100 ({band}){gate}{cal}",
+    "calibrationSuffix": " · low-confidence → calibration",
+    "cancelled": "Cancelled",
+    "decertified": "Decertified · v{version}. Production paused; a re-review was queued.",
+    "approvedAsLead": "Approved as Lead · v{version} now live.",
+    "sentBackRevision": "Sent back to the Steward for revision.",
+    "confirmDecertify": "Decertify this BIO? Production pauses until it is re-certified. Briefing stays available and running jobs finish.",
+    "loading": "Loading…",
+    "jobNotFound": "Job not found.",
+    "brandFallback": "(brand)",
+    "certifiedV": "certified v{version}",
+    "queuedRel": "queued {rel}",
+    "bioV": "BIO v{version}",
+    "candidateBio": "Candidate BIO · v{version}",
+    "editedTag": "· edited",
+    "resetEdits": "Reset edits",
+    "fldPositioning": "Positioning",
+    "phPositioning": "One sentence — what the brand actually is",
+    "fldCategory": "Category",
+    "fldPillars": "Pillars",
+    "addPillar": "+ Add pillar",
+    "fldPrimaryAudience": "Primary audience",
+    "fldSecondaryAudience": "Secondary audience",
+    "fldJtbd": "Jobs to be done",
+    "addJtbd": "+ Add JTBD",
+    "fldVoiceRegister": "Voice register",
+    "fldRhythm": "Rhythm",
+    "fldSignatureMoves": "Signature moves",
+    "addSignature": "+ Add signature",
+    "fldForbiddenWords": "Forbidden words",
+    "addForbidden": "+ Add forbidden",
+    "fldNorthStar": "North star",
+    "fldThisQuarter": "This quarter",
+    "fldNextQuarter": "Next quarter",
+    "fldWatchouts": "Strategic watchouts",
+    "addWatchout": "+ Add watchout",
+    "fldNotList": "What the brand is NOT",
+    "addNotList": "+ Add not-list item",
+    "fldImagery": "Imagery direction",
+    "addImagery": "+ Add imagery cue",
+    "fldVisualAvoid": "Visual avoid",
+    "addVisualAvoid": "+ Add visual avoid",
+    "bioEditHint": "Edit any field — changes are tracked locally and sent as a `bioPatch` when you certify (creates a new BIO version). Visual fields will be auto-filled by the vision pass in P5; you can populate them by hand here for now.",
+    "focusFirst": "Focus first",
+    "nothingFlagged": "Nothing flagged — every field reads through.",
+    "statusMissing": "missing",
+    "statusLowConf": "low conf",
+    "highStakes": "high-stakes",
+    "sourcesRead": "Sources read",
+    "charsScraped": "{chars} chars scraped",
+    "pendingLeadReview": "Pending Lead review",
+    "pendingLeadIsLead": "You're a Lead — approve to finalize the cert, or send it back to the original Steward.",
+    "pendingLeadNotLead": "A Lead Steward will approve this cert before it lands.",
+    "leadNotesPrivate": "Lead notes (private)",
+    "certNotesClient": "Cert notes (visible to client)",
+    "notesPlaceholderLead": "Optional. If sending back, explain what needs revision.",
+    "notesPlaceholderCert": "e.g. Voice + audience read true. Pillars trimmed — 'origin-traceable' is the strongest.",
+    "conditionsLabel": "Conditions / required changes (one per line)",
+    "conditionsPlaceholder": "Used when the decision is approve-with-conditions or return-for-changes.\ne.g. Replace the placeholder logo before Visual runs.",
+    "rejectReasonLabel": "Reject reason code (only if rejecting)",
+    "rejectReasonPlaceholder": "e.g. unverifiable_authority",
+    "approveAsLead": "Approve as Lead",
+    "confirmSendBack": "Send this back to the Steward for revision?",
+    "sendBack": "Send back",
+    "awaitingLead": "Awaiting Lead Steward approval — you submitted this cert; a Lead will finalize.",
+    "alreadyReviewed": "Already reviewed",
+    "saveEditsSubmit": "Save edits & submit review",
+    "submitReview": "Submit review",
+    "confirmCancelJob": "Cancel this certification job?",
+    "cancel": "Cancel",
+    "scoreAllToSubmit": "Score every rubric criterion above to submit.",
+    "leadHelpA1": "Approving finalizes the cert and writes ",
+    "leadHelpA2": ". The original Steward stays as ",
+    "leadHelpA3": " (four-eyes: you can't approve your own).",
+    "rubricHelpB1": "The rubric decides the outcome from your scores; every decision is recorded to ",
+    "rubricHelpB2": " for defensibility. Under calibration a Lead approves before an approval finalizes.",
+    "decertify": "Decertify",
+    "decertifyThisBio": "Decertify this BIO",
+    "decertifyHint": "Pulls certification. New/queued production blocks immediately; running jobs finish; completed outputs keep their chip; briefing stays up. A re-review is queued.",
+    "dayMon": "Mon",
+    "dayTue": "Tue",
+    "dayWed": "Wed",
+    "dayThu": "Thu",
+    "dayFri": "Fri",
+    "capEyebrow": "Team lead",
+    "capTitle": "Capacity & SLA",
+    "capSub": "Where the team is loaded, where SLA is at risk, where the next job should land.",
+    "teamLoadWeek": "Team load · this week",
+    "slaRiskJobs": "SLA risk · 3 jobs",
+    "reassign": "Reassign",
+    "dailyThroughput": "Daily throughput · last 14 days",
+    "jobsCount": {
+      "plural": {
+        "one": "{count} job",
+        "other": "{count} jobs"
+      }
+    },
+    "twoWeeksAgo": "2 weeks ago",
+    "today": "today",
+    "backlog": "Backlog · oldest unstarted",
+    "submittedAt": "submitted {when}",
+    "assign": "Assign",
+    "clientsEyebrow": "Team portal",
+    "clientsCount": "Clients · {count}",
+    "clientsSub": "The workspaces the team serves. Useful when you're picking up multiple jobs from the same brand.",
+    "colBio": "BIO",
+    "colTier": "Tier",
+    "colActiveJobs": "Active jobs",
+    "colLifetime": "Lifetime",
+    "colLastActivity": "Last activity",
+    "colPrimaryContact": "Primary contact",
+    "tierN": "Tier {tier}",
+    "meEyebrow": "My desk",
+    "meTitle": "{name} · Senior designer",
+    "meSub": "Hours, jobs, satisfaction. La Mesa pays on a separate rail — this is the visibility, not the pay slip.",
+    "scopeMonth": "Month",
+    "scopeQuarter": "Quarter",
+    "scopeLifetime": "Lifetime",
+    "statJobsDelivered": "Jobs delivered",
+    "statHoursLogged": "Hours logged",
+    "statAvgSatisfaction": "Avg satisfaction",
+    "statCreditsEarned": "Credits earned",
+    "hoursLoggedMonth": "Hours logged · this month",
+    "topClientsMonth": "Top clients · this month",
+    "recentDeliveries": "Recent deliveries",
+    "craftEyebrow": "Human craft · polish queue",
+    "craftTitle": "Pieces awaiting human polish",
+    "craftSub": "Each piece was sent from a brand's canvas with a polish brief. Refine the copy and deliver it back onto their card.",
+    "loadingQueue": "Loading queue…",
+    "craftEmpty": "Nothing in the polish queue. Pieces land here when a brand hits \"Send to human\".",
+    "untitled": "Untitled",
+    "polishBrief": "Polish brief from the operator",
+    "refineIt": "The piece — refine it",
+    "delivering": "Delivering…",
+    "deliverPolished": "Deliver polished version →"
   },
   "admin": {
     "specs": "Specs",
@@ -82,7 +275,12 @@
     "title": "Notifications",
     "markAllRead": "Mark all read",
     "empty": "You're all caught up.",
-    "ariaUnread": { "plural": { "one": "Notifications, {count} unread", "other": "Notifications, {count} unread" } },
+    "ariaUnread": {
+      "plural": {
+        "one": "Notifications, {count} unread",
+        "other": "Notifications, {count} unread"
+      }
+    },
     "ago": {
       "seconds": "{count}s ago",
       "minutes": "{count}m ago",
@@ -114,7 +312,12 @@
     "currentPlan": "Current plan",
     "tierLabel": "Tier {id}",
     "allowanceUnlimited": "Unlimited brands",
-    "allowance": { "plural": { "one": "{count} brand", "other": "{count} brands" } },
+    "allowance": {
+      "plural": {
+        "one": "{count} brand",
+        "other": "{count} brands"
+      }
+    },
     "yourPlan": "Your plan",
     "managedByAdmin": "Plan changes are managed by your workspace admin.",
     "talkToUs": "Talk to us",
@@ -141,5 +344,987 @@
   },
   "locale": {
     "name": "English"
+  },
+  "brandolph": {
+    "hero": "What do you want to {word}?",
+    "heroWord": "create",
+    "subcopy": "Describe the change you want made — not the deliverable. Brandolph reads the BIO, sharpens the brief, assembles the team, and shows you the cost before anything runs.",
+    "scope": "Scope",
+    "promptPlaceholder": "e.g. Make the Summer Tuesdays campaign earn the slow afternoon back — café-first, no discount, lift Tuesday footfall by 18%.",
+    "modeFlow": "Full flow",
+    "modeWords": "Words only",
+    "modeVisual": "Visual only",
+    "modePolish": "Polish",
+    "start": "Start",
+    "reBrief": "Re-brief",
+    "assemblyNote": "BIO {score}% · Brandolph will sharpen your brief before assembly · Asking is free",
+    "sharpeningEyebrow": "Brandolph · sharpening",
+    "sharpeningLoading": "Reading your BIO. Pressuring the brief. Picking the smallest crew.",
+    "sharpeningFailedEyebrow": "Brandolph · sharpening failed",
+    "sharpeningFailedBody": "{error}. You can run the brief as-written.",
+    "proceedRaw": "Proceed with raw brief",
+    "cmoRewrite": "How a CMO would write this",
+    "answerPlaceholder": "Answer in a sentence — or skip.",
+    "proposedCrew": "Proposed crew",
+    "proceedAssembly": "Proceed to assembly",
+    "assemblyComplete": "Assembly · complete",
+    "assemblyReady": "Assembly · ready to run",
+    "specialists": {
+      "plural": {
+        "one": "{count} specialist",
+        "other": "{count} specialists"
+      }
+    },
+    "creditsCount": {
+      "plural": {
+        "one": "{count} credit",
+        "other": "{count} credits"
+      }
+    },
+    "newBrief": "New brief",
+    "total": "Total",
+    "remainingAfter": "{n} remaining after",
+    "runCredits": {
+      "plural": {
+        "one": "Run — {count} credit",
+        "other": "Run — {count} credits"
+      }
+    },
+    "assembling": "Assembling…",
+    "openInLibrary": "Open in Library",
+    "streaming": "streaming",
+    "approved": "approved",
+    "flagged": "flagged",
+    "failed": "failed",
+    "composedBy": "Composed by",
+    "certified": "certified",
+    "uncertified": "uncertified",
+    "creditsThisCycle": "Credits this cycle",
+    "ledger": "Ledger",
+    "creditsMeter": "/ {monthly} · {days}d left",
+    "campaigns": "Campaigns",
+    "allBriefs": "All briefs",
+    "created": "created",
+    "successRate": "success rate",
+    "inFlightShipped": "{inFlight} in flight · {shipped} shipped",
+    "library": "Library",
+    "open": "Open",
+    "inFlightHeading": "In flight · {count}",
+    "viewAll": "View all"
+  },
+  "briefs": {
+    "runsCount": {
+      "plural": {
+        "one": "{count} run",
+        "other": "{count} runs"
+      }
+    },
+    "status": {
+      "approved": "approved",
+      "flagged": "flagged"
+    },
+    "filter": {
+      "all": "All",
+      "approved": "Approved",
+      "flagged": "Flagged",
+      "allSpecialists": "All specialists"
+    },
+    "mode": {
+      "auto": "auto"
+    },
+    "common": {
+      "close": "Close"
+    },
+    "spec": {
+      "eyebrow": "L2 · 33 senior specialists",
+      "title": "The department, on shift.",
+      "sub": "Brandolph reads the brief. The specialists do the work. Each one routes to the model best suited to the job — visible, auditable, paid out of the same credit pool.",
+      "liveCount": "{live} live · {soon} coming soon",
+      "newSpecialist": "New specialist",
+      "pinned": "★ Pinned · your preferred specialists",
+      "mostUsedFor": "Most used for",
+      "searchPlaceholder": "Search specialists, departments, capabilities…",
+      "sortDepartment": "Department",
+      "sortCredits": "Credits",
+      "sortMostUsed": "Most used",
+      "viewGrid": "Grid",
+      "viewList": "List",
+      "allDepartments": "All departments",
+      "resultsCount": {
+        "plural": {
+          "one": "{count} result",
+          "other": "{count} results"
+        }
+      },
+      "deptCount": "{specialists} specialists · {live} live",
+      "noMatch": "No specialists match “{query}”.",
+      "soon": "Soon"
+    },
+    "lib": {
+      "eyebrow": "Workspace",
+      "eyebrowBrand": "Workspace · {name}",
+      "title": "Briefs",
+      "sub": "Every specialist run on this brand — auditable against the certified BIO. {runs} on record · {credits} cr spent.",
+      "reload": "Reload",
+      "runSpecialist": "Run a specialist",
+      "searchPlaceholder": "Search briefs…",
+      "countOf": "{shown} of {total}",
+      "emptyTitle": "No briefs on the table yet.",
+      "emptyBody": "Brandolph is waiting on the first one. Type what you need into the launchpad — even a sentence — and he'll sharpen it, name the tension, and assemble the smallest crew that earns it.",
+      "startFirst": "Start the first brief",
+      "browseSpecialists": "Browse specialists",
+      "noMatch": "No briefs match the current filters."
+    },
+    "detail": {
+      "allBriefs": "All briefs",
+      "specialistsCount": {
+        "plural": {
+          "one": "{count} specialist",
+          "other": "{count} specialists"
+        }
+      },
+      "tabOverview": "Overview",
+      "tabRecommendation": "Recommendation",
+      "tabDelivery": "Delivery",
+      "approve": "Approve",
+      "reviseWithBrandolph": "Revise with Brandolph",
+      "exportPdf": "Export PDF",
+      "smpLabel": "Single-minded proposition",
+      "openBoard": "Open the board",
+      "outputsCount": {
+        "plural": {
+          "one": "{count} output",
+          "other": "{count} outputs"
+        }
+      },
+      "departmentsCount": {
+        "plural": {
+          "one": "{count} department",
+          "other": "{count} departments"
+        }
+      },
+      "deliverables": "Deliverables",
+      "background": "Background",
+      "objective": "Objective",
+      "audience": "Audience",
+      "metricsThatMatter": "Metrics that matter",
+      "creativeStrategy": "Creative strategy",
+      "tone": "Tone",
+      "direction": "Direction",
+      "mandatories": "Mandatories",
+      "notDoing": "What this brief is NOT doing",
+      "strategicAssumptions": "Strategic assumptions",
+      "productionWatchouts": "Production watchouts"
+    },
+    "try": {
+      "tryAgent": "Try {name}",
+      "reset": "Reset",
+      "placeholder": "Write a brief for {name}. {job}",
+      "running": "Running…",
+      "done": "Done",
+      "runHint": "~{cr} cr · ⌘+↵ to run",
+      "streaming": "Streaming…",
+      "ran": "Ran",
+      "run": "Run",
+      "composedBy": "Composed by",
+      "certified": "certified",
+      "uncertified": "uncertified",
+      "voiceQa": "Voice QA",
+      "passed": "passed",
+      "flagged": "flagged"
+    },
+    "drawer": {
+      "tryAgentCr": "Try {name} · {cr} cr",
+      "perRun": "per run",
+      "theJob": "The job",
+      "capabilities": "Capabilities",
+      "picksThisFor": "Brandolph picks this for",
+      "turnaround": "Turnaround",
+      "unlocksFrom": "Unlocks from",
+      "tier": "Tier",
+      "refusals": "Refusals · won't do",
+      "howBriefs": "How Brandolph briefs this specialist",
+      "hide": "Hide",
+      "viewPrompt": "View composed prompt",
+      "briefsFallback": "{name} reads the BIO before responding, follows {method}, and refuses anything that breaks the brand rules. {objective}",
+      "methodAs": "their method as {role}",
+      "methodPlain": "their method",
+      "composedFrom": "Composed from PLATFORM + BIO + SPEC + TASK",
+      "routedTo": " · routed to {model}",
+      "recentUsage": "Recent usage · 30 days",
+      "jobsRun": "Jobs run",
+      "creditsSpent": "Credits spent",
+      "successRate": "Success rate",
+      "exampleOutputs": "Example outputs · for",
+      "noOutputs": "You haven't used this specialist yet."
+    },
+    "canvas": {
+      "zoomOut": "Zoom out",
+      "zoomIn": "Zoom in",
+      "fit": "Fit",
+      "fitTitle": "Fit all nodes in view",
+      "exportImage": "Export canvas as image",
+      "helperA": "Drag to pan · scroll to zoom ·",
+      "helperClick": "click any node",
+      "helperB": "for the detail and rationale.",
+      "runComplete": "Run complete",
+      "running": "Running",
+      "crewAssembled": "Crew assembled",
+      "untitled": "(untitled brief)",
+      "tension": "Tension",
+      "hideBrief": "Hide brief",
+      "showBrief": "Show brief",
+      "sharpenedBrief": "Brandolph's sharpened brief",
+      "hardRefusals": "Hard refusals for this brief"
+    },
+    "run": {
+      "deliverableCount": {
+        "plural": {
+          "one": "{count} deliverable",
+          "other": "{count} deliverables"
+        }
+      },
+      "generic": "generic",
+      "flagged": "FLAGGED",
+      "ready": "READY",
+      "inHumanCraft": "✦ IN HUMAN CRAFT",
+      "byName": "by {name}",
+      "statusStreaming": "streaming",
+      "statusDone": "done",
+      "statusFlagged": "flagged",
+      "statusFailed": "failed",
+      "open": "open",
+      "subPairsCopy": "pairs with the copy cluster",
+      "subStreaming": "streaming…",
+      "subRendering": "rendering…",
+      "subRenderingImages": "rendering images…",
+      "helperRunning": "Running the crew… each card streams its progress. Click any to open the full output.",
+      "helperComplete": "Run complete · {cr} cr spent. Click any specialist to verify, edit, or copy its output.",
+      "helperAssembled": "Crew assembled. Hit Run when you're ready.",
+      "runComplete": "Run complete",
+      "openLibrary": "Open Library",
+      "newBrief": "New brief",
+      "runningCrew": "Running the crew…",
+      "runWord": "Run",
+      "theAssembly": "the assembly"
+    },
+    "briefDrawer": {
+      "titleFallback": "Brief",
+      "eyebrow": "BRANDOLPH · BRIEF & RECOMMENDATIONS",
+      "tensionNamed": "The tension Brandolph named",
+      "howCmo": "How a CMO would write this",
+      "yourRequest": "Your original request",
+      "recommendations": "Brandolph's recommendations — what we will NOT do",
+      "producing": "What Brandolph is producing"
+    },
+    "deliverable": {
+      "inCraftBadge": "✦ In human craft",
+      "cancel": "Cancel",
+      "confirmSend": "Confirm — send to human · {cr} cr",
+      "export": "Export",
+      "copied": "Copied ✓",
+      "copy": "Copy",
+      "sendToHuman": "Send to human · {cr} cr",
+      "craftBanner": "✦ A human is polishing this piece. You'll see the refined version land here when it's done.",
+      "yourBriefToHuman": "Your brief to the human:",
+      "briefHuman": "Brief the human · what to polish",
+      "polishPlaceholder": "Specific requests, points to add or edit — e.g. 'tighten the opening', 'make the CTA softer', 'add a line about the Madrid pour-over'.",
+      "chipTighten": "Tighten it",
+      "chipPlayful": "More playful",
+      "chipCta": "Fix the CTA",
+      "chipBioVoice": "Match the BIO voice",
+      "chipShorter": "Make it shorter"
+    },
+    "notepad": {
+      "download": "Download",
+      "copied": "Copied",
+      "copy": "Copy",
+      "titleNotPersisted": "Output not persisted yet",
+      "titleNoChanges": "No changes",
+      "titleSaveEdit": "Save edit to DB",
+      "saving": "Saving…",
+      "savedAt": "Saved · {time}",
+      "saveEdit": "Save edit",
+      "saved": "Saved",
+      "theBrief": "The brief",
+      "sharpened": "Sharpened (a02)",
+      "brandQa": "Brand QA",
+      "voiceQa": "Voice QA",
+      "output": "Output",
+      "outputImage": "· image",
+      "outputEditable": "· editable",
+      "unsaved": "· unsaved",
+      "chars": "{count} chars",
+      "rerunWith": "Re-run with…",
+      "reviseFeedback": "Revise with feedback",
+      "current": "· current",
+      "revisePlaceholder": "What's not landing? e.g. 'too clinical — push toward editorial' or 'change the hero from coffee to a single ceramic vessel'",
+      "cancel": "Cancel",
+      "withRevision": "with revision",
+      "rerunWithFeedback": "Re-run with feedback",
+      "rerunLabel": "Re-run",
+      "runningSuffix": "running…",
+      "failedSuffix": "failed",
+      "doneSuffix": "done",
+      "dismiss": "Dismiss",
+      "calling": "Calling…",
+      "empty": "(empty)",
+      "certifiedBy": "certified by"
+    },
+    "rerun": {
+      "noteOpus": "Premium — deepest reasoning",
+      "noteSonnet": "Balanced workhorse",
+      "noteHaiku": "Fast + cheap",
+      "noteGeminiPro": "Long-context synthesis",
+      "noteGeminiFlash": "Cheapest",
+      "noteFluxPro": "Premium hero quality",
+      "noteFluxSchnell": "Fast draft (13× cheaper)",
+      "noteRecraft": "Vector / illustration"
+    },
+    "view": {
+      "notFound": "Brief not found",
+      "notFoundDot": "Brief not found.",
+      "loading": "Loading brief…",
+      "backToBriefs": "Back to briefs",
+      "imagesCount": {
+        "plural": {
+          "one": "{count} image",
+          "other": "{count} images"
+        }
+      },
+      "certifiedByName": "Certified by {name}",
+      "certifiedCanon": "Certified canon",
+      "helper": "{runs} on this brief. Click any specialist to verify, edit, or copy its output.",
+      "briefsBack": "← Briefs"
+    },
+    "board": {
+      "sourceCanon": "Source · the canon",
+      "whyRouted": "Why Brandolph routed this here",
+      "bestFit": "Best fit for this part of the brief.",
+      "whyChoice": "Why this creative choice",
+      "theBriefL1": "The brief · L1 Brandolph",
+      "askedFirst": "Brandolph asked first",
+      "sourceCanonShort": "Source · canon",
+      "specialistPrefix": "Specialist",
+      "whyRoutes": "Why Brandolph routes here",
+      "theOutput": "The output",
+      "whyChoiceShort": "Why this choice",
+      "addSpecialist": "Add specialist",
+      "dropSpecialist": "Drop a specialist, then connect it",
+      "export": "Export",
+      "connectingFromA": "Connecting from",
+      "connectingFromB": "— click a node to link.",
+      "helperConnect": "Click a node to connect · Esc to cancel.",
+      "helperDefaultB": "on a node to connect it · click a result for the rationale."
+    },
+    "library": {
+      "title": "Library",
+      "sub": "Every brief your crew has produced, filed as a folder. Open one to browse its assets, read them in full, and put them back to work.",
+      "assetsCount": {
+        "plural": {
+          "one": "{count} asset",
+          "other": "{count} assets"
+        }
+      },
+      "foldersCount": {
+        "plural": {
+          "one": "{count} folder",
+          "other": "{count} folders"
+        }
+      },
+      "assetWord": {
+        "plural": {
+          "one": "asset",
+          "other": "assets"
+        }
+      },
+      "emptyTitle": "The Library is waiting.",
+      "emptyBody": "Every output your crew produces lands here — filed under the brief that asked for it, the BIO version it was judged against, and the Steward who signed the canon. Run a brief and watch the shelves fill.",
+      "startBrief": "Start a brief",
+      "deleted": "Deleted",
+      "deleteFailed": "Delete failed",
+      "couldNotDelete": "Could not delete",
+      "needsReview": "needs review",
+      "openInCanvas": "Open in canvas",
+      "searchFolder": "Search this folder…",
+      "folderEmpty": "This folder is empty.",
+      "noAssetsMatch": "No assets match the current filter.",
+      "visualDirection": "Visual direction",
+      "noDirection": "(no direction)",
+      "editedSuffix": "· edited",
+      "qaNotes": "QA notes",
+      "reuse": "Reuse",
+      "copyPrompt": "Copy prompt",
+      "confirmDelete": "Delete this asset?",
+      "delete": "Delete",
+      "promptCopied": "Prompt copied",
+      "couldNotCopy": "Could not copy",
+      "downloading": "Downloading",
+      "downloaded": "Downloaded"
+    },
+    "author": {
+      "eyebrow": "Capabilities · admin",
+      "title": "New specialist",
+      "sub": "Define an L2 specialist. The prompt on the right is the real composed brief — PLATFORM + the live BIO + this spec + the task — assembled as you type.",
+      "saved": "Saved ✓",
+      "saveSpecialist": "Save specialist",
+      "identity": "Identity",
+      "name": "Name",
+      "namePlaceholder": "e.g. The Wholesale Closer",
+      "department": "Department",
+      "status": "Status",
+      "statusLive": "Live",
+      "statusSoon": "Coming soon",
+      "statusDraft": "Draft",
+      "jobLabel": "The job · one-liner",
+      "jobPlaceholder": "What this specialist does, in one line.",
+      "promptSpec": "Prompt spec",
+      "prefillFrom": "Prefill from {dept} template",
+      "role": "Role",
+      "rolePlaceholder": "a conversion copywriter who…",
+      "objective": "Objective",
+      "objectivePlaceholder": "What a good run produces.",
+      "methodSteps": "Method · steps",
+      "methodPlaceholder": "A step the specialist follows",
+      "outputContract": "Output contract",
+      "outputContractPlaceholder": "Shape / length / format it must return.",
+      "voice": "Voice",
+      "voicePlaceholder": "Voice constraints (inherits brand voice).",
+      "tools": "Tools",
+      "toolsPlaceholder": "e.g. Exa search, image generation",
+      "refusalsLabel": "Refusals · won't do (on top of brand rules)",
+      "refusalsPlaceholder": "A hard rule this specialist won't break",
+      "routingCost": "Routing & cost",
+      "model": "Model",
+      "creditsPerRun": "Credits / run",
+      "livePrompt": "Live composed prompt",
+      "testTab": "Test · dry run + QA gate",
+      "tabPrompt": "Prompt",
+      "tabTest": "Test",
+      "refusalsInherit": {
+        "plural": {
+          "one": "Brand refusals auto-inherit from the BIO · {count} rule",
+          "other": "Brand refusals auto-inherit from the BIO · {count} rules"
+        }
+      },
+      "sampleBrief": "Sample brief",
+      "sampleBriefDefault": "Write the annual pricing announcement email for wholesale buyers.",
+      "dryRun": "Dry run",
+      "draftOutput": "Draft output · editable",
+      "qaGate": "Brand QA gate",
+      "blocking": "{count} blocking",
+      "pass": "Pass",
+      "notReady": "Not ready.",
+      "notReadyBody": "Fix the flagged rule before setting this specialist live.",
+      "clearsGate": "Clears the gate.",
+      "clearsGateBody": "Safe to set status “Live”.",
+      "remove": "Remove",
+      "add": "Add"
+    },
+    "date": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "undated": "Undated"
+    },
+    "misc": {
+      "untitled": "(untitled)",
+      "untitledBrief": "(untitled brief)",
+      "yourSteward": "your Steward",
+      "yourBrandSteward": "your Brand Steward"
+    }
+  },
+  "discovery": {
+    "stepper": {
+      "connect": "Connect",
+      "extract": "Extract",
+      "confirm": "Confirm",
+      "skip": "Skip onboarding →"
+    },
+    "bucket": {
+      "foundations": {
+        "label": "Brand foundations",
+        "help": "Brand book, decks, manifestos, “about us” docs",
+        "readBy": "All specialists"
+      },
+      "visual": {
+        "label": "Visual references",
+        "help": "Moodboards, examples of work you admire",
+        "readBy": "Design dept"
+      },
+      "voice": {
+        "label": "Voice references",
+        "help": "Emails, posts, talks where you sound like yourself",
+        "readBy": "Copy dept"
+      }
+    },
+    "removeFile": "Remove {name}",
+    "step1": {
+      "brandNameRequired": "Brand name is required.",
+      "titleAddEm": "Add a brand.",
+      "titlePointEm": "Point us at your brand.",
+      "titleAddRest": "Name it, point us at it, and Brandolph reads the rest.",
+      "titlePointRest": "Brandolph will read the rest.",
+      "lead": "A URL is enough. If you have guidelines, hand them over. If you don't — we'll work from what's already public, and tell you what we couldn't find.",
+      "brandNameLabel": "Brand name",
+      "brandNamePlaceholder": "e.g. Vinilo Coffee",
+      "urlLabel": "Primary website URL",
+      "urlPlaceholder": "brand.com",
+      "igLabel": "Instagram handle",
+      "igOptional": "· optional",
+      "igPlaceholder": "@handle",
+      "sourcesLabel": "Sources",
+      "sourcesOptional": "· optional — drag in or click to upload",
+      "timing": "⏱ ~40s · 🔒 Sources save to your BIO ledger",
+      "filesReady": {
+        "plural": {
+          "one": " · {count} file ready",
+          "other": " · {count} files ready"
+        }
+      },
+      "uploading": "Uploading sources…",
+      "starting": "Starting…",
+      "startExtraction": "Start extraction",
+      "fromScratch": "Start from scratch",
+      "clone": "Clone a space (Tier 03)"
+    },
+    "step2": {
+      "reading1": "Brandolph is reading every page of your site",
+      "reading2": "The design crew is mapping your palette and typography",
+      "reading3": "Brandolph is sharpening your brand into a BIO",
+      "reading4": "Filing the draft for your Brand Steward to certify",
+      "compiledTitle": "Brandolph compiled your BIO",
+      "readingTitle": "Brandolph is reading your brand",
+      "extraction": "EXTRACTION",
+      "elapsed": "{sec}s elapsed"
+    },
+    "chapter": {
+      "identity": {
+        "label": "Identity",
+        "blurb": "Who you are and what you stand for."
+      },
+      "audience": {
+        "label": "Audience",
+        "blurb": "Who you're for."
+      },
+      "voice": {
+        "label": "Voice",
+        "blurb": "How you sound."
+      },
+      "visual": {
+        "label": "Visual",
+        "blurb": "How you look."
+      },
+      "goals": {
+        "label": "Goals",
+        "blurb": "Where you're headed."
+      },
+      "strategic": {
+        "label": "Strategic",
+        "blurb": "Tensions and no-gos."
+      }
+    },
+    "field": {
+      "identity": {
+        "positioning": "Positioning",
+        "category": "Category",
+        "founded": "Founded",
+        "pillars": "Pillars"
+      },
+      "audience": {
+        "primary": "Primary audience",
+        "secondary": "Secondary audience",
+        "tertiary": "Tertiary audience",
+        "jtbd": "Jobs to be done"
+      },
+      "voice": {
+        "register": "Register",
+        "rhythm": "Sentence rhythm",
+        "forbidden": "Forbidden words",
+        "signatures": "Signature moves"
+      },
+      "visual": {
+        "palette": "Palette",
+        "type": "Typography",
+        "imagery": "Shoot this",
+        "avoid": "Never this"
+      },
+      "goals": {
+        "northStar": "North star",
+        "q2": "This quarter",
+        "q3": "Next quarter"
+      },
+      "strategic": {
+        "watchouts": "Watchouts",
+        "notList": "What you're NOT"
+      },
+      "from": "from {source}",
+      "emptyState": "Empty — we couldn't find this. Add it if you know it, or leave it blank.",
+      "editPlaceholder": "Type what's true — leave blank if you're not sure",
+      "markedUndo": "Marked {mark} · undo",
+      "markAccurate": "Mark accurate",
+      "markAspirational": "Mark aspirational",
+      "doneEditing": "Done editing",
+      "addIt": "Add it",
+      "edit": "Edit",
+      "leaveBlank": "Leave blank"
+    },
+    "fieldStatus": {
+      "missing": "we couldn't find this",
+      "accurate": "confirmed accurate",
+      "aspirational": "aspirational",
+      "inferred": "confirm — inferred, not stated",
+      "stated": "your words"
+    },
+    "sectionStatus": {
+      "needs": "needs sources",
+      "filling": "filling in",
+      "well": "well sourced"
+    },
+    "mark": {
+      "accurate": "accurate",
+      "aspirational": "aspirational"
+    },
+    "attestError": {
+      "statements": "Confirm all three statements to attest.",
+      "gaps": "A few important fields still need answers{fields}. Fill or mark them, then attest.",
+      "belowScore": "Your BIO is at {score}/100{below}. Confirm more fields or add sources to raise it.",
+      "belowNeeded": ", below the {minScore} needed",
+      "default": "Couldn't attest just yet — try again."
+    },
+    "palette": {
+      "namePlaceholder": "Colour name"
+    },
+    "type": {
+      "rolePlaceholder": "Role",
+      "familyPlaceholder": "Family"
+    },
+    "common": {
+      "remove": "Remove",
+      "addColour": "Add colour",
+      "addTypeface": "Add typeface",
+      "cancel": "Cancel"
+    },
+    "delegate": {
+      "title": "Delegate this chapter",
+      "desc": "Hand {chapter} to a teammate who knows it best. They get a link to fill just this section.",
+      "emailPlaceholder": "teammate@brand.com",
+      "notePlaceholder": "Note (optional)",
+      "sending": "Sending…",
+      "sendInvite": "Send invite",
+      "inviteReady": "Invite ready.",
+      "copied": "Copied",
+      "copyLink": "Copy link"
+    },
+    "results": {
+      "savedExit": "Saved — pick up right here anytime.",
+      "bioSigned": "BIO signed — briefing unlocked.",
+      "saving": "Saving…",
+      "saved": "All changes saved",
+      "saveError": "Save failed — retries on next edit",
+      "finishLater": "Save & finish later",
+      "noBrand": "Couldn't find a brand to review.",
+      "startDiscovery": "Start discovery",
+      "loading": "Loading your draft…",
+      "certifiedBy": "Certified by",
+      "certPending": "A senior Brand Steward certifies this BIO within 24h. Confirm the draft below to unlock briefing now.",
+      "draftEyebrow": "Draft BIO · review before you sign",
+      "yourBrand": "Your brand",
+      "completion": "Completion"
+    },
+    "completion": {
+      "well": "well sourced",
+      "filling": "filling in",
+      "needs": "needs more sources"
+    },
+    "hub": {
+      "reviewed": "Reviewed",
+      "gaps": {
+        "plural": {
+          "one": "{count} gap",
+          "other": "{count} gaps"
+        }
+      },
+      "toConfirm": "{count} to confirm",
+      "fieldsConfirmed": "fields confirmed",
+      "inferredToConfirm": "inferred to confirm",
+      "gapsWord": "gaps",
+      "confirmAttest": "Confirm & attest"
+    },
+    "chapterView": {
+      "allChapters": "← All chapters",
+      "instruction": "Confirm what's right, fix what's not, leave blank what you don't know.",
+      "doneBack": "Done — back to chapters"
+    },
+    "attest": {
+      "back": "← Back to chapters",
+      "title": "Confirm & sign your BIO",
+      "desc": "Signing promotes this draft to a certified BIO version and unlocks briefing. A senior Brand Steward still reviews it before production.",
+      "confirmed": "Confirmed",
+      "inferredToConfirm": "Inferred to confirm",
+      "gaps": "Gaps",
+      "stillOpen": "Still open ({count})",
+      "attestation": "Attestation",
+      "signing": "Signing…",
+      "signActivate": "Sign & activate brand space",
+      "confirmAllThree": "Confirm all three statements to continue."
+    },
+    "statement": {
+      "authority": "I'm authorized to represent this brand.",
+      "reflects": "This BIO reflects the brand as it actually is.",
+      "aspirational": "I've separated what's factual from what's aspirational."
+    },
+    "step3": {
+      "title": "Brand Space is live.",
+      "openBrandolph": "Open Brandolph"
+    },
+    "selfCert": {
+      "attestedBold": "Self-attested",
+      "attestedRest": "briefing is unlocked. Production stays gated until your Brand Steward certifies.",
+      "fillBefore": "Fill these before self-certifying: {fields}",
+      "belowScore": "BIO score {score} is below the {minScore} needed — add sources to raise it.",
+      "eyebrow": "Self-certify to start briefing",
+      "desc": "Confirm the BIO is accurate enough to brief against. This unlocks briefing now; a senior Brand Steward still certifies before production.",
+      "submitting": "Submitting…",
+      "submit": "Self-certify & unlock briefing"
+    },
+    "reasonCode": {
+      "insufficient_evidence": "Not enough evidence to certify",
+      "out_of_scope": "Out of scope for this brand",
+      "brand_mismatch": "Doesn't match the brand as we understand it",
+      "inaccurate": "Contains inaccuracies",
+      "incomplete": "Too incomplete to certify",
+      "low_quality": "Not yet at certification quality",
+      "aspirational_unmarked": "Aspirational claims not separated from fact",
+      "needs_sources": "Needs more sources",
+      "duplicate": "Duplicate of an existing BIO"
+    },
+    "steward": {
+      "defaultName": "your Brand Steward",
+      "fromSteward": "From your Steward",
+      "returnHeading": "Your Steward needs a few changes",
+      "returnCta": "Make these changes",
+      "rejectHeading": "Your Steward returned this BIO",
+      "rejectCta": "Edit & resubmit",
+      "conditionsHeading": "Certified with conditions"
+    },
+    "diff": {
+      "title": {
+        "plural": {
+          "one": "What your Steward changed · {count} field",
+          "other": "What your Steward changed · {count} fields"
+        }
+      },
+      "hide": "Hide",
+      "show": "Show"
+    },
+    "bio": {
+      "savedVersion": "Saved · BIO v{version}. Steward will re-certify.",
+      "reviewInProgress": "A human review is already in progress.",
+      "sentForReview": "Sent to your Brand Steward for review.",
+      "couldntRequestReview": "Couldn't request review: {error}",
+      "added": "Added \"{ref}\". Brandolph will read it on next discovery.",
+      "couldntAdd": "Couldn't add: {error}",
+      "reviewingThis": "Your Brand Steward is reviewing this BIO",
+      "awaitingCert": "Awaiting certification by your Brand Steward",
+      "noBioYet": "No BIO yet — type a URL on Discovery to extract one",
+      "versionScore": "BIO v{version} · score {score}/100",
+      "flaggedAreas": {
+        "plural": {
+          "one": "Brandolph flagged {count} area for your Steward to confirm.",
+          "other": "Brandolph flagged {count} areas for your Steward to confirm."
+        }
+      },
+      "inReview": "in review",
+      "within24h": "within 24h",
+      "eyebrow": "Brand Intelligence Object",
+      "of100": "OF 100",
+      "certifiedDate": "Certified {date}",
+      "uncertified": "Uncertified",
+      "versionTitle": "BIO version {version}",
+      "feedBrandolph": "Feed Brandolph",
+      "editBio": "Edit BIO",
+      "savingChanges": "Saving…",
+      "saveChanges": "Save changes",
+      "rerunDiscovery": "Re-run discovery",
+      "reviewInProgressTitle": "A human review is already in progress",
+      "requestReviewTitle": "Send this BIO to your Brand Steward for a human review — no edit required",
+      "inReviewShort": "In review…",
+      "sending": "Sending…",
+      "requestHumanReview": "Request human review",
+      "editingBanner": "Editing the BIO — saving creates a new version your Brand Steward will re-certify.",
+      "noCanon": "No canon yet.",
+      "noCanonDesc": "The BIO is the source of truth every output is judged against. Point Discovery at your URL or paste what you have — Brandolph will compile the first draft in about thirty seconds. A senior Steward signs it before it becomes canon.",
+      "startDiscovery": "Start Discovery"
+    },
+    "tab": {
+      "identity": "Identity",
+      "audience": "Audience",
+      "competitive": "Competitive",
+      "voice": "Voice",
+      "visual": "Visual",
+      "goals": "Goals",
+      "strategic": "Strategic",
+      "sources": "Sources"
+    },
+    "bioTone": {
+      "well": {
+        "word": "well sourced",
+        "hint": "Brandolph has enough evidence to trust this."
+      },
+      "filling": {
+        "word": "filling in",
+        "hint": "Getting there — a few more sources will firm it up."
+      },
+      "needs": {
+        "word": "needs more sources",
+        "hint": "Feed Brandolph more pages or files to raise this."
+      }
+    },
+    "table": {
+      "field": "Field",
+      "whatWeKnow": "What we know",
+      "confidence": "Confidence",
+      "confidenceTitle": "How sure Brandolph is about this field, based on its sources. Red = thin evidence, green = well sourced.",
+      "lowHigh": "low → high"
+    },
+    "competitive": {
+      "placeholder": "Competitive map comes from a32 (Competitor Map specialist) — wired in a later phase. The BIO Compiler doesn't extract competitors today."
+    },
+    "editPrimitive": {
+      "chipAdd": "+ add",
+      "addItem": "Add item",
+      "labelPlaceholder": "Label",
+      "sourcePlaceholder": "Source",
+      "valuePlaceholder": "Value",
+      "removeField": "Remove field",
+      "addField": "Add field",
+      "addListField": "Add list field"
+    },
+    "bioField": {
+      "positioning": "Positioning",
+      "category": "Category",
+      "founded": "Founded",
+      "pillars": "Pillars",
+      "primary": "Primary",
+      "secondary": "Secondary",
+      "tertiary": "Tertiary",
+      "jtbd": "Jobs to be done",
+      "register": "Register",
+      "forbidden": "Forbidden",
+      "rhythm": "Rhythm",
+      "signatures": "Signatures",
+      "northStar": "North star",
+      "thisQuarter": "This quarter",
+      "nextQuarter": "Next quarter"
+    },
+    "visual": {
+      "paletteHead": "Colour palette",
+      "paletteSource": "extracted from 47 pages + logo",
+      "typographyHead": "Typography",
+      "typographySource": "visual extraction",
+      "imageryHead": "Imagery",
+      "imagerySource": "image analysis · 90 posts",
+      "namePlaceholder": "Name",
+      "wcagPlaceholder": "WCAG",
+      "wcag": "WCAG {value}",
+      "removeColour": "Remove colour",
+      "familyPlaceholder": "Family",
+      "sizePlaceholder": "Size",
+      "licensePlaceholder": "License",
+      "webAltPlaceholder": "Web alternative",
+      "webAlt": "Web alternative",
+      "grade": "Grade",
+      "shootThis": "Shoot this",
+      "neverThis": "Never this"
+    },
+    "strategic": {
+      "watchouts": "Strategic watchouts",
+      "gaps": "Gaps",
+      "whatNot": "What Vinilo is NOT",
+      "diagnosis": "Brandolph's diagnosis · this week"
+    },
+    "sources": {
+      "feedBrandolph": "Feed Brandolph",
+      "feedDesc": "Drop a link, a doc, or a note. Brandolph reads it and tightens the BIO.",
+      "pastePlaceholder": "Paste a URL — site, article, competitor, social…",
+      "reading": "Reading…",
+      "readIt": "Read it",
+      "uploadDoc": "Upload document",
+      "repullSocial": "Re-pull social",
+      "addCompetitor": "Add competitor",
+      "ledger": "{sources} sources · {signals} signals learned",
+      "compounds": "Every source compounds the BIO.",
+      "signals": "{count} signals",
+      "new": "new",
+      "justNow": "just now",
+      "reExtract": "Re-extract"
+    }
+  },
+  "floater": {
+    "greeting": {
+      "home": "*Briefing a new flow lives in the launchpad above.* Use this for status, advice, or anything you'd ask a CMO mid-week.",
+      "discovery": "*You're mid-extraction.* I'm reading the site in another tab. Ask me anything while we wait — including 'what should I check first when it lands'.",
+      "bio": "*The BIO is the canon.* I'll quote it back if you ask me about a field. Ask me what's weak.",
+      "briefs": "*Three briefs in flight, four shipped.* Ask me about any one of them, or ask me which one I'd push first this week.",
+      "briefDetail": "*You're inside a brief.* I can take you through the SMP, the refusals, or what I'd do differently if we were writing it tomorrow.",
+      "specialists": "*That's your department.* Ask me who I'd assemble for a specific job, and I'll show you the pick + why.",
+      "canvas": "*This is the workspace.* The map gets denser as you ship. Ask me about any node, or ask me what's downstream of the BIO.",
+      "craft": "*Hand work the team should finish.* I'll match a finishing pack to a job if you describe it.",
+      "credits": "*Spend, not budget.* Ask me where the money went, or what would change if you doubled the cycle.",
+      "settings": "*Workspace governance.* Ask me what the forbidden list should be, or whether your auto-approve threshold is loose.",
+      "default": "*I'm Brandolph.* Ask me what's running, what's stuck, or what to do next. Free to ask — briefs preview cost."
+    },
+    "prompt": {
+      "statusEyebrow": "Status",
+      "statusText": "What's running and what needs me?",
+      "nextEyebrow": "Next",
+      "nextText": "What should I brief next?",
+      "sharpenEyebrow": "Sharpen",
+      "sharpenText": "Read my BIO and tell me what's weak.",
+      "refuseEyebrow": "Refuse",
+      "refuseText": "What should I kill this cycle?"
+    },
+    "ask": "Ask Brandolph",
+    "headerSub": "Your CMO · Free to ask",
+    "close": "Close",
+    "tryAsking": "Try asking",
+    "reading": "Brandolph is reading…",
+    "placeholder": "Ask anything — status, next brief, refusals…",
+    "send": "Send",
+    "free": "Free",
+    "metaRest": "to ask · Briefing a task previews cost first",
+    "clear": "Clear",
+    "briefNewTask": "Brief a new task",
+    "addToFlow": "Add to a flow",
+    "pingLabel": "Brandolph has 1 suggestion for you",
+    "pingTitle": "Brandolph has a suggestion for you"
+  },
+  "ui": {
+    "brandolphThinking": "Brandolph is thinking",
+    "specialist": "Specialist",
+    "comingSoon": "Coming soon",
+    "composedBy": "Composed by",
+    "bioVersion": "BIO v{version}",
+    "certifiedBy": "certified by",
+    "routedVia": "routed via",
+    "run": "run",
+    "debugAttribution": "Debug attribution",
+    "close": "Close",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "reading": "reading…",
+    "status": {
+      "draft": "Draft",
+      "approved": "Approved",
+      "inProduction": "In production",
+      "shipped": "Shipped",
+      "archived": "Archived",
+      "unassigned": "Unassigned",
+      "inProgress": "In progress",
+      "review": "In review",
+      "delivered": "Delivered",
+      "blocked": "Blocked",
+      "live": "Live"
+    }
   }
 }

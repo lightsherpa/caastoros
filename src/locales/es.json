@@ -28,7 +28,200 @@
     "craftPolish": "Pulido artesanal",
     "capacity": "Capacidad",
     "clients": "Clientes",
-    "myEarnings": "Mis ingresos"
+    "myEarnings": "Mis ingresos",
+    "queued": "En cola",
+    "inReview": "En revisión",
+    "yoursOpen": "Tuyos · abiertos",
+    "capacityOverrides": "Excepciones de capacidad",
+    "stewardQueue": "Cola del Steward",
+    "filterAll": "Todos",
+    "filterPendingLead": "Pendiente de Lead",
+    "unassigned": "Sin asignar",
+    "filterMine": "Míos",
+    "reload": "Recargar",
+    "colBrand": "Marca",
+    "colKind": "Tipo",
+    "colStatus": "Estado",
+    "colAssignee": "Responsable",
+    "queueEmpty": "Ningún trabajo coincide con este filtro. Lanza una ejecución de Discovery para crear uno:",
+    "you": "Tú",
+    "assigned": "Asignado",
+    "notSteward": "No eres Steward — ejecuta ",
+    "aboutJobs": "Sobre estos trabajos",
+    "aboutJobsBody": "Cada fila es una marca a la espera de la certificación del BIO — una revisión humana sénior antes de que cualquier especialista lea de él. El foso: cada resultado sale ",
+    "certifiedByName": "certificado por {name}",
+    "addGeneric": "+ Añadir",
+    "removeItem": "Eliminar {item}",
+    "palette": "Paleta",
+    "namePlaceholder": "nombre",
+    "removeColor": "Eliminar color",
+    "addColor": "+ Añadir color",
+    "addedUrlTo": "URL añadida a {bucket}",
+    "uploadedTo": "\"{name}\" subido a {bucket}",
+    "addReference": "Añadir referencia",
+    "bucketFoundations": "Fundamentos",
+    "bucketVisual": "Visual",
+    "bucketVoice": "Voz",
+    "bucketOther": "Otros",
+    "pasteUrl": "Pega una URL…",
+    "addUrl": "Añadir URL",
+    "fileHint": "Máx. 50 MB · PDF, imagen, .doc, .txt, .md",
+    "typography": "Tipografía",
+    "typeKindPlaceholder": "Tipo (p. ej. Display)",
+    "typeFamilyPlaceholder": "Familia (p. ej. Söhne Breit)",
+    "removeTypeface": "Eliminar tipografía",
+    "addTypeface": "+ Añadir tipografía",
+    "anchorAbsent": "Ausente",
+    "anchorWeak": "Débil",
+    "anchorAdequate": "Adecuado",
+    "anchorStrong": "Sólido",
+    "anchorExemplary": "Ejemplar",
+    "confLow": "Baja",
+    "confMed": "Media",
+    "confHigh": "Alta",
+    "rubricScore": "Rúbrica · puntúa cada criterio",
+    "autoPct": "auto · {pct}%",
+    "gateFloor": "umbral ≥{floor}",
+    "notScored": "sin puntuar",
+    "confidence": "confianza",
+    "scoreEveryCriterion": "Puntúa todos los criterios: {list}",
+    "gateSuffix": " · umbral: {ids}",
+    "submittedForLead": "Enviado a revisión de Lead — propuesto {decision}, {composite}/100{gate}.",
+    "decisionResult": "Decisión: {decision} · {composite}/100 ({band}){gate}{cal}",
+    "calibrationSuffix": " · baja confianza → calibración",
+    "cancelled": "Cancelado",
+    "decertified": "Descertificado · v{version}. Producción en pausa; se ha puesto en cola una nueva revisión.",
+    "approvedAsLead": "Aprobado como Lead · v{version} ya activo.",
+    "sentBackRevision": "Devuelto al Steward para revisión.",
+    "confirmDecertify": "¿Descertificar este BIO? La producción se pausa hasta que se vuelva a certificar. El briefing sigue disponible y los trabajos en curso finalizan.",
+    "loading": "Cargando…",
+    "jobNotFound": "Trabajo no encontrado.",
+    "brandFallback": "(marca)",
+    "certifiedV": "certificado v{version}",
+    "queuedRel": "en cola {rel}",
+    "bioV": "BIO v{version}",
+    "candidateBio": "BIO candidato · v{version}",
+    "editedTag": "· editado",
+    "resetEdits": "Descartar cambios",
+    "fldPositioning": "Posicionamiento",
+    "phPositioning": "Una frase — lo que la marca realmente es",
+    "fldCategory": "Categoría",
+    "fldPillars": "Pilares",
+    "addPillar": "+ Añadir pilar",
+    "fldPrimaryAudience": "Audiencia principal",
+    "fldSecondaryAudience": "Audiencia secundaria",
+    "fldJtbd": "Trabajos por hacer",
+    "addJtbd": "+ Añadir JTBD",
+    "fldVoiceRegister": "Registro de voz",
+    "fldRhythm": "Ritmo",
+    "fldSignatureMoves": "Gestos distintivos",
+    "addSignature": "+ Añadir gesto",
+    "fldForbiddenWords": "Palabras prohibidas",
+    "addForbidden": "+ Añadir prohibida",
+    "fldNorthStar": "Estrella polar",
+    "fldThisQuarter": "Este trimestre",
+    "fldNextQuarter": "Próximo trimestre",
+    "fldWatchouts": "Alertas estratégicas",
+    "addWatchout": "+ Añadir alerta",
+    "fldNotList": "Lo que la marca NO es",
+    "addNotList": "+ Añadir elemento",
+    "fldImagery": "Dirección de imágenes",
+    "addImagery": "+ Añadir referencia visual",
+    "fldVisualAvoid": "Evitar en lo visual",
+    "addVisualAvoid": "+ Añadir a evitar",
+    "bioEditHint": "Edita cualquier campo — los cambios se registran localmente y se envían como `bioPatch` al certificar (crea una nueva versión del BIO). Los campos visuales se autocompletarán con el pase de visión en P5; por ahora puedes rellenarlos a mano aquí.",
+    "focusFirst": "Revisa primero",
+    "nothingFlagged": "Nada señalado — todos los campos se leen bien.",
+    "statusMissing": "falta",
+    "statusLowConf": "baja conf.",
+    "highStakes": "alto riesgo",
+    "sourcesRead": "Fuentes leídas",
+    "charsScraped": "{chars} caracteres extraídos",
+    "pendingLeadReview": "Pendiente de revisión de Lead",
+    "pendingLeadIsLead": "Eres Lead — aprueba para finalizar la certificación o devuélvela al Steward original.",
+    "pendingLeadNotLead": "Un Lead Steward aprobará esta certificación antes de que se aplique.",
+    "leadNotesPrivate": "Notas del Lead (privadas)",
+    "certNotesClient": "Notas de certificación (visibles para el cliente)",
+    "notesPlaceholderLead": "Opcional. Si lo devuelves, explica qué necesita revisión.",
+    "notesPlaceholderCert": "p. ej. La voz y la audiencia suenan auténticas. Pilares recortados — 'origin-traceable' es el más fuerte.",
+    "conditionsLabel": "Condiciones / cambios requeridos (uno por línea)",
+    "conditionsPlaceholder": "Se usa cuando la decisión es aprobar-con-condiciones o devolver-para-cambios.\np. ej. Sustituye el logo provisional antes de ejecutar Visual.",
+    "rejectReasonLabel": "Código de motivo de rechazo (solo si se rechaza)",
+    "rejectReasonPlaceholder": "p. ej. unverifiable_authority",
+    "approveAsLead": "Aprobar como Lead",
+    "confirmSendBack": "¿Devolver esto al Steward para revisión?",
+    "sendBack": "Devolver",
+    "awaitingLead": "A la espera de la aprobación del Lead Steward — enviaste esta certificación; un Lead la finalizará.",
+    "alreadyReviewed": "Ya revisado",
+    "saveEditsSubmit": "Guardar cambios y enviar revisión",
+    "submitReview": "Enviar revisión",
+    "confirmCancelJob": "¿Cancelar este trabajo de certificación?",
+    "cancel": "Cancelar",
+    "scoreAllToSubmit": "Puntúa todos los criterios de la rúbrica de arriba para enviar.",
+    "leadHelpA1": "Aprobar finaliza la certificación y escribe ",
+    "leadHelpA2": ". El Steward original permanece como ",
+    "leadHelpA3": " (doble control: no puedes aprobar la tuya).",
+    "rubricHelpB1": "La rúbrica decide el resultado a partir de tus puntuaciones; cada decisión se registra en ",
+    "rubricHelpB2": " para poder justificarlo. En calibración, un Lead aprueba antes de que una aprobación se finalice.",
+    "decertify": "Descertificar",
+    "decertifyThisBio": "Descertificar este BIO",
+    "decertifyHint": "Retira la certificación. La producción nueva o en cola se bloquea de inmediato; los trabajos en curso finalizan; los resultados completados conservan su sello; el briefing sigue activo. Se pone en cola una nueva revisión.",
+    "dayMon": "Lun",
+    "dayTue": "Mar",
+    "dayWed": "Mié",
+    "dayThu": "Jue",
+    "dayFri": "Vie",
+    "capEyebrow": "Líder de equipo",
+    "capTitle": "Capacidad y SLA",
+    "capSub": "Dónde está cargado el equipo, dónde peligra el SLA y dónde debería caer el próximo trabajo.",
+    "teamLoadWeek": "Carga del equipo · esta semana",
+    "slaRiskJobs": "Riesgo de SLA · 3 trabajos",
+    "reassign": "Reasignar",
+    "dailyThroughput": "Rendimiento diario · últimos 14 días",
+    "jobsCount": {
+      "plural": {
+        "one": "{count} trabajo",
+        "other": "{count} trabajos"
+      }
+    },
+    "twoWeeksAgo": "hace 2 semanas",
+    "today": "hoy",
+    "backlog": "Pendientes · los más antiguos sin empezar",
+    "submittedAt": "enviado {when}",
+    "assign": "Asignar",
+    "clientsEyebrow": "Portal del equipo",
+    "clientsCount": "Clientes · {count}",
+    "clientsSub": "Los espacios de trabajo que atiende el equipo. Útil cuando tomas varios trabajos de la misma marca.",
+    "colBio": "BIO",
+    "colTier": "Nivel",
+    "colActiveJobs": "Trabajos activos",
+    "colLifetime": "Histórico",
+    "colLastActivity": "Última actividad",
+    "colPrimaryContact": "Contacto principal",
+    "tierN": "Nivel {tier}",
+    "meEyebrow": "Mi mesa",
+    "meTitle": "{name} · Diseñadora sénior",
+    "meSub": "Horas, trabajos, satisfacción. La Mesa paga por otra vía — esto es la visibilidad, no la nómina.",
+    "scopeMonth": "Mes",
+    "scopeQuarter": "Trimestre",
+    "scopeLifetime": "Histórico",
+    "statJobsDelivered": "Trabajos entregados",
+    "statHoursLogged": "Horas registradas",
+    "statAvgSatisfaction": "Satisfacción media",
+    "statCreditsEarned": "Créditos ganados",
+    "hoursLoggedMonth": "Horas registradas · este mes",
+    "topClientsMonth": "Mejores clientes · este mes",
+    "recentDeliveries": "Entregas recientes",
+    "craftEyebrow": "Trabajo humano · cola de pulido",
+    "craftTitle": "Piezas a la espera de pulido humano",
+    "craftSub": "Cada pieza se envió desde el lienzo de una marca con un brief de pulido. Refina el texto y devuélvelo a su tarjeta.",
+    "loadingQueue": "Cargando cola…",
+    "craftEmpty": "Nada en la cola de pulido. Las piezas llegan aquí cuando una marca pulsa \"Enviar a humano\".",
+    "untitled": "Sin título",
+    "polishBrief": "Brief de pulido del operador",
+    "refineIt": "La pieza — refínala",
+    "delivering": "Entregando…",
+    "deliverPolished": "Entregar versión pulida →"
   },
   "admin": {
     "specs": "Especificaciones",
@@ -87,7 +280,12 @@
     "title": "Notificaciones",
     "markAllRead": "Marcar todo como leído",
     "empty": "Estás al día.",
-    "ariaUnread": { "plural": { "one": "Notificaciones, {count} sin leer", "other": "Notificaciones, {count} sin leer" } },
+    "ariaUnread": {
+      "plural": {
+        "one": "Notificaciones, {count} sin leer",
+        "other": "Notificaciones, {count} sin leer"
+      }
+    },
     "ago": {
       "seconds": "hace {count} s",
       "minutes": "hace {count} min",
@@ -119,7 +317,12 @@
     "currentPlan": "Plan actual",
     "tierLabel": "Nivel {id}",
     "allowanceUnlimited": "Marcas ilimitadas",
-    "allowance": { "plural": { "one": "{count} marca", "other": "{count} marcas" } },
+    "allowance": {
+      "plural": {
+        "one": "{count} marca",
+        "other": "{count} marcas"
+      }
+    },
     "yourPlan": "Tu plan",
     "managedByAdmin": "Los cambios de plan los gestiona el administrador de tu espacio de trabajo.",
     "talkToUs": "Habla con nosotros",
@@ -146,5 +349,987 @@
   },
   "locale": {
     "name": "Español"
+  },
+  "brandolph": {
+    "hero": "¿Qué quieres {word}?",
+    "heroWord": "crear",
+    "subcopy": "Describe el cambio que quieres lograr, no el entregable. Brandolph lee el BIO, afina el brief, reúne al equipo y te muestra el costo antes de que algo se ejecute.",
+    "scope": "Alcance",
+    "promptPlaceholder": "p. ej. Haz que la campaña Summer Tuesdays recupere la tarde tranquila — prioridad al café, sin descuentos, sube el tráfico de los martes un 18 %.",
+    "modeFlow": "Flujo completo",
+    "modeWords": "Solo texto",
+    "modeVisual": "Solo visual",
+    "modePolish": "Pulido",
+    "start": "Iniciar",
+    "reBrief": "Rehacer brief",
+    "assemblyNote": "BIO {score}% · Brandolph afinará tu brief antes de reunir al equipo · Preguntar es gratis",
+    "sharpeningEyebrow": "Brandolph · afinando",
+    "sharpeningLoading": "Leyendo tu BIO. Presionando el brief. Eligiendo el equipo más pequeño.",
+    "sharpeningFailedEyebrow": "Brandolph · falló al afinar",
+    "sharpeningFailedBody": "{error}. Puedes ejecutar el brief tal como está.",
+    "proceedRaw": "Continuar con el brief sin afinar",
+    "cmoRewrite": "Cómo lo escribiría un CMO",
+    "answerPlaceholder": "Responde en una frase, o sáltalo.",
+    "proposedCrew": "Equipo propuesto",
+    "proceedAssembly": "Continuar al ensamblaje",
+    "assemblyComplete": "Ensamblaje · completo",
+    "assemblyReady": "Ensamblaje · listo para ejecutar",
+    "specialists": {
+      "plural": {
+        "one": "{count} especialista",
+        "other": "{count} especialistas"
+      }
+    },
+    "creditsCount": {
+      "plural": {
+        "one": "{count} crédito",
+        "other": "{count} créditos"
+      }
+    },
+    "newBrief": "Nuevo brief",
+    "total": "Total",
+    "remainingAfter": "{n} restantes después",
+    "runCredits": {
+      "plural": {
+        "one": "Ejecutar — {count} crédito",
+        "other": "Ejecutar — {count} créditos"
+      }
+    },
+    "assembling": "Ensamblando…",
+    "openInLibrary": "Abrir en la Biblioteca",
+    "streaming": "transmitiendo",
+    "approved": "aprobado",
+    "flagged": "marcado",
+    "failed": "falló",
+    "composedBy": "Compuesto por",
+    "certified": "certificado",
+    "uncertified": "sin certificar",
+    "creditsThisCycle": "Créditos de este ciclo",
+    "ledger": "Registro",
+    "creditsMeter": "/ {monthly} · quedan {days} d",
+    "campaigns": "Campañas",
+    "allBriefs": "Todos los briefs",
+    "created": "creadas",
+    "successRate": "tasa de éxito",
+    "inFlightShipped": "{inFlight} en curso · {shipped} entregadas",
+    "library": "Biblioteca",
+    "open": "Abrir",
+    "inFlightHeading": "En curso · {count}",
+    "viewAll": "Ver todo"
+  },
+  "briefs": {
+    "runsCount": {
+      "plural": {
+        "one": "{count} ejecución",
+        "other": "{count} ejecuciones"
+      }
+    },
+    "status": {
+      "approved": "aprobado",
+      "flagged": "marcado"
+    },
+    "filter": {
+      "all": "Todos",
+      "approved": "Aprobados",
+      "flagged": "Marcados",
+      "allSpecialists": "Todos los especialistas"
+    },
+    "mode": {
+      "auto": "auto"
+    },
+    "common": {
+      "close": "Cerrar"
+    },
+    "spec": {
+      "eyebrow": "L2 · 33 especialistas sénior",
+      "title": "El departamento, en turno.",
+      "sub": "Brandolph lee el brief. Los especialistas hacen el trabajo. Cada uno se enruta al modelo más adecuado para la tarea — visible, auditable, pagado del mismo fondo de créditos.",
+      "liveCount": "{live} activos · {soon} próximamente",
+      "newSpecialist": "Nuevo especialista",
+      "pinned": "★ Fijados · tus especialistas preferidos",
+      "mostUsedFor": "Más usados para",
+      "searchPlaceholder": "Buscar especialistas, departamentos, capacidades…",
+      "sortDepartment": "Departamento",
+      "sortCredits": "Créditos",
+      "sortMostUsed": "Más usados",
+      "viewGrid": "Cuadrícula",
+      "viewList": "Lista",
+      "allDepartments": "Todos los departamentos",
+      "resultsCount": {
+        "plural": {
+          "one": "{count} resultado",
+          "other": "{count} resultados"
+        }
+      },
+      "deptCount": "{specialists} especialistas · {live} activos",
+      "noMatch": "Ningún especialista coincide con “{query}”.",
+      "soon": "Próximo"
+    },
+    "lib": {
+      "eyebrow": "Espacio de trabajo",
+      "eyebrowBrand": "Espacio de trabajo · {name}",
+      "title": "Briefs",
+      "sub": "Cada ejecución de especialista en esta marca — auditable frente al BIO certificado. {runs} en el registro · {credits} cr gastados.",
+      "reload": "Recargar",
+      "runSpecialist": "Ejecutar un especialista",
+      "searchPlaceholder": "Buscar briefs…",
+      "countOf": "{shown} de {total}",
+      "emptyTitle": "Aún no hay briefs sobre la mesa.",
+      "emptyBody": "Brandolph está esperando el primero. Escribe lo que necesitas en la plataforma de lanzamiento — aunque sea una frase — y él lo afinará, nombrará la tensión y reunirá el equipo más pequeño que lo merezca.",
+      "startFirst": "Comenzar el primer brief",
+      "browseSpecialists": "Explorar especialistas",
+      "noMatch": "Ningún brief coincide con los filtros actuales."
+    },
+    "detail": {
+      "allBriefs": "Todos los briefs",
+      "specialistsCount": {
+        "plural": {
+          "one": "{count} especialista",
+          "other": "{count} especialistas"
+        }
+      },
+      "tabOverview": "Resumen",
+      "tabRecommendation": "Recomendación",
+      "tabDelivery": "Entrega",
+      "approve": "Aprobar",
+      "reviseWithBrandolph": "Revisar con Brandolph",
+      "exportPdf": "Exportar PDF",
+      "smpLabel": "Propuesta única",
+      "openBoard": "Abrir el tablero",
+      "outputsCount": {
+        "plural": {
+          "one": "{count} entregable",
+          "other": "{count} entregables"
+        }
+      },
+      "departmentsCount": {
+        "plural": {
+          "one": "{count} departamento",
+          "other": "{count} departamentos"
+        }
+      },
+      "deliverables": "Entregables",
+      "background": "Contexto",
+      "objective": "Objetivo",
+      "audience": "Audiencia",
+      "metricsThatMatter": "Métricas que importan",
+      "creativeStrategy": "Estrategia creativa",
+      "tone": "Tono",
+      "direction": "Dirección",
+      "mandatories": "Elementos obligatorios",
+      "notDoing": "Lo que este brief NO hace",
+      "strategicAssumptions": "Supuestos estratégicos",
+      "productionWatchouts": "Advertencias de producción"
+    },
+    "try": {
+      "tryAgent": "Probar {name}",
+      "reset": "Reiniciar",
+      "placeholder": "Escribe un brief para {name}. {job}",
+      "running": "Ejecutando…",
+      "done": "Listo",
+      "runHint": "~{cr} cr · ⌘+↵ para ejecutar",
+      "streaming": "Transmitiendo…",
+      "ran": "Ejecutado",
+      "run": "Ejecutar",
+      "composedBy": "Compuesto por",
+      "certified": "certificado",
+      "uncertified": "sin certificar",
+      "voiceQa": "QA de voz",
+      "passed": "aprobado",
+      "flagged": "marcado"
+    },
+    "drawer": {
+      "tryAgentCr": "Probar {name} · {cr} cr",
+      "perRun": "por ejecución",
+      "theJob": "El trabajo",
+      "capabilities": "Capacidades",
+      "picksThisFor": "Brandolph lo elige para",
+      "turnaround": "Tiempo de entrega",
+      "unlocksFrom": "Se desbloquea desde",
+      "tier": "Nivel",
+      "refusals": "Rechazos · no hará",
+      "howBriefs": "Cómo Brandolph instruye a este especialista",
+      "hide": "Ocultar",
+      "viewPrompt": "Ver prompt compuesto",
+      "briefsFallback": "{name} lee el BIO antes de responder, sigue {method} y rechaza cualquier cosa que rompa las reglas de la marca. {objective}",
+      "methodAs": "su método como {role}",
+      "methodPlain": "su método",
+      "composedFrom": "Compuesto de PLATFORM + BIO + SPEC + TASK",
+      "routedTo": " · enrutado a {model}",
+      "recentUsage": "Uso reciente · 30 días",
+      "jobsRun": "Trabajos ejecutados",
+      "creditsSpent": "Créditos gastados",
+      "successRate": "Tasa de éxito",
+      "exampleOutputs": "Ejemplos de salida · para",
+      "noOutputs": "Aún no has usado este especialista."
+    },
+    "canvas": {
+      "zoomOut": "Alejar",
+      "zoomIn": "Acercar",
+      "fit": "Ajustar",
+      "fitTitle": "Ajustar todos los nodos a la vista",
+      "exportImage": "Exportar lienzo como imagen",
+      "helperA": "Arrastra para desplazar · desplaza para hacer zoom ·",
+      "helperClick": "haz clic en cualquier nodo",
+      "helperB": "para ver el detalle y la justificación.",
+      "runComplete": "Ejecución completa",
+      "running": "En ejecución",
+      "crewAssembled": "Equipo reunido",
+      "untitled": "(brief sin título)",
+      "tension": "Tensión",
+      "hideBrief": "Ocultar brief",
+      "showBrief": "Mostrar brief",
+      "sharpenedBrief": "El brief afinado de Brandolph",
+      "hardRefusals": "Rechazos absolutos para este brief"
+    },
+    "run": {
+      "deliverableCount": {
+        "plural": {
+          "one": "{count} entregable",
+          "other": "{count} entregables"
+        }
+      },
+      "generic": "genérico",
+      "flagged": "MARCADO",
+      "ready": "LISTO",
+      "inHumanCraft": "✦ EN ARTESANÍA HUMANA",
+      "byName": "por {name}",
+      "statusStreaming": "transmitiendo",
+      "statusDone": "hecho",
+      "statusFlagged": "marcado",
+      "statusFailed": "fallido",
+      "open": "abrir",
+      "subPairsCopy": "se empareja con el clúster de copy",
+      "subStreaming": "transmitiendo…",
+      "subRendering": "renderizando…",
+      "subRenderingImages": "renderizando imágenes…",
+      "helperRunning": "Ejecutando el equipo… cada tarjeta transmite su progreso. Haz clic en cualquiera para abrir la salida completa.",
+      "helperComplete": "Ejecución completa · {cr} cr gastados. Haz clic en cualquier especialista para verificar, editar o copiar su salida.",
+      "helperAssembled": "Equipo reunido. Pulsa Ejecutar cuando estés listo.",
+      "runComplete": "Ejecución completa",
+      "openLibrary": "Abrir biblioteca",
+      "newBrief": "Nuevo brief",
+      "runningCrew": "Ejecutando el equipo…",
+      "runWord": "Ejecuta",
+      "theAssembly": "el ensamblaje"
+    },
+    "briefDrawer": {
+      "titleFallback": "Brief",
+      "eyebrow": "BRANDOLPH · BRIEF Y RECOMENDACIONES",
+      "tensionNamed": "La tensión que nombró Brandolph",
+      "howCmo": "Cómo lo escribiría un CMO",
+      "yourRequest": "Tu solicitud original",
+      "recommendations": "Recomendaciones de Brandolph — lo que NO haremos",
+      "producing": "Lo que Brandolph está produciendo"
+    },
+    "deliverable": {
+      "inCraftBadge": "✦ En artesanía humana",
+      "cancel": "Cancelar",
+      "confirmSend": "Confirmar — enviar a un humano · {cr} cr",
+      "export": "Exportar",
+      "copied": "Copiado ✓",
+      "copy": "Copiar",
+      "sendToHuman": "Enviar a un humano · {cr} cr",
+      "craftBanner": "✦ Un humano está puliendo esta pieza. Verás aquí la versión refinada cuando esté lista.",
+      "yourBriefToHuman": "Tu encargo al humano:",
+      "briefHuman": "Instruye al humano · qué pulir",
+      "polishPlaceholder": "Solicitudes específicas, puntos a añadir o editar — p. ej. 'ajusta la apertura', 'suaviza el CTA', 'añade una línea sobre el pour-over de Madrid'.",
+      "chipTighten": "Ajústalo",
+      "chipPlayful": "Más desenfadado",
+      "chipCta": "Arregla el CTA",
+      "chipBioVoice": "Ajusta a la voz del BIO",
+      "chipShorter": "Hazlo más corto"
+    },
+    "notepad": {
+      "download": "Descargar",
+      "copied": "Copiado",
+      "copy": "Copiar",
+      "titleNotPersisted": "La salida aún no se ha guardado",
+      "titleNoChanges": "Sin cambios",
+      "titleSaveEdit": "Guardar edición en la BD",
+      "saving": "Guardando…",
+      "savedAt": "Guardado · {time}",
+      "saveEdit": "Guardar edición",
+      "saved": "Guardado",
+      "theBrief": "El brief",
+      "sharpened": "Afinado (a02)",
+      "brandQa": "QA de marca",
+      "voiceQa": "QA de voz",
+      "output": "Salida",
+      "outputImage": "· imagen",
+      "outputEditable": "· editable",
+      "unsaved": "· sin guardar",
+      "chars": "{count} caracteres",
+      "rerunWith": "Volver a ejecutar con…",
+      "reviseFeedback": "Revisar con comentarios",
+      "current": "· actual",
+      "revisePlaceholder": "¿Qué no encaja? p. ej. 'demasiado clínico — llévalo hacia lo editorial' o 'cambia el hero de café a un solo recipiente de cerámica'",
+      "cancel": "Cancelar",
+      "withRevision": "con revisión",
+      "rerunWithFeedback": "Volver a ejecutar con comentarios",
+      "rerunLabel": "Reejecución",
+      "runningSuffix": "en ejecución…",
+      "failedSuffix": "fallido",
+      "doneSuffix": "hecho",
+      "dismiss": "Descartar",
+      "calling": "Llamando…",
+      "empty": "(vacío)",
+      "certifiedBy": "certificado por"
+    },
+    "rerun": {
+      "noteOpus": "Premium — el razonamiento más profundo",
+      "noteSonnet": "Caballo de batalla equilibrado",
+      "noteHaiku": "Rápido y económico",
+      "noteGeminiPro": "Síntesis de contexto largo",
+      "noteGeminiFlash": "El más económico",
+      "noteFluxPro": "Calidad hero premium",
+      "noteFluxSchnell": "Borrador rápido (13× más económico)",
+      "noteRecraft": "Vector / ilustración"
+    },
+    "view": {
+      "notFound": "Brief no encontrado",
+      "notFoundDot": "Brief no encontrado.",
+      "loading": "Cargando brief…",
+      "backToBriefs": "Volver a los briefs",
+      "imagesCount": {
+        "plural": {
+          "one": "{count} imagen",
+          "other": "{count} imágenes"
+        }
+      },
+      "certifiedByName": "Certificado por {name}",
+      "certifiedCanon": "Canon certificado",
+      "helper": "{runs} en este brief. Haz clic en cualquier especialista para verificar, editar o copiar su salida.",
+      "briefsBack": "← Briefs"
+    },
+    "board": {
+      "sourceCanon": "Fuente · el canon",
+      "whyRouted": "Por qué Brandolph lo enrutó aquí",
+      "bestFit": "La mejor opción para esta parte del brief.",
+      "whyChoice": "Por qué esta elección creativa",
+      "theBriefL1": "El brief · L1 Brandolph",
+      "askedFirst": "Brandolph preguntó primero",
+      "sourceCanonShort": "Fuente · canon",
+      "specialistPrefix": "Especialista",
+      "whyRoutes": "Por qué Brandolph enruta aquí",
+      "theOutput": "La salida",
+      "whyChoiceShort": "Por qué esta elección",
+      "addSpecialist": "Añadir especialista",
+      "dropSpecialist": "Suelta un especialista y luego conéctalo",
+      "export": "Exportar",
+      "connectingFromA": "Conectando desde",
+      "connectingFromB": "— haz clic en un nodo para enlazar.",
+      "helperConnect": "Haz clic en un nodo para conectar · Esc para cancelar.",
+      "helperDefaultB": "en un nodo para conectarlo · haz clic en un resultado para ver la justificación."
+    },
+    "library": {
+      "title": "Biblioteca",
+      "sub": "Cada brief que ha producido tu equipo, archivado como una carpeta. Abre una para explorar sus recursos, leerlos completos y ponerlos de nuevo a trabajar.",
+      "assetsCount": {
+        "plural": {
+          "one": "{count} recurso",
+          "other": "{count} recursos"
+        }
+      },
+      "foldersCount": {
+        "plural": {
+          "one": "{count} carpeta",
+          "other": "{count} carpetas"
+        }
+      },
+      "assetWord": {
+        "plural": {
+          "one": "recurso",
+          "other": "recursos"
+        }
+      },
+      "emptyTitle": "La biblioteca está esperando.",
+      "emptyBody": "Cada salida que produce tu equipo aterriza aquí — archivada bajo el brief que la pidió, la versión del BIO frente a la que se evaluó y el Steward que firmó el canon. Ejecuta un brief y observa cómo se llenan los estantes.",
+      "startBrief": "Comenzar un brief",
+      "deleted": "Eliminado",
+      "deleteFailed": "Error al eliminar",
+      "couldNotDelete": "No se pudo eliminar",
+      "needsReview": "necesita revisión",
+      "openInCanvas": "Abrir en el lienzo",
+      "searchFolder": "Buscar en esta carpeta…",
+      "folderEmpty": "Esta carpeta está vacía.",
+      "noAssetsMatch": "Ningún recurso coincide con el filtro actual.",
+      "visualDirection": "Dirección visual",
+      "noDirection": "(sin dirección)",
+      "editedSuffix": "· editado",
+      "qaNotes": "Notas de QA",
+      "reuse": "Reutilizar",
+      "copyPrompt": "Copiar prompt",
+      "confirmDelete": "¿Eliminar este recurso?",
+      "delete": "Eliminar",
+      "promptCopied": "Prompt copiado",
+      "couldNotCopy": "No se pudo copiar",
+      "downloading": "Descargando",
+      "downloaded": "Descargado"
+    },
+    "author": {
+      "eyebrow": "Capacidades · admin",
+      "title": "Nuevo especialista",
+      "sub": "Define un especialista L2. El prompt de la derecha es el brief compuesto real — PLATFORM + el BIO en vivo + esta especificación + la tarea — ensamblado a medida que escribes.",
+      "saved": "Guardado ✓",
+      "saveSpecialist": "Guardar especialista",
+      "identity": "Identidad",
+      "name": "Nombre",
+      "namePlaceholder": "p. ej. El Cerrador Mayorista",
+      "department": "Departamento",
+      "status": "Estado",
+      "statusLive": "Activo",
+      "statusSoon": "Próximamente",
+      "statusDraft": "Borrador",
+      "jobLabel": "El trabajo · una línea",
+      "jobPlaceholder": "Lo que hace este especialista, en una línea.",
+      "promptSpec": "Especificación del prompt",
+      "prefillFrom": "Rellenar desde la plantilla de {dept}",
+      "role": "Rol",
+      "rolePlaceholder": "un redactor de conversión que…",
+      "objective": "Objetivo",
+      "objectivePlaceholder": "Lo que produce una buena ejecución.",
+      "methodSteps": "Método · pasos",
+      "methodPlaceholder": "Un paso que sigue el especialista",
+      "outputContract": "Contrato de salida",
+      "outputContractPlaceholder": "Forma / longitud / formato que debe devolver.",
+      "voice": "Voz",
+      "voicePlaceholder": "Restricciones de voz (hereda la voz de marca).",
+      "tools": "Herramientas",
+      "toolsPlaceholder": "p. ej. búsqueda Exa, generación de imágenes",
+      "refusalsLabel": "Rechazos · no hará (además de las reglas de marca)",
+      "refusalsPlaceholder": "Una regla estricta que este especialista no romperá",
+      "routingCost": "Enrutamiento y coste",
+      "model": "Modelo",
+      "creditsPerRun": "Créditos / ejecución",
+      "livePrompt": "Prompt compuesto en vivo",
+      "testTab": "Prueba · ejecución de prueba + control de QA",
+      "tabPrompt": "Prompt",
+      "tabTest": "Prueba",
+      "refusalsInherit": {
+        "plural": {
+          "one": "Los rechazos de marca se heredan del BIO · {count} regla",
+          "other": "Los rechazos de marca se heredan del BIO · {count} reglas"
+        }
+      },
+      "sampleBrief": "Brief de muestra",
+      "sampleBriefDefault": "Escribe el correo del anuncio anual de precios para compradores mayoristas.",
+      "dryRun": "Ejecución de prueba",
+      "draftOutput": "Salida en borrador · editable",
+      "qaGate": "Control de QA de marca",
+      "blocking": "{count} bloqueando",
+      "pass": "Aprobado",
+      "notReady": "No está listo.",
+      "notReadyBody": "Corrige la regla marcada antes de poner este especialista en activo.",
+      "clearsGate": "Pasa el control.",
+      "clearsGateBody": "Seguro para poner el estado en “Activo”.",
+      "remove": "Quitar",
+      "add": "Añadir"
+    },
+    "date": {
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "undated": "Sin fecha"
+    },
+    "misc": {
+      "untitled": "(sin título)",
+      "untitledBrief": "(brief sin título)",
+      "yourSteward": "tu Steward",
+      "yourBrandSteward": "tu Brand Steward"
+    }
+  },
+  "discovery": {
+    "stepper": {
+      "connect": "Conectar",
+      "extract": "Extraer",
+      "confirm": "Confirmar",
+      "skip": "Omitir la introducción →"
+    },
+    "bucket": {
+      "foundations": {
+        "label": "Fundamentos de marca",
+        "help": "Manual de marca, presentaciones, manifiestos, documentos «sobre nosotros»",
+        "readBy": "Todos los especialistas"
+      },
+      "visual": {
+        "label": "Referencias visuales",
+        "help": "Moodboards, ejemplos de trabajos que admiras",
+        "readBy": "Depto. de diseño"
+      },
+      "voice": {
+        "label": "Referencias de voz",
+        "help": "Correos, publicaciones, charlas donde suenas como tú",
+        "readBy": "Depto. de copy"
+      }
+    },
+    "removeFile": "Quitar {name}",
+    "step1": {
+      "brandNameRequired": "El nombre de la marca es obligatorio.",
+      "titleAddEm": "Añade una marca.",
+      "titlePointEm": "Muéstranos tu marca.",
+      "titleAddRest": "Ponle nombre, muéstranosla y Brandolph lee el resto.",
+      "titlePointRest": "Brandolph leerá el resto.",
+      "lead": "Con una URL basta. Si tienes guías, compártelas. Y si no las tienes, trabajaremos con lo que ya es público y te diremos qué no pudimos encontrar.",
+      "brandNameLabel": "Nombre de la marca",
+      "brandNamePlaceholder": "p. ej. Vinilo Coffee",
+      "urlLabel": "URL del sitio web principal",
+      "urlPlaceholder": "marca.com",
+      "igLabel": "Usuario de Instagram",
+      "igOptional": "· opcional",
+      "igPlaceholder": "@usuario",
+      "sourcesLabel": "Fuentes",
+      "sourcesOptional": "· opcional — arrastra o haz clic para subir",
+      "timing": "⏱ ~40s · 🔒 Las fuentes se guardan en el registro de tu BIO",
+      "filesReady": {
+        "plural": {
+          "one": " · {count} archivo listo",
+          "other": " · {count} archivos listos"
+        }
+      },
+      "uploading": "Subiendo fuentes…",
+      "starting": "Empezando…",
+      "startExtraction": "Iniciar extracción",
+      "fromScratch": "Empezar desde cero",
+      "clone": "Clonar un espacio (Nivel 03)"
+    },
+    "step2": {
+      "reading1": "Brandolph está leyendo cada página de tu sitio",
+      "reading2": "El equipo de diseño está mapeando tu paleta y tu tipografía",
+      "reading3": "Brandolph está afinando tu marca en un BIO",
+      "reading4": "Archivando el borrador para que tu Steward de marca lo certifique",
+      "compiledTitle": "Brandolph compiló tu BIO",
+      "readingTitle": "Brandolph está leyendo tu marca",
+      "extraction": "EXTRACCIÓN",
+      "elapsed": "{sec}s transcurridos"
+    },
+    "chapter": {
+      "identity": {
+        "label": "Identidad",
+        "blurb": "Quién eres y qué defiendes."
+      },
+      "audience": {
+        "label": "Audiencia",
+        "blurb": "Para quién eres."
+      },
+      "voice": {
+        "label": "Voz",
+        "blurb": "Cómo suenas."
+      },
+      "visual": {
+        "label": "Visual",
+        "blurb": "Cómo te ves."
+      },
+      "goals": {
+        "label": "Objetivos",
+        "blurb": "Hacia dónde vas."
+      },
+      "strategic": {
+        "label": "Estratégico",
+        "blurb": "Tensiones y líneas rojas."
+      }
+    },
+    "field": {
+      "identity": {
+        "positioning": "Posicionamiento",
+        "category": "Categoría",
+        "founded": "Fundación",
+        "pillars": "Pilares"
+      },
+      "audience": {
+        "primary": "Audiencia principal",
+        "secondary": "Audiencia secundaria",
+        "tertiary": "Audiencia terciaria",
+        "jtbd": "Tareas por resolver"
+      },
+      "voice": {
+        "register": "Registro",
+        "rhythm": "Ritmo de las frases",
+        "forbidden": "Palabras prohibidas",
+        "signatures": "Gestos característicos"
+      },
+      "visual": {
+        "palette": "Paleta",
+        "type": "Tipografía",
+        "imagery": "Fotografía así",
+        "avoid": "Nunca así"
+      },
+      "goals": {
+        "northStar": "Estrella polar",
+        "q2": "Este trimestre",
+        "q3": "Próximo trimestre"
+      },
+      "strategic": {
+        "watchouts": "Puntos de atención",
+        "notList": "Lo que NO eres"
+      },
+      "from": "de {source}",
+      "emptyState": "Vacío — no pudimos encontrarlo. Añádelo si lo sabes, o déjalo en blanco.",
+      "editPlaceholder": "Escribe lo que es cierto — déjalo en blanco si no estás seguro",
+      "markedUndo": "Marcado como {mark} · deshacer",
+      "markAccurate": "Marcar como preciso",
+      "markAspirational": "Marcar como aspiracional",
+      "doneEditing": "Terminar edición",
+      "addIt": "Añadirlo",
+      "edit": "Editar",
+      "leaveBlank": "Dejar en blanco"
+    },
+    "fieldStatus": {
+      "missing": "no pudimos encontrar esto",
+      "accurate": "confirmado como preciso",
+      "aspirational": "aspiracional",
+      "inferred": "confirma — inferido, no declarado",
+      "stated": "tus palabras"
+    },
+    "sectionStatus": {
+      "needs": "necesita fuentes",
+      "filling": "completándose",
+      "well": "bien documentado"
+    },
+    "mark": {
+      "accurate": "preciso",
+      "aspirational": "aspiracional"
+    },
+    "attestError": {
+      "statements": "Confirma las tres declaraciones para dar fe.",
+      "gaps": "Todavía faltan respuestas en algunos campos importantes{fields}. Complétalos o márcalos y luego da fe.",
+      "belowScore": "Tu BIO está en {score}/100{below}. Confirma más campos o añade fuentes para subirlo.",
+      "belowNeeded": ", por debajo de los {minScore} necesarios",
+      "default": "No se pudo dar fe todavía — inténtalo de nuevo."
+    },
+    "palette": {
+      "namePlaceholder": "Nombre del color"
+    },
+    "type": {
+      "rolePlaceholder": "Rol",
+      "familyPlaceholder": "Familia"
+    },
+    "common": {
+      "remove": "Quitar",
+      "addColour": "Añadir color",
+      "addTypeface": "Añadir tipografía",
+      "cancel": "Cancelar"
+    },
+    "delegate": {
+      "title": "Delegar este capítulo",
+      "desc": "Entrega {chapter} a un compañero que lo conozca mejor. Recibirá un enlace para completar solo esta sección.",
+      "emailPlaceholder": "companero@marca.com",
+      "notePlaceholder": "Nota (opcional)",
+      "sending": "Enviando…",
+      "sendInvite": "Enviar invitación",
+      "inviteReady": "Invitación lista.",
+      "copied": "Copiado",
+      "copyLink": "Copiar enlace"
+    },
+    "results": {
+      "savedExit": "Guardado — retoma justo aquí cuando quieras.",
+      "bioSigned": "BIO firmado — briefing desbloqueado.",
+      "saving": "Guardando…",
+      "saved": "Todos los cambios guardados",
+      "saveError": "Error al guardar — se reintenta en la próxima edición",
+      "finishLater": "Guardar y terminar después",
+      "noBrand": "No encontramos una marca para revisar.",
+      "startDiscovery": "Iniciar descubrimiento",
+      "loading": "Cargando tu borrador…",
+      "certifiedBy": "Certificado por",
+      "certPending": "Un Steward de marca sénior certifica este BIO en 24 h. Confirma el borrador de abajo para desbloquear el briefing ahora.",
+      "draftEyebrow": "Borrador del BIO · revísalo antes de firmar",
+      "yourBrand": "Tu marca",
+      "completion": "Progreso"
+    },
+    "completion": {
+      "well": "bien documentado",
+      "filling": "completándose",
+      "needs": "necesita más fuentes"
+    },
+    "hub": {
+      "reviewed": "Revisado",
+      "gaps": {
+        "plural": {
+          "one": "{count} vacío",
+          "other": "{count} vacíos"
+        }
+      },
+      "toConfirm": "{count} por confirmar",
+      "fieldsConfirmed": "campos confirmados",
+      "inferredToConfirm": "inferidos por confirmar",
+      "gapsWord": "vacíos",
+      "confirmAttest": "Confirmar y dar fe"
+    },
+    "chapterView": {
+      "allChapters": "← Todos los capítulos",
+      "instruction": "Confirma lo correcto, corrige lo que no lo sea, deja en blanco lo que no sepas.",
+      "doneBack": "Listo — volver a los capítulos"
+    },
+    "attest": {
+      "back": "← Volver a los capítulos",
+      "title": "Confirma y firma tu BIO",
+      "desc": "Firmar promueve este borrador a una versión certificada del BIO y desbloquea el briefing. Un Steward de marca sénior aún lo revisa antes de la producción.",
+      "confirmed": "Confirmados",
+      "inferredToConfirm": "Inferidos por confirmar",
+      "gaps": "Vacíos",
+      "stillOpen": "Aún abiertos ({count})",
+      "attestation": "Declaración",
+      "signing": "Firmando…",
+      "signActivate": "Firmar y activar el espacio de marca",
+      "confirmAllThree": "Confirma las tres declaraciones para continuar."
+    },
+    "statement": {
+      "authority": "Estoy autorizado para representar esta marca.",
+      "reflects": "Este BIO refleja la marca tal como es en realidad.",
+      "aspirational": "He separado lo factual de lo aspiracional."
+    },
+    "step3": {
+      "title": "El Espacio de Marca está activo.",
+      "openBrandolph": "Abrir Brandolph"
+    },
+    "selfCert": {
+      "attestedBold": "Autoatestiguado",
+      "attestedRest": "el briefing está desbloqueado. La producción sigue bloqueada hasta que tu Steward de marca certifique.",
+      "fillBefore": "Completa esto antes de autocertificar: {fields}",
+      "belowScore": "La puntuación del BIO {score} está por debajo de los {minScore} necesarios — añade fuentes para subirla.",
+      "eyebrow": "Autocertifica para empezar el briefing",
+      "desc": "Confirma que el BIO es lo bastante preciso para hacer briefing. Esto desbloquea el briefing ahora; un Steward de marca sénior aún certifica antes de la producción.",
+      "submitting": "Enviando…",
+      "submit": "Autocertificar y desbloquear el briefing"
+    },
+    "reasonCode": {
+      "insufficient_evidence": "No hay evidencia suficiente para certificar",
+      "out_of_scope": "Fuera del alcance de esta marca",
+      "brand_mismatch": "No coincide con la marca tal como la entendemos",
+      "inaccurate": "Contiene inexactitudes",
+      "incomplete": "Demasiado incompleto para certificar",
+      "low_quality": "Todavía no tiene calidad de certificación",
+      "aspirational_unmarked": "Afirmaciones aspiracionales no separadas de los hechos",
+      "needs_sources": "Necesita más fuentes",
+      "duplicate": "Duplicado de un BIO existente"
+    },
+    "steward": {
+      "defaultName": "tu Steward de marca",
+      "fromSteward": "De tu Steward",
+      "returnHeading": "Tu Steward necesita algunos cambios",
+      "returnCta": "Hacer estos cambios",
+      "rejectHeading": "Tu Steward devolvió este BIO",
+      "rejectCta": "Editar y reenviar",
+      "conditionsHeading": "Certificado con condiciones"
+    },
+    "diff": {
+      "title": {
+        "plural": {
+          "one": "Lo que cambió tu Steward · {count} campo",
+          "other": "Lo que cambió tu Steward · {count} campos"
+        }
+      },
+      "hide": "Ocultar",
+      "show": "Mostrar"
+    },
+    "bio": {
+      "savedVersion": "Guardado · BIO v{version}. El Steward volverá a certificar.",
+      "reviewInProgress": "Ya hay una revisión humana en curso.",
+      "sentForReview": "Enviado a tu Steward de marca para revisión.",
+      "couldntRequestReview": "No se pudo solicitar la revisión: {error}",
+      "added": "Añadido \"{ref}\". Brandolph lo leerá en el próximo descubrimiento.",
+      "couldntAdd": "No se pudo añadir: {error}",
+      "reviewingThis": "Tu Steward de marca está revisando este BIO",
+      "awaitingCert": "En espera de certificación por tu Steward de marca",
+      "noBioYet": "Aún no hay BIO — escribe una URL en Descubrimiento para extraer uno",
+      "versionScore": "BIO v{version} · puntuación {score}/100",
+      "flaggedAreas": {
+        "plural": {
+          "one": "Brandolph marcó {count} área para que tu Steward la confirme.",
+          "other": "Brandolph marcó {count} áreas para que tu Steward las confirme."
+        }
+      },
+      "inReview": "en revisión",
+      "within24h": "en 24 h",
+      "eyebrow": "Objeto de Inteligencia de Marca",
+      "of100": "DE 100",
+      "certifiedDate": "Certificado {date}",
+      "uncertified": "Sin certificar",
+      "versionTitle": "Versión del BIO {version}",
+      "feedBrandolph": "Alimentar a Brandolph",
+      "editBio": "Editar BIO",
+      "savingChanges": "Guardando…",
+      "saveChanges": "Guardar cambios",
+      "rerunDiscovery": "Volver a ejecutar el descubrimiento",
+      "reviewInProgressTitle": "Ya hay una revisión humana en curso",
+      "requestReviewTitle": "Envía este BIO a tu Steward de marca para una revisión humana — sin necesidad de editar",
+      "inReviewShort": "En revisión…",
+      "sending": "Enviando…",
+      "requestHumanReview": "Solicitar revisión humana",
+      "editingBanner": "Editando el BIO — al guardar se crea una nueva versión que tu Steward de marca volverá a certificar.",
+      "noCanon": "Aún no hay canon.",
+      "noCanonDesc": "El BIO es la fuente de verdad con la que se juzga cada resultado. Apunta Descubrimiento a tu URL o pega lo que tengas — Brandolph compilará el primer borrador en unos treinta segundos. Un Steward sénior lo firma antes de que se convierta en canon.",
+      "startDiscovery": "Iniciar descubrimiento"
+    },
+    "tab": {
+      "identity": "Identidad",
+      "audience": "Audiencia",
+      "competitive": "Competencia",
+      "voice": "Voz",
+      "visual": "Visual",
+      "goals": "Objetivos",
+      "strategic": "Estratégico",
+      "sources": "Fuentes"
+    },
+    "bioTone": {
+      "well": {
+        "word": "bien documentado",
+        "hint": "Brandolph tiene evidencia suficiente para confiar en esto."
+      },
+      "filling": {
+        "word": "completándose",
+        "hint": "Va por buen camino — unas fuentes más lo afianzarán."
+      },
+      "needs": {
+        "word": "necesita más fuentes",
+        "hint": "Dale a Brandolph más páginas o archivos para subir esto."
+      }
+    },
+    "table": {
+      "field": "Campo",
+      "whatWeKnow": "Lo que sabemos",
+      "confidence": "Confianza",
+      "confidenceTitle": "Qué tan segura está Brandolph sobre este campo, según sus fuentes. Rojo = evidencia escasa, verde = bien documentado.",
+      "lowHigh": "baja → alta"
+    },
+    "competitive": {
+      "placeholder": "El mapa competitivo viene de a32 (especialista en Mapa de Competidores) — se conectará en una fase posterior. El Compilador de BIO no extrae competidores hoy."
+    },
+    "editPrimitive": {
+      "chipAdd": "+ añadir",
+      "addItem": "Añadir elemento",
+      "labelPlaceholder": "Etiqueta",
+      "sourcePlaceholder": "Fuente",
+      "valuePlaceholder": "Valor",
+      "removeField": "Quitar campo",
+      "addField": "Añadir campo",
+      "addListField": "Añadir campo de lista"
+    },
+    "bioField": {
+      "positioning": "Posicionamiento",
+      "category": "Categoría",
+      "founded": "Fundación",
+      "pillars": "Pilares",
+      "primary": "Principal",
+      "secondary": "Secundaria",
+      "tertiary": "Terciaria",
+      "jtbd": "Tareas por resolver",
+      "register": "Registro",
+      "forbidden": "Prohibidas",
+      "rhythm": "Ritmo",
+      "signatures": "Firmas",
+      "northStar": "Estrella polar",
+      "thisQuarter": "Este trimestre",
+      "nextQuarter": "Próximo trimestre"
+    },
+    "visual": {
+      "paletteHead": "Paleta de colores",
+      "paletteSource": "extraída de 47 páginas + logo",
+      "typographyHead": "Tipografía",
+      "typographySource": "extracción visual",
+      "imageryHead": "Imágenes",
+      "imagerySource": "análisis de imágenes · 90 publicaciones",
+      "namePlaceholder": "Nombre",
+      "wcagPlaceholder": "WCAG",
+      "wcag": "WCAG {value}",
+      "removeColour": "Quitar color",
+      "familyPlaceholder": "Familia",
+      "sizePlaceholder": "Tamaño",
+      "licensePlaceholder": "Licencia",
+      "webAltPlaceholder": "Alternativa web",
+      "webAlt": "Alternativa web",
+      "grade": "Grado",
+      "shootThis": "Fotografía así",
+      "neverThis": "Nunca así"
+    },
+    "strategic": {
+      "watchouts": "Puntos de atención estratégicos",
+      "gaps": "Vacíos",
+      "whatNot": "Lo que Vinilo NO es",
+      "diagnosis": "Diagnóstico de Brandolph · esta semana"
+    },
+    "sources": {
+      "feedBrandolph": "Alimentar a Brandolph",
+      "feedDesc": "Suelta un enlace, un documento o una nota. Brandolph lo lee y afina el BIO.",
+      "pastePlaceholder": "Pega una URL — sitio, artículo, competidor, redes…",
+      "reading": "Leyendo…",
+      "readIt": "Léelo",
+      "uploadDoc": "Subir documento",
+      "repullSocial": "Volver a extraer redes",
+      "addCompetitor": "Añadir competidor",
+      "ledger": "{sources} fuentes · {signals} señales aprendidas",
+      "compounds": "Cada fuente hace crecer el BIO.",
+      "signals": "{count} señales",
+      "new": "nuevo",
+      "justNow": "justo ahora",
+      "reExtract": "Volver a extraer"
+    }
+  },
+  "floater": {
+    "greeting": {
+      "home": "*Encargar un nuevo flujo se hace en la plataforma de lanzamiento de arriba.* Usa esto para estados, consejos o cualquier cosa que le preguntarías a un CMO a media semana.",
+      "discovery": "*Estás a mitad de la extracción.* Estoy leyendo el sitio en otra pestaña. Pregúntame lo que quieras mientras esperamos — incluido 'qué debería revisar primero cuando termine'.",
+      "bio": "*El BIO es el canon.* Te lo cito si me preguntas por algún campo. Pregúntame qué está flojo.",
+      "briefs": "*Tres briefs en marcha, cuatro entregados.* Pregúntame por cualquiera de ellos, o pregúntame cuál impulsaría yo primero esta semana.",
+      "briefDetail": "*Estás dentro de un brief.* Puedo guiarte por el SMP, las negativas, o lo que haría distinto si lo escribiéramos mañana.",
+      "specialists": "*Ese es tu departamento.* Pregúntame a quién reuniría para un trabajo concreto, y te muestro la elección y el porqué.",
+      "canvas": "*Este es el espacio de trabajo.* El mapa se vuelve más denso a medida que entregas. Pregúntame por cualquier nodo, o pregúntame qué depende del BIO.",
+      "craft": "*Trabajo manual que el equipo debería rematar.* Asocio un paquete de acabado a un trabajo si me lo describes.",
+      "credits": "*Gasto, no presupuesto.* Pregúntame a dónde fue el dinero, o qué cambiaría si duplicaras el ciclo.",
+      "settings": "*Gobernanza del espacio de trabajo.* Pregúntame cuál debería ser la lista de prohibiciones, o si tu umbral de aprobación automática está demasiado holgado.",
+      "default": "*Soy Brandolph.* Pregúntame qué está en marcha, qué está atascado, o qué hacer a continuación. Preguntar es gratis — los briefs muestran el coste."
+    },
+    "prompt": {
+      "statusEyebrow": "Estado",
+      "statusText": "¿Qué está en marcha y qué necesita de mí?",
+      "nextEyebrow": "Siguiente",
+      "nextText": "¿Qué debería encargar a continuación?",
+      "sharpenEyebrow": "Afinar",
+      "sharpenText": "Lee mi BIO y dime qué está flojo.",
+      "refuseEyebrow": "Rechazar",
+      "refuseText": "¿Qué debería descartar este ciclo?"
+    },
+    "ask": "Pregúntale a Brandolph",
+    "headerSub": "Tu CMO · Preguntar es gratis",
+    "close": "Cerrar",
+    "tryAsking": "Prueba a preguntar",
+    "reading": "Brandolph está leyendo…",
+    "placeholder": "Pregunta lo que sea — estado, próximo brief, negativas…",
+    "send": "Enviar",
+    "free": "Gratis",
+    "metaRest": "para preguntar · Encargar una tarea muestra el coste primero",
+    "clear": "Borrar",
+    "briefNewTask": "Encargar una tarea nueva",
+    "addToFlow": "Añadir a un flujo",
+    "pingLabel": "Brandolph tiene 1 sugerencia para ti",
+    "pingTitle": "Brandolph tiene una sugerencia para ti"
+  },
+  "ui": {
+    "brandolphThinking": "Brandolph está pensando",
+    "specialist": "Especialista",
+    "comingSoon": "Próximamente",
+    "composedBy": "Compuesto por",
+    "bioVersion": "BIO v{version}",
+    "certifiedBy": "certificado por",
+    "routedVia": "enrutado vía",
+    "run": "ejecución",
+    "debugAttribution": "Atribución de depuración",
+    "close": "Cerrar",
+    "pin": "Fijar",
+    "unpin": "Dejar de fijar",
+    "reading": "leyendo…",
+    "status": {
+      "draft": "Borrador",
+      "approved": "Aprobado",
+      "inProduction": "En producción",
+      "shipped": "Enviado",
+      "archived": "Archivado",
+      "unassigned": "Sin asignar",
+      "inProgress": "En curso",
+      "review": "En revisión",
+      "delivered": "Entregado",
+      "blocked": "Bloqueado",
+      "live": "En vivo"
+    }
   }
 }
