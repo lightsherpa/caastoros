@@ -37,10 +37,12 @@ test("specialist execution requires a certified BIO and atomic persistence", () 
   assert.doesNotMatch(source, /requireCertified:\s*false/);
 });
 
-test("Steward submission and lead review use the atomic state machine", () => {
+test("Steward submission preserves the audited rubric state machine", () => {
   const source = read("server/src/routes/steward.js");
-  assert.match(source, /rpc\("submit_steward_job_atomic"/);
-  assert.match(source, /rpc\("review_steward_job_atomic"/);
+  assert.match(source, /evaluateCertification\(/);
+  assert.match(source, /writeDecision\(/);
+  assert.match(source, /rpc\("append_bio_version"/);
+  assert.match(source, /normalizeBioEvidence\(deepMerge\(/);
   assert.doesNotMatch(source, /score:\s*75/);
 });
 
@@ -49,7 +51,7 @@ test("Discovery uploads sources before enqueue and has no demo default/results",
   const upload = source.indexOf("const filesToUpload");
   const enqueue = source.indexOf('const res = await apiFetch("/api/discovery/start"');
   assert.ok(upload >= 0 && enqueue > upload);
-  assert.doesNotMatch(source, /useDState\("vinilo\.coffee"\)/);
+  assert.doesNotMatch(source, /useDState\("https?:\/\//);
   assert.doesNotMatch(source, /const d = window\.CI_DISCOVERY/);
 });
 

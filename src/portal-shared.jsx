@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale } from "./lib/i18n.js";
 /* Caastor Intelligence — shared UI primitives. */
 /* Pure components; no router or page logic. Globals exposed on window. */
 
@@ -6,9 +7,10 @@ const { useState, useEffect, useRef, useMemo } = React;
 
 /* Brandolph avatar — yellow pulse dot. Two states. */
 function BrandolphDot({ state = "idle", size = 10 }) {
+  const { t } = useLocale();
   if (state === "thinking") {
     return (
-      <span style={{display:"inline-flex", gap:4, alignItems:"center"}} aria-label="Brandolph is thinking">
+      <span style={{display:"inline-flex", gap:4, alignItems:"center"}} aria-label={t("ui.brandolphThinking")}>
         {[0,1,2].map(i => (
           <span key={i} style={{
             width: size-2, height: size-2, borderRadius: "50%",
@@ -120,6 +122,7 @@ function AgentCard({ agentId, compact = false, onClick, showCaps = false }) {
   const a = window.CI_AGENTS.find(x => x.id === agentId);
   if (!a) return null;
   const isTeam = useIsTeam();
+  const { t } = useLocale();
   const soon = a.status === "soon";
   const accent = isTeam ? window.CI_MODELS[a.model].color : (window.CI_DEPT_COLORS[a.dept] || "var(--neutral-400)");
   const caps = (window.CI_DEPT_META[a.dept] || {}).capabilities || [];
@@ -167,9 +170,9 @@ function AgentCard({ agentId, compact = false, onClick, showCaps = false }) {
         borderTop: "1px dashed var(--c-line-2)",
         display:"flex", justifyContent:"space-between", alignItems:"center",
       }}>
-        {isTeam ? <ModelChip modelKey={a.model} /> : <span className="eyebrow">Specialist</span>}
+        {isTeam ? <ModelChip modelKey={a.model} /> : <span className="eyebrow">{t("ui.specialist")}</span>}
         {soon ? (
-          <span className="pill" style={{height:18, padding:"0 8px", fontSize: 9.5}}>Coming soon</span>
+          <span className="pill" style={{height:18, padding:"0 8px", fontSize: 9.5}}>{t("ui.comingSoon")}</span>
         ) : (
           <LayerTag layer="L2" />
         )}
@@ -181,7 +184,7 @@ function AgentCard({ agentId, compact = false, onClick, showCaps = false }) {
 /* Output card — used in /briefs/[id] and canvas drawers.
    Footer renders the rev-2 §5.5 / §9 attribution. Two render modes:
    - Client (default, public): leads with the Steward chip; NO model name.
-     This is the moat-defining trust signal — `certified by Marina` is
+     This is the moat-defining trust signal — `certified by Your steward` is
      impossible to fake without the real Steward operation.
    - Team / debug: adds `routed via {model}` and `run {short_id}` for
      ops debugging. Surfaces by default on team portal; hover-reveal on
@@ -191,6 +194,7 @@ function AgentCard({ agentId, compact = false, onClick, showCaps = false }) {
    output.meta (date), CI_AGENTS[].model (key into CI_MODELS for label),
    output.id (truncated to 7 chars as the run short_id). */
 function OutputCard({ output }) {
+  const { t } = useLocale();
   const agent = window.CI_AGENTS.find(a => a.id === output.agentId);
   const isTeam = useIsTeam();
   const brand = window.CI_BRAND;
@@ -207,19 +211,19 @@ function OutputCard({ output }) {
 
   const ClientFooter = (
     <div style={footerBase}>
-      Composed by <span style={{color:"var(--c-ink)"}}>{agent ? agent.name : "Specialist"}</span>
-      {brand && brand.bioVersion ? <> · BIO v{brand.bioVersion}</> : null}
-      {steward ? <> · certified by <span style={{color:"var(--c-ink)"}}>{steward.firstName}</span> · {steward.certifiedAt}</> : null}
+      {t("ui.composedBy")} <span style={{color:"var(--c-ink)"}}>{agent ? agent.name : t("ui.specialist")}</span>
+      {brand && brand.bioVersion ? <> · {t("ui.bioVersion", { version: brand.bioVersion })}</> : null}
+      {steward ? <> · {t("ui.certifiedBy")} <span style={{color:"var(--c-ink)"}}>{steward.firstName}</span> · {steward.certifiedAt}</> : null}
     </div>
   );
 
   const DebugFooter = (
     <div style={{...footerBase, color:"var(--c-dim)"}}>
-      Composed by <span style={{color:"var(--c-ink)"}}>{agent ? agent.name : "Specialist"}</span>
-      {modelLabel ? <> · routed via {modelLabel}</> : null}
-      {brand && brand.bioVersion ? <> · BIO v{brand.bioVersion}</> : null}
-      {steward ? <> · certified by <span style={{color:"var(--c-ink)"}}>{steward.firstName}</span> · {steward.certifiedAt}</> : null}
-      {shortRunId ? <> · run {shortRunId}</> : null}
+      {t("ui.composedBy")} <span style={{color:"var(--c-ink)"}}>{agent ? agent.name : t("ui.specialist")}</span>
+      {modelLabel ? <> · {t("ui.routedVia")} {modelLabel}</> : null}
+      {brand && brand.bioVersion ? <> · {t("ui.bioVersion", { version: brand.bioVersion })}</> : null}
+      {steward ? <> · {t("ui.certifiedBy")} <span style={{color:"var(--c-ink)"}}>{steward.firstName}</span> · {steward.certifiedAt}</> : null}
+      {shortRunId ? <> · {t("ui.run")} {shortRunId}</> : null}
     </div>
   );
 
@@ -253,7 +257,7 @@ function OutputCard({ output }) {
             transition:"opacity 140ms ease, transform 140ms ease",
             zIndex: 5,
           }}>
-            <div style={{fontSize:9.5, fontFamily:"var(--font-mono)", letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--c-faint)", marginBottom: 4}}>Debug attribution</div>
+            <div style={{fontSize:9.5, fontFamily:"var(--font-mono)", letterSpacing:"0.14em", textTransform:"uppercase", color:"var(--c-faint)", marginBottom: 4}}>{t("ui.debugAttribution")}</div>
             {DebugFooter}
           </div>
         </div>
@@ -264,19 +268,20 @@ function OutputCard({ output }) {
 
 /* Status pill for jobs / briefs */
 function StatusPill({ status }) {
+  const { t } = useLocale();
   const map = {
-    "draft":        { label:"Draft",          cls:"" },
-    "approved":     { label:"Approved",       cls:"pill--green" },
-    "in-production":{ label:"In production",  cls:"pill--yellow" },
-    "shipped":      { label:"Shipped",        cls:"pill--purple" },
-    "archived":     { label:"Archived",       cls:"" },
-    "unassigned":   { label:"Unassigned",     cls:"" },
-    "in-progress":  { label:"In progress",    cls:"pill--yellow" },
-    "review":       { label:"In review",      cls:"pill--purple" },
-    "delivered":    { label:"Delivered",      cls:"pill--green" },
-    "blocked":      { label:"Blocked",        cls:"pill--pink" },
-    "live":         { label:"Live",           cls:"pill--green" },
-    "soon":         { label:"Coming soon",    cls:"" },
+    "draft":        { label:t("ui.status.draft"),        cls:"" },
+    "approved":     { label:t("ui.status.approved"),     cls:"pill--green" },
+    "in-production":{ label:t("ui.status.inProduction"), cls:"pill--yellow" },
+    "shipped":      { label:t("ui.status.shipped"),      cls:"pill--purple" },
+    "archived":     { label:t("ui.status.archived"),     cls:"" },
+    "unassigned":   { label:t("ui.status.unassigned"),   cls:"" },
+    "in-progress":  { label:t("ui.status.inProgress"),   cls:"pill--yellow" },
+    "review":       { label:t("ui.status.review"),       cls:"pill--purple" },
+    "delivered":    { label:t("ui.status.delivered"),    cls:"pill--green" },
+    "blocked":      { label:t("ui.status.blocked"),      cls:"pill--pink" },
+    "live":         { label:t("ui.status.live"),         cls:"pill--green" },
+    "soon":         { label:t("ui.comingSoon"),          cls:"" },
   };
   const v = map[status] || { label: status, cls: "" };
   return <span className={"pill " + v.cls}>{v.label}</span>;
@@ -299,6 +304,7 @@ function Reveal({ children, delay = 0, as: As = "div", style }) {
 
 /* Drawer wrapper */
 function Drawer({ open, onClose, title, eyebrow, children, footer, width = 520 }) {
+  const { t } = useLocale();
   if (!open) return null;
   return (
     <>
@@ -312,7 +318,7 @@ function Drawer({ open, onClose, title, eyebrow, children, footer, width = 520 }
             {eyebrow && <span className="eyebrow">{eyebrow}</span>}
             <h3 style={{margin:0, fontSize:18}}>{title}</h3>
           </div>
-          <button className="btn btn--icon btn--ghost" onClick={onClose} aria-label="Close">
+          <button className="btn btn--icon btn--ghost" onClick={onClose} aria-label={t("ui.close")}>
             <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
           </button>
         </header>
@@ -495,6 +501,7 @@ function streamToHtml(s) {
 /* Brandolph's voice signature: a brief "reading…" beat, then the    */
 /* message arrives one line at a time (opacity + translateX stagger).*/
 function StreamedText({ html, stream = true, startDelay = 600, lineStep = 420, className }) {
+  const { t } = useLocale();
   const segs = useMemo(() => (stream ? splitSentences(html) : [html]), [html, stream]);
   const reduce = typeof window !== "undefined" && window.matchMedia
     && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -511,7 +518,7 @@ function StreamedText({ html, stream = true, startDelay = 600, lineStep = 420, c
     return (
       <span className="b-typing">
         <BrandolphDot state="thinking" />
-        <span className="b-typing__label">reading…</span>
+        <span className="b-typing__label">{t("ui.reading")}</span>
       </span>
     );
   }
@@ -531,6 +538,35 @@ function StreamedText({ html, stream = true, startDelay = 600, lineStep = 420, c
   );
 }
 
+/* Shared Brandolph message row used by conversational completion screens. */
+export function BrandolphLine({ html, who = "brandolph" }) {
+  const isBrandolph = who === "brandolph";
+  const user = window.CI_USER || {};
+  return (
+    <div style={{display:"flex", gap: 12, alignItems:"flex-start"}}>
+      {isBrandolph ? <BrandolphAvatar /> : (
+        <img
+          src={user.avatar}
+          alt=""
+          style={{width: 36, height: 36, borderRadius: "50%", objectFit:"cover"}}
+        />
+      )}
+      <div style={{flex: 1, minWidth: 0}}>
+        <div style={{display:"flex", alignItems:"center", gap:8, marginBottom: 4}}>
+          <span style={{fontWeight:500, fontSize:13, color:"var(--c-ink)"}}>
+            {isBrandolph ? "Brandolph" : (user.name || "You")}
+          </span>
+          {isBrandolph && <LayerTag layer="L1" />}
+          <span className="eyebrow" style={{marginLeft:"auto"}}>now</span>
+        </div>
+        <div className="b-voice" style={{fontSize: 14.5, lineHeight: 1.6, color:"var(--c-ink)"}}>
+          <StreamedText html={html} stream={isBrandolph} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* Pins — re-render on change; toggle favorite outputs / specialists. */
 function usePins() {
   const [, force] = useState(0);
@@ -543,10 +579,11 @@ function usePins() {
 }
 
 function PinButton({ kind, id, size = 15, style }) {
+  const { t } = useLocale();
   const pins = usePins();
   const on = pins.has(kind, id);
   return (
-    <button onClick={(e) => { e.stopPropagation(); pins.toggle(kind, id); }} title={on ? "Unpin" : "Pin"}
+    <button onClick={(e) => { e.stopPropagation(); pins.toggle(kind, id); }} title={on ? t("ui.unpin") : t("ui.pin")}
       aria-pressed={on}
       style={{ border:"none", background:"transparent", cursor:"pointer", padding:2, lineHeight:0,
         color: on ? "var(--yellow-600)" : "var(--c-faint)", ...style }}>
@@ -561,5 +598,5 @@ function PinButton({ kind, id, size = 15, style }) {
 Object.assign(window, {
   BrandolphDot, BrandolphAvatar, LayerTag, ModelChip, Credit, Confidence,
   AgentCard, OutputCard, StatusPill, Reveal, Drawer, Counter, SlaHeat,
-  PageHeader, Icon, useIsTeam, StreamedText, usePins, PinButton,
+  PageHeader, Icon, useIsTeam, StreamedText, BrandolphLine, usePins, PinButton,
 });

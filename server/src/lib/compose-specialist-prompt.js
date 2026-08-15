@@ -3,9 +3,16 @@
 // apis-and-agents-plan §2.2.
 //
 //   PLATFORM PREAMBLE    constant (cached)
-//   BRAND CONTEXT · BIO  sliced per spec.payload.bioSlices (cached)
+//   BRAND CONTEXT · BIO  tiered reader, sliced per spec.payload.bioSlices (cached)
 //   SPECIALIST SPEC      role + objective + method + refusals (not cached)
 //   TASK CONTEXT         the brief + any prior outputs (not cached)
+//
+// The BIO layer is produced by the shared tiered reader getBioForAgent
+// (bio-schema.js). It returns one or more content blocks that already
+// carry provenance-as-exceptions (low-confidence inline markers + a
+// "do not invent these gaps" line) and the brand-global refusals, so
+// every specialist reads the BIO with the same fidelity contract L1
+// Brandolph does. Its core block keeps cache_control:ephemeral.
 //
 // PLATFORM + BIO carry cache_control:ephemeral so Anthropic caches them
 // across an assembly run — the cost lever per apis-and-agents-plan §7
@@ -14,9 +21,13 @@
 // which is fine — non-Anthropic models don't honor it anyway.
 // ─────────────────────────────────────────────────────────────────────
 
+import { getBioForAgent } from "./bio-schema.js";
+
 const PLATFORM_PREAMBLE = `You are inside CaastorOS — a brand-methodology platform that lets a brand work like it has a senior CMO and a 33-person crew on call.
 
 You are a senior L2 specialist on a brand's crew. Brandolph (the L1 operator) routed this task to you specifically because of your role. Every output you produce is read against the Brand Intelligence Object (BIO) below. The BIO has been certified by a senior human (the Brand Steward) — never contradict it.
+
+Never invent brand attributes the BIO does not contain. The BIO carries its own provenance: a value flagged inferred or low-confidence is a hypothesis — use it, but never assert it as established fact. Where the BIO does not carry something the task needs, say so plainly and do not fabricate it. An invented tone, palette, or claim is the worst failure you can make on this crew.
 
 You write with conviction. You refuse anything that contradicts the BIO and explain the conflict instead of complying. You do not pad. You do not list-dump. You ship.
 
@@ -44,56 +55,6 @@ DO this instead:
 - One idea per paragraph. White space is part of the writing.
 
 If your draft contains any of the forbidden patterns above, rewrite it before returning.`;
-
-function renderBioSlice(brand, bio, slices, refusals) {
-  const include = Array.isArray(slices) && slices.length > 0
-    ? new Set(slices)
-    : new Set(["positioning", "voice", "audience"]);
-
-  const lines = [`## BRAND INTELLIGENCE OBJECT — ${brand?.name || "(brand)"} · BIO v${bio?.version ?? "?"}`];
-
-  // Identity is always included — every specialist needs the positioning anchor
-  if (bio?.identity?.positioning) lines.push(`POSITIONING: ${bio.identity.positioning}`);
-  if (bio?.identity?.category)    lines.push(`CATEGORY: ${bio.identity.category}`);
-  if (bio?.identity?.pillars?.length) lines.push(`PILLARS: ${bio.identity.pillars.join(" · ")}`);
-
-  if (include.has("audience") || include.has("positioning")) {
-    if (bio?.audience?.primary)    lines.push(`\nPRIMARY AUDIENCE: ${bio.audience.primary}`);
-    if (bio?.audience?.secondary)  lines.push(`SECONDARY: ${bio.audience.secondary}`);
-    if (bio?.audience?.jtbd?.length) lines.push(`JTBD: ${bio.audience.jtbd.map((j) => `"${j}"`).join(" | ")}`);
-  }
-
-  if (include.has("voice")) {
-    if (bio?.voice?.register)         lines.push(`\nVOICE REGISTER: ${bio.voice.register}`);
-    if (bio?.voice?.rhythm)           lines.push(`RHYTHM: ${bio.voice.rhythm}`);
-    if (bio?.voice?.signatures?.length) lines.push(`SIGNATURES: ${bio.voice.signatures.map((s) => `"${s}"`).join(" · ")}`);
-  }
-
-  if (include.has("forbidden") || include.has("voice")) {
-    if (bio?.voice?.forbidden?.length) lines.push(`\nFORBIDDEN WORDS (never use, no exceptions): ${bio.voice.forbidden.join(", ")}`);
-  }
-
-  if (include.has("palette") || include.has("type")) {
-    if (bio?.visual?.palette?.length) lines.push(`\nPALETTE: ${bio.visual.palette.map((p) => `${p.name || ""} ${p.hex || ""}`.trim()).join(", ")}`);
-    if (bio?.visual?.type?.length)    lines.push(`TYPE: ${bio.visual.type.map((t) => `${t.kind || ""}: ${t.family || ""}`).join(" · ")}`);
-    if (bio?.visual?.imagery?.length) lines.push(`IMAGERY: ${bio.visual.imagery.join(" · ")}`);
-    if (bio?.visual?.avoid?.length)   lines.push(`AVOID: ${bio.visual.avoid.join(" · ")}`);
-  }
-
-  if (bio?.goals?.northStar) lines.push(`\nNORTH STAR: ${bio.goals.northStar}`);
-
-  if (bio?.strategic?.watchouts?.length) {
-    lines.push(`\nSTRATEGIC WATCHOUTS`);
-    bio.strategic.watchouts.forEach((w) => lines.push(`- ${w}`));
-  }
-
-  if (Array.isArray(refusals) && refusals.length) {
-    lines.push(`\n## BRAND-GLOBAL REFUSALS (you must not violate)`);
-    refusals.forEach((r, i) => lines.push(`${i + 1}. ${r}`));
-  }
-
-  return lines.join("\n");
-}
 
 function renderSpecLayer(spec) {
   const p = spec?.payload || {};
@@ -127,19 +88,34 @@ function renderTaskLayer(brief, priorOutputs) {
 
 /**
  * @param {object} args
- * @param {object} args.spec        - DB row from `specs` (with .payload, .specialist_id, .version)
- * @param {object} args.brand       - { id, name, url, ... }
- * @param {object} args.bio         - BIO payload (identity, audience, voice, visual, goals, strategic) + version/score
- * @param {string[]} [args.refusals]
+ * @param {object} args.spec        - DB row from `specs` (with .payload, .specialist_id, .version).
+ *                                    spec.payload.bioSlices selects the per-department BIO slices.
+ * @param {object} [args.brand]     - { id, name, url, ... }. Accepted for caller compatibility;
+ *                                    the BIO layer now derives brand identity from the BIO itself
+ *                                    via the shared tiered reader.
+ * @param {object} args.bio         - normalized BIO payload (identity, audience, voice, visual,
+ *                                    goals, strategic) with provenance (confidence/missing).
+ * @param {string[]} [args.refusals] - brand-global refusals; forwarded to the reader.
  * @param {string} args.brief       - the task / brief text
  * @param {object[]} [args.priorOutputs]
  * @param {string} [args.deliverableContract] - optional output format specification
  * @returns content blocks array compatible with the router (Anthropic + OpenRouter)
  */
-export function composeSpecialistPrompt({ spec, brand, bio, refusals = [], brief, priorOutputs = [], deliverableContract = null }) {
+export function composeSpecialistPrompt({ spec, bio, refusals = [], brief, priorOutputs = [], deliverableContract = null }) {
+  // Tiered BIO read-contract: one or more content blocks carrying the
+  // sliced BIO + provenance-as-exceptions + brand-global refusals. The
+  // reader owns cache_control on its core block. deepFields is [] for now.
+  const { blocks: bioBlocks } = getBioForAgent({
+    bio,
+    audience: "specialist",
+    slices: spec?.payload?.bioSlices,
+    refusals,
+    deepFields: [],
+  });
+
   const blocks = [
     { type: "text", text: PLATFORM_PREAMBLE, cache_control: { type: "ephemeral" } },
-    { type: "text", text: renderBioSlice(brand, bio, spec?.payload?.bioSlices, refusals), cache_control: { type: "ephemeral" } },
+    ...bioBlocks,
     { type: "text", text: renderSpecLayer(spec) },
     { type: "text", text: renderTaskLayer(brief, priorOutputs) },
   ];

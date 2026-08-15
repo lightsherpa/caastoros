@@ -1,27 +1,27 @@
-/* Caastor Intelligence — mock data shared across all screens. */
-/* Loaded as a regular script so all globals attach to window.       */
+/* Neutral demo data for pre-auth and empty-state surfaces. Live workspace
+   data replaces these globals after authentication. */
 
 window.CI_BRAND = {
-  id: "vinilo",
-  name: "Vinilo",
-  tagline: "Specialty coffee for slow Tuesdays.",
-  website: "vinilo.coffee",
-  bioCompleteness: 91,
-  bioVersion: 7,                                      /* rev-2 §5.5 — surfaces on OutputCard footer */
-  bioLastUpdated: "Updated 14 May — 09:42",
+  id: "demo-brand",
+  name: "Your brand",
+  tagline: "Your positioning appears here after Discovery.",
+  website: "yourbrand.example",
+  bioCompleteness: 0,
+  bioVersion: 1,                                      /* rev-2 §5.5 — surfaces on OutputCard footer */
+  bioLastUpdated: "—",
   tier: "Tier 02 — The River 🌊",
   /* Brand Steward — the senior human who certified this brand's BIO.
      Per rev-2 §5.1: a Steward is a team_member with role 'steward'.
      This mock represents the certification record post-onboarding.
      The OutputCard footer reads `firstName + certifiedAt` (rev-2 §5.5). */
-  steward: { firstName: "Marina", fullName: "Marina Castellanos", role: "Senior designer · La Mesa", certifiedAt: "14 May" },
+  steward: { firstName: "Your steward", fullName: "Your steward", role: "Senior designer", certifiedAt: "—" },
 };
 
 window.CI_USER = {
-  name: "Marina Reyes",
+  name: "Demo user",
   role: "Founder",
-  email: "marina@vinilo.coffee",
-  avatar: "caastor/assets/profile-3.jpg",
+  email: "you@yourbrand.example",
+  avatar: "caastor/assets/profile-1.jpg",
 };
 
 window.CI_CREDITS = {
@@ -180,7 +180,7 @@ window.CI_PINS = {
 /* Brand workspaces — multi-brand is a higher-plan (Suite) feature. The
    first is the active/seeded one; the rest demonstrate the switcher. */
 window.CI_WORKSPACES = [
-  { id:"vinilo", name:"Vinilo",          initial:"V", bio:91, plan:"Tier 02 · The River 🌊", campaigns:9 },
+  { id:"demo-brand", name:"Your brand",          initial:"Y", bio:0,  plan:"Tier 02 · The River 🌊", campaigns:0 },
   { id:"lumen",  name:"Lúmen Studio",    initial:"L", bio:64, plan:"Tier 01 · The Dam 🦫",    campaigns:3 },
   { id:"otono",  name:"Otoño Skincare",  initial:"O", bio:78, plan:"Tier 02 · The River 🌊", campaigns:6 },
 ];
@@ -191,7 +191,7 @@ window.CI_WORKSPACES = [
    patterns the QA output already checks. */
 window.CI_BRAND_REFUSALS = [
   "Never use the words “unlock”, “limited”, or “exclusive” — they cheapen the brand.",
-  "Respect the 11.4× annual pricing formula; never invent a discount.",
+  "Respect the published price; never invent a discount.",
   "Reference provenance (origin, grower) only where the BIO marks it mandatory — once, never as decoration.",
   "Refuse anything that contradicts the BIO; flag the conflict instead of complying.",
   "Keep voice-drift ≤ 0.20 against the brand voice — no hype, no manufactured urgency.",
@@ -275,7 +275,7 @@ window.CI_SPECIALIST_SPECS = {
   /* ── Strategy ─────────────────────────────────────────────── */
   a34: {
     role: "an audience profiler who reads a brand's people like a senior CMO would describe them — not as a CRM segment",
-    objective: "Produce a deep, opinionated read of the primary audience (and any specifically named secondary) — what they believe, what they're tired of, what they'd pay 11.4× more for.",
+    objective: "Produce a deep, opinionated read of the primary audience (and any specifically named secondary) — what they believe, what they're tired of, and what they'd pay a premium for.",
     method: ["Read the BIO audience + JTBD + voice fields", "Name the unspoken belief that makes them the AUDIENCE, not a market", "Surface the wedge — what competitors mis-read about them", "Translate that into 1-2 lines a specialist crew can actually write to"],
     outputContract: "≤ 220 words. Two named segments max, each with: belief · tension · what to never say · what they'd quote back.",
     voice: "Conviction over hedging. A senior who'd rather be wrong with reason than safe with caveats.",
@@ -492,24 +492,24 @@ window.CI_BRIEFS = [
     strategy: "Reframe price as cost-of-pause. The objection isn't dollars; it's the implicit promise to commit to a slower Tuesday.",
     tone: "Calm conviction. No urgency manipulation. A little funny, never cute.",
     direction: "Pricing page lead with editorial pull quote. Email sequence three-part. Subjects under 40 chars.",
-    mandatories: "Mention provenance once (Honduras). Avoid 'unlock' / 'limited'. Lead with annual option.",
+    mandatories: "Mention provenance once (Collection). Avoid 'unlock' / 'limited'. Lead with annual option.",
     deliverables: ["Pricing page hero (web)","Email 1: announce","Email 2: case for annual","Email 3: last call","Subjects ×6","Brand consistency QA"],
     metrics: "Annual conversion %, time-on-page, sequence open + click, churn delta.",
     notDoing: "Not 'limited-time' urgency. Not a discount. Not a referral push. Not bundling with the brewing kit.",
-    watchouts: ["Annual price ≠ 12× monthly. Apply the 11.4× formula consistently.","Trial-ending cohort opens twice as much; don't waste subject line position 1 on subscribers."],
+    watchouts: ["Use the published annual price consistently.","Trial-ending cohort opens twice as much; don't waste subject line position 1 on subscribers."],
     assumptions: ["Klaviyo flow is the channel. No paid social spend this push.","Wholesale audience receives sequence variant B only."],
     status: "in-production",
     credits: 37,
     agents: ["a02","a03","a12","a13","a14","a18","a24"],
     clarifications: [
-      { q:"Annual at 11.4× monthly, or 10×?", why:"At 10× you compete with your own monthly. At 11.4× you're offering 1-in-12 free — that reads as a decision, not a discount." },
+      { q:"Annual as one month free, or a flat discount?", why:"A flat discount competes with your monthly plan. One month free reads as a decision, not a markdown." },
       { q:"Is the wholesale audience in or out of this push?", why:"They convert on email differently. In → I route sequence variant B. Out → we don't spend a Sonnet pass on copy that won't land." },
     ],
     createdAt: "Mon · 14 May",
   },
   {
-    id: "b-honduras-microlot",
-    title: "Honduras single-origin launch",
+    id: "b-collection-microlot",
+    title: "New collection launch",
     type: "Story",
     smp: "Sometimes a coffee deserves to be named after the person who grew it.",
     background: "Quarterly microlot launch. Producer relationship is the story, not the tasting notes.",
@@ -615,7 +615,7 @@ window.CI_OUTPUTS = [
   {
     id:"o4", briefId:"b-pricing-relaunch", kind:"qa",
     type:"BRAND CONSISTENCY QA", agentId:"a24", status:"approved",
-    body:"Pass. No use of 'unlock' or 'limited'. Annual price respects 11.4× formula. Provenance (Honduras) referenced once in Email 1 paragraph 3, in line with mandatory. Voice drift index 0.14 (target ≤0.20).",
+    body:"Pass. No use of 'unlock' or 'limited'. Annual price matches the approved rate. Provenance is referenced once in Email 1 paragraph 3, in line with the mandatory. Voice drift index 0.14 (target ≤0.20).",
     meta:"1 page · QA gate green"
   },
   {
@@ -626,22 +626,22 @@ window.CI_OUTPUTS = [
     rationale:"No price on the visual — the BIO keeps price in copy, not image. Chose Tuesday-morning kitchen light over studio product shots so the frame says “ritual” not “sale”, matching the cost-of-pause strategy."
   },
 
-  /* ── Honduras single-origin ── */
+  /* ── New collection ── */
   {
-    id:"o5", briefId:"b-honduras-microlot", kind:"longform",
+    id:"o5", briefId:"b-collection-microlot", kind:"longform",
     type:"LONG-FORM · ESSAY OPENER", agentId:"a15", status:"review",
     body:"Don José grew this. He has 1.4 hectares and the inheritance of a name that, in his town, you don't introduce because everyone knows it already. We don't need to tell you the elevation or the variety. We need to tell you that the coffee is named after the person, and that's where you'll start.",
     meta:"1,840 words · editorial register",
     rationale:"Started on the grower's name, not the elevation or varietal — the BIO marks provenance as mandatory but warns against decoration, so the essay leads with the person and earns the spec details later instead of front-loading them."
   },
   {
-    id:"o7", briefId:"b-honduras-microlot", kind:"image",
+    id:"o7", briefId:"b-collection-microlot", kind:"image",
     type:"BAG LABEL · FRONT", agentId:"a20", status:"draft",
     body:"Hand-set serial number, Don José's signature reproduced under the lot code. Kraft stock, single-colour amber. The label is the provenance — nothing decorative.",
     meta:"label dieline · print-ready"
   },
   {
-    id:"o8", briefId:"b-honduras-microlot", kind:"social",
+    id:"o8", briefId:"b-collection-microlot", kind:"social",
     type:"INSTAGRAM · CAROUSEL ×4", agentId:"a14", status:"draft",
     body:"Slide 1: the name. Slide 2: the hectares. Slide 3: the cup. Slide 4: where to get it. No 'link in bio' energy — it reads like a short letter.",
     meta:"4 frames · caption + alt text"
@@ -683,13 +683,13 @@ window.CI_OUTPUTS = [
   {
     id:"o14", briefId:"b-investor-deck", kind:"image",
     type:"MARKET MAP · DIAGRAM", agentId:"a18", status:"review",
-    body:"2×2 with 'commodity ↔ provenance' on x and 'transactional ↔ ritual' on y. Competitors clustered bottom-left; Vinilo alone top-right. Clean, no gradient soup.",
+    body:"2×2 with 'commodity ↔ provenance' on x and 'transactional ↔ ritual' on y. Competitors clustered bottom-left; Your brand alone top-right. Clean, no gradient soup.",
     meta:"vector · light + dark variants"
   },
 
   /* ── Client uploads (reference material the brand brought in) ── */
   {
-    id:"u1", briefId:"b-honduras-microlot", kind:"upload", source:"upload",
+    id:"u1", briefId:"b-collection-microlot", kind:"upload", source:"upload",
     type:"UPLOAD · FARM PHOTOS", agentId:null, status:"draft",
     body:"12 photos from Don José's farm — harvest, drying beds, the signature on the lot ledger. Source material for the bag label and the essay.",
     meta:"12 images · 48 MB · client upload"
@@ -697,7 +697,7 @@ window.CI_OUTPUTS = [
   {
     id:"u2", briefId:"b-pricing-relaunch", kind:"upload", source:"upload",
     type:"UPLOAD · BRAND GUIDELINES", agentId:null, status:"draft",
-    body:"Vinilo brand book v2 (PDF). Type, colour, the 11.4× pricing formula, the forbidden-words list Brandolph QAs against.",
+    body:"Your brand book v2 (PDF). Type, colour, approved pricing, and the forbidden-words list Brandolph QAs against.",
     meta:"PDF · 18 pp · client upload"
   },
 ];
@@ -712,14 +712,14 @@ window.CI_BRANDOLPH_OPENERS = {
 
 /* Discovery — extraction signals (used in /discovery results) ----- */
 window.CI_DISCOVERY = {
-  brand: "Vinilo Coffee",
-  url:   "vinilo.coffee",
+  brand: "Your brand",
+  url:   "yourbrand.example",
   confidence: 91,
   duration: "38.4s",
   signals: 94,
   flags: 1,
   identity: [
-    { key:"Brand name",    val:"Vinilo Coffee",                       conf:99 },
+    { key:"Brand name",    val:"Your brand",                       conf:99 },
     { key:"One-liner",     val:"Specialty coffee for slow Tuesdays.", conf:88 },
     { key:"Origin year",   val:"2021",                                conf:94 },
     { key:"Headquarters",  val:"Barcelona, Spain",                    conf:96 },
@@ -752,9 +752,9 @@ window.CI_DISCOVERY = {
 
 /* Team queue (jobs) ----------------------------------------------- */
 window.CI_JOBS = [
-  { id:"j-9f2a1c", client:"Vinilo Coffee",   type:"Hero KV finish",      cr:220, submitted:"2h ago",  sla:"48h",     status:"unassigned", assignee:null },
-  { id:"j-d4e8b7", client:"Vinilo Coffee",   type:"Email build polish",  cr:120, submitted:"5h ago",  sla:"32h",     status:"in-progress", assignee:"Aitana V." },
-  { id:"j-3b6c2a", client:"Vinilo Coffee",   type:"Pricing page review", cr:80,  submitted:"yesterday", sla:"18h overdue", status:"review",  assignee:"Marc P." },
+  { id:"j-9f2a1c", client:"Your brand",   type:"Hero KV finish",      cr:220, submitted:"2h ago",  sla:"48h",     status:"unassigned", assignee:null },
+  { id:"j-d4e8b7", client:"Your brand",   type:"Email build polish",  cr:120, submitted:"5h ago",  sla:"32h",     status:"in-progress", assignee:"Aitana V." },
+  { id:"j-3b6c2a", client:"Your brand",   type:"Pricing page review", cr:80,  submitted:"yesterday", sla:"18h overdue", status:"review",  assignee:"Marc P." },
   { id:"j-77a9d1", client:"Plaza Hortelana", type:"Identity finalisation",cr:550,submitted:"3d ago", sla:"8h",      status:"delivered",  assignee:"Aitana V." },
   { id:"j-22e6f5", client:"Plaza Hortelana", type:"Deck polish",         cr:300, submitted:"4d ago", sla:"24h",      status:"in-progress", assignee:"Diego M." },
   { id:"j-55c0a3", client:"Bandera",         type:"Minor polish",        cr:80,  submitted:"1h ago", sla:"40h",      status:"unassigned",  assignee:null },
@@ -795,10 +795,10 @@ window.CI_LEDGER = [
   { date:"14 May · 11:42", desc:"Pricing relaunch — Email sequence",  who:"Email Sequence · L2-13",  cr:-12, layer:"L2" },
   { date:"14 May · 11:42", desc:"Pricing relaunch — Subject lines",   who:"Subject Lines · L2-14",   cr:-2,  layer:"L2" },
   { date:"14 May · 11:43", desc:"Pricing relaunch — Brand QA",        who:"Brand Consistency QA · L2-24", cr:-2,  layer:"L2" },
-  { date:"13 May · 17:08", desc:"Hero KV finish — Vinilo",            who:"Aitana V. · Senior designer", cr:-220, layer:"L3" },
-  { date:"12 May · 09:31", desc:"Discovery compile — Vinilo",         who:"BIO Compiler · L2-30",    cr:-10, layer:"L2" },
+  { date:"13 May · 17:08", desc:"Hero KV finish — Your brand",            who:"Aitana V. · Senior designer", cr:-220, layer:"L3" },
+  { date:"12 May · 09:31", desc:"Discovery compile — Your brand",         who:"BIO Compiler · L2-30",    cr:-10, layer:"L2" },
   { date:"11 May · 14:55", desc:"Brandolph turn — assembly proposal", who:"Brandolph",   cr:-3,  layer:"L1" },
   { date:"08 May · 10:12", desc:"Investor deck — Build",              who:"Deck Build · L2-27",       cr:-12, layer:"L2" },
-  { date:"06 May · 16:40", desc:"Honduras essay — Long-form",         who:"Long-form Editor · L2-15",cr:-14, layer:"L2" },
+  { date:"06 May · 16:40", desc:"Collection essay — Long-form",         who:"Long-form Editor · L2-15",cr:-14, layer:"L2" },
   { date:"05 May · 09:00", desc:"Cycle credit refresh",                who:"—",          cr:900, layer:"—" },
 ];

@@ -1,6 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
+/* i18n boot — set <html lang/dir> from the resolved locale BEFORE first
+   paint so RTL/lang-dependent CSS is correct on the very first render.
+   Locale is resolved from localStorage → browser → "en" inside the lib. */
+import { initI18n } from "./lib/i18n.js";
+initI18n();
+
 /* Load order matters: data + primitives populate `window` before the
    screens and shell read them at module-eval time. */
 import "./portal-data.js";        // window.CI_* mock data

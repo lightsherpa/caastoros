@@ -13,6 +13,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
+import { loadBioForRun } from "../lib/load-brand-bio.js";
 import { notify, notifyTeamRole } from "../lib/notify.js";
 
 const app = new Hono();
@@ -56,6 +57,17 @@ app.post("/", requireAuth, async (c) => {
   const { output, error } = await loadOutput(outputId);
   if (error || !output) return c.json({ error: "Output not found" }, 404);
   if (output.brief?.brand?.workspace_id !== workspaceId) return c.json({ error: "Forbidden" }, 403);
+
+  // Production gate: human craft, like specialist runs, requires the brand's
+  // BIO to have reached the certification state enforced by loadBioForRun.
+  try {
+    await loadBioForRun({ workspaceId, brandId: output.brief?.brand_id });
+  } catch (err) {
+    if (err.code === "BIO_NOT_CERTIFIED" || err.code === "NO_BIO") {
+      return c.json({ error: "This brand's BIO must be certified by a Brand Steward before human craft.", code: err.code }, 409);
+    }
+    return c.json({ error: err.message || String(err) }, 400);
+  }
 
   const requestKey = `craft:${outputId}:${Number(slot)}`;
   const { data: result, error: requestErr } = await supabaseAdmin.rpc("request_craft_atomic", {

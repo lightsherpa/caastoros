@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from "./lib/supabase-browser.js";
+import { setLocale } from "./lib/i18n.js";
 
 const { Icon, BrandolphAvatar } = window;
 /* Real Supabase auth (P0-004) — replaces the prior localStorage mock.
@@ -61,10 +62,13 @@ async function resolveProfile(authUser) {
   if (!authUser) return null;
   const { data, error } = await supabase
     .from("users")
-    .select("id, workspace_id, email, role")
+    .select("id, workspace_id, email, role, locale")
     .eq("id", authUser.id)
     .maybeSingle();
   if (error) console.warn("[auth] users row lookup failed:", error.message);
+  // Apply the user's saved platform language across every surface. setLocale
+  // guards absent/invalid values, so a null column is a harmless no-op.
+  if (data?.locale) setLocale(data.locale);
   return {
     id: authUser.id,
     email: authUser.email,
@@ -308,7 +312,7 @@ function Login({ role = "client", go, initialMode = "signin" }) {
         <div className="auth-story__copy">
           <div className="auth-story__eyebrow">CaastorOS</div>
           <h2 className="auth-story__head">Your brand,<br />made certifiable.</h2>
-          <p className="auth-story__sub">Brandolph reads your brand into a living BIO, assembles the crew, and lands the work on a canvas — every output certified by a senior human.</p>
+          <p className="auth-story__sub">Brandolph reads your brand into a living, human-certified BIO, assembles the crew, and lands the work on a canvas — with optional human finishing when the work needs it.</p>
           <div className="auth-story__dots"><span className="is-active" /><span /><span /><span /></div>
         </div>
       </aside>

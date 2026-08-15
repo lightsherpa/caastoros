@@ -15,9 +15,8 @@ const app = new Hono();
    SSE events: token | done (normalized usage) | error
 
    The brand + BIO now come from Supabase (loadBrandBio). If the
-   user's brand has no BIO yet, the loader falls back to the Vinilo
-   seed so the endpoint still works pre-P1 Discovery. Once P1.5
-   Steward lands, set requireCertified=true here.                       */
+   user's brand has no BIO yet, the loader fails closed rather than using a
+   fixture. Read-only Brandolph requests use the latest real BIO.       */
 app.post("/ask", requireAuth, async (c) => {
   const route = BRANDOLPH_SYNTHETIC_SPEC.payload.modelRouting.primary;
   if (!isRouteAvailable(route)) {
@@ -34,12 +33,15 @@ app.post("/ask", requireAuth, async (c) => {
   const routeId = typeof body?.routeId === "string" ? body.routeId : null;
   const brandId = typeof body?.brandId === "string" ? body.brandId : null;
 
+  /* Read-only Brandolph Q&A is allowed before certification — it just needs
+     a BIO to read (latest version, certified or not). It never falls back to
+     the fictional seed; a brand with no BIO gets a clear NO_BIO. */
   let brandBio;
   try {
-    brandBio = await loadBrandBio({ workspaceId, brandId, requireCertified: false });
+    brandBio = await loadBrandBio({ workspaceId, brandId });
   } catch (err) {
-    if (err.code === "BIO_NOT_CERTIFIED") {
-      return c.json({ error: "Your BIO is awaiting Brand Steward certification.", code: err.code }, 409);
+    if (err.code === "NO_BIO") {
+      return c.json({ error: "This brand has no BIO yet — run Discovery to create one.", code: err.code }, 409);
     }
     return c.json({ error: err.message || String(err) }, 400);
   }

@@ -1,6 +1,7 @@
 import React from "react";
 import { supabase, apiFetch } from "./lib/supabase-browser.js";
-const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory } = window;
+import { useLocale, t, fmtNumber, applyOverrides } from "./lib/i18n.js";
+const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory, AdminLanguages } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
 
@@ -25,30 +26,36 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
    workspace state, not a destination. Route id `craft` keeps its old id
    so route guard + TopBar.titles don't break; label flips to "Humans".
    The id rename is a follow-up cleanup PR. */
+/* Route labels/sections are i18n KEYS (labelKey/sectionKey), resolved with
+   t() at render time — never localized literals, so switching locale
+   re-labels the nav without touching routing (which keys off `id`).
+   sectionKey doubles as the grouping key: adjacent routes sharing a
+   sectionKey render under one section header. */
 const CLIENT_ROUTES = [
-  { id:"home",        label:"Create",      icon:"sparkles", section:"Create / Briefs" },
-  { id:"briefs",      label:"Briefs",      icon:"brief",    section:"Create / Briefs" },
-  { id:"bio",         label:"BIO",         icon:"bio",      section:"BIO / Library" },
-  { id:"library",     label:"Library",     icon:"files",    section:"BIO / Library" },
-  { id:"specialists", label:"Specialists", icon:"team",     section:"Specialists / Humans" },
-  { id:"craft",       label:"Humans",      icon:"craft",    section:"Specialists / Humans" },
-  { id:"credits",     label:"Credits",     icon:"credit",   section:"Credits / Account" },
-  { id:"settings",    label:"Account",     icon:"settings", section:"Credits / Account" },
+  { id:"home",        labelKey:"nav.create",      icon:"sparkles", sectionKey:"section.createBriefs" },
+  { id:"briefs",      labelKey:"nav.briefs",      icon:"brief",    sectionKey:"section.createBriefs" },
+  { id:"bio",         labelKey:"nav.bio",         icon:"bio",      sectionKey:"section.bioLibrary" },
+  { id:"library",     labelKey:"nav.library",     icon:"files",    sectionKey:"section.bioLibrary" },
+  { id:"specialists", labelKey:"nav.specialists", icon:"team",     sectionKey:"section.specialistsHumans" },
+  { id:"craft",       labelKey:"nav.humans",      icon:"craft",    sectionKey:"section.specialistsHumans" },
+  { id:"credits",     labelKey:"nav.credits",     icon:"credit",   sectionKey:"section.creditsAccount" },
+  { id:"settings",    labelKey:"nav.account",     icon:"settings", sectionKey:"section.creditsAccount" },
 ];
 
 const TEAM_ROUTES = [
-  { id:"team",          label:"Job queue",     icon:"brief", section:"Team" },
-  { id:"team-craft",    label:"Craft polish",  icon:"brief", section:"Team" },
-  { id:"team-capacity", label:"Capacity",      icon:"timer", section:"Team" },
-  { id:"team-clients",  label:"Clients",       icon:"team",  section:"Team" },
-  { id:"team-me",       label:"My earnings",   icon:"credit", section:"Team" },
+  { id:"team",          labelKey:"team.jobQueue",    icon:"brief",  sectionKey:"section.team" },
+  { id:"team-craft",    labelKey:"team.craftPolish", icon:"brief",  sectionKey:"section.team" },
+  { id:"team-capacity", labelKey:"team.capacity",    icon:"timer",  sectionKey:"section.team" },
+  { id:"team-clients",  labelKey:"team.clients",     icon:"team",   sectionKey:"section.team" },
+  { id:"team-me",       labelKey:"team.myEarnings",  icon:"credit", sectionKey:"section.team" },
 ];
 
 /* Admin-only routes appended below the client nav for users with
    role:'admin'. Keeps the admin's client view intact; adds tools. */
 const ADMIN_ROUTES = [
-  { id:"admin-specs",     label:"Specs",            icon:"settings", section:"Admin" },
-  { id:"admin-brandolph", label:"Brandolph memory", icon:"sparkles", section:"Admin" },
+  { id:"admin-specs",     labelKey:"admin.specs",           icon:"settings", sectionKey:"section.admin" },
+  { id:"admin-languages", labelKey:"admin.languages",       icon:"settings", sectionKey:"section.admin" },
+  { id:"admin-brandolph", labelKey:"admin.brandolphMemory", icon:"sparkles", sectionKey:"section.admin" },
 ];
 
 /* useTweaks-style hook (copied to keep app self-contained from the panel) */
@@ -205,6 +212,7 @@ function useLiveCredits() {
 }
 
 function WorkspaceSwitcher() {
+  const { t } = useLocale();
   const { brands, loading } = useBrandList();
   const tier = useWorkspaceTier();
   const currentId = useCurrentBrandId();
@@ -238,7 +246,7 @@ function WorkspaceSwitcher() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox" aria-expanded={open}>
         <span className="ws-switcher__chip" aria-hidden="true">{initial}</span>
-        <span className="ws-switcher__name">{current.name || "Workspace"}</span>
+        <span className="ws-switcher__name">{current.name || t("ws.workspace")}</span>
         <span className="ws-switcher__chev" aria-hidden="true"><Icon name="chev" size={12} /></span>
       </button>
       {open && (
@@ -264,7 +272,7 @@ function WorkspaceSwitcher() {
             <span className="ws-switcher__chip ws-switcher__chip--sm"
               style={{background:"transparent", color:"var(--c-dim)", boxShadow:"inset 0 0 0 1px var(--c-line)"}}
               aria-hidden="true">+</span>
-            <span className="ws-switcher__name" style={{color:"var(--c-dim)"}}>Add brand</span>
+            <span className="ws-switcher__name" style={{color:"var(--c-dim)"}}>{t("ws.addBrand")}</span>
           </button>
         </div>
       )}
@@ -285,6 +293,7 @@ function Brandmark() {
 
 /* Sidebar --------------------------------------------------------- */
 function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bioScore }) {
+  const { t } = useLocale();
   const routes = portal === "team" ? TEAM_ROUTES : CLIENT_ROUTES;
   const isClient = portal === "client";
   const credits = useLiveCredits();
@@ -307,9 +316,9 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
               }}>V</div>
               <div style={{flex:1, minWidth: 0}}>
                 <div style={{fontSize:13, fontWeight: 500, color:"var(--c-ink)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{brandName}</div>
-                <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>BIO {bioScore}%</div>
+                <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", letterSpacing:"0.04em"}}>{t("sidebar.bioScore", { score: bioScore })}</div>
               </div>
-              <button className="btn btn--icon btn--ghost" aria-label="Switch brand" style={{height:26, width:26}}>
+              <button className="btn btn--icon btn--ghost" aria-label={t("a11y.switchBrand")} style={{height:26, width:26}}>
                 <Icon name="chev" size={14} />
               </button>
             </div>
@@ -320,7 +329,7 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
               <img src="caastor/assets/profile-1.jpg" alt="" style={{width:30, height:30, borderRadius:"50%", objectFit:"cover"}} />
               <div style={{flex:1, minWidth: 0}}>
                 <div style={{fontSize:13, fontWeight: 500, color:"var(--c-ink)"}}>Aitana Vives</div>
-                <div className="eyebrow">Senior designer</div>
+                <div className="eyebrow">{t("sidebar.seniorDesigner")}</div>
               </div>
             </div>
           </div>
@@ -331,7 +340,7 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
       <div className="scroll" style={{flex:1, overflowY:"auto", padding:"12px 12px"}}>
         <div style={{display:"flex", flexDirection:"column", gap: 1}}>
           {routes.map((r, i) => {
-            const showSection = i === 0 || r.section !== routes[i - 1].section;
+            const showSection = i === 0 || r.sectionKey !== routes[i - 1].sectionKey;
             const active = currentRoute === r.id
               || (r.id === "briefs" && currentRoute === "brief-detail")
               || (r.id === "bio" && currentRoute === "discovery")
@@ -341,14 +350,14 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
               <React.Fragment key={r.id}>
                 {showSection && (
                   <div className="eyebrow" style={{padding: i === 0 ? "4px 12px 8px" : "16px 12px 8px"}}>
-                    {r.section}
+                    {t(r.sectionKey)}
                   </div>
                 )}
                 <button onClick={() => onNav(r.id)}
                   className={"navitem" + (active ? " navitem--active" : "")}
                   style={{border:"none", background: undefined, textAlign:"left", width:"100%"}}>
                   <Icon name={r.icon} size={16} />
-                  <span>{r.label}</span>
+                  <span>{t(r.labelKey)}</span>
                   {r.id === "bio" && currentRoute !== "discovery" && bioScore < 70 && <BrandolphDot />}
                 </button>
               </React.Fragment>
@@ -358,14 +367,14 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
 
         {isClient && (
           <>
-            <div className="eyebrow" style={{padding:"18px 12px 8px"}}>Brandolph</div>
+            <div className="eyebrow" style={{padding:"18px 12px 8px"}}>{t("common.brandolph")}</div>
             <div className="card" style={{background:"var(--c-bg)", boxShadow:"none", padding:"10px 12px"}}>
               <div style={{display:"flex", alignItems:"center", gap: 8, marginBottom: 6}}>
                 <BrandolphDot />
-                <span className="eyebrow eyebrow--yellow">Active</span>
+                <span className="eyebrow eyebrow--yellow">{t("sidebar.active")}</span>
               </div>
               <div style={{fontSize: 12, color:"var(--c-dim)", lineHeight: 1.4}}>
-                Reading your BIO. Watching the pricing relaunch through review.
+                {t("sidebar.brandolphReading")}
               </div>
             </div>
           </>
@@ -376,9 +385,9 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
       {isClient ? (
         <div style={{padding:"12px 16px", borderTop:"1px solid var(--c-line)"}}>
           <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom: 6}}>
-            <span className="eyebrow">Credits</span>
+            <span className="eyebrow">{t("nav.credits")}</span>
             <span style={{fontFamily:"var(--font-mono)", fontSize:12, color:"var(--c-dim)"}}>
-              <strong style={{color:"var(--c-ink)"}}>{credits.balance}</strong> / {credits.monthly > 0 ? credits.monthly : "∞"}
+              <strong style={{color:"var(--c-ink)"}}>{fmtNumber(credits.balance)}</strong> / {credits.monthly > 0 ? fmtNumber(credits.monthly) : "∞"}
             </span>
           </div>
           <div style={{height:6, background:"var(--c-line)", borderRadius: 999, overflow:"hidden"}}>
@@ -388,19 +397,19 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
             }} />
           </div>
           <button className="btn btn--link" style={{marginTop: 8, fontSize:12}} onClick={() => onNav("credits")}>
-            View ledger →
+            {t("sidebar.viewLedger")}
           </button>
         </div>
       ) : (
         <div style={{padding:"12px 16px", borderTop:"1px solid var(--c-line)"}}>
-          <div className="eyebrow" style={{marginBottom:6}}>This week</div>
+          <div className="eyebrow" style={{marginBottom:6}}>{t("sidebar.thisWeek")}</div>
           <div style={{display:"flex", justifyContent:"space-between", fontSize:13}}>
-            <span style={{color:"var(--c-dim)"}}>Jobs delivered</span>
-            <strong style={{fontFamily:"var(--font-mono)"}}>14</strong>
+            <span style={{color:"var(--c-dim)"}}>{t("sidebar.jobsDelivered")}</span>
+            <strong style={{fontFamily:"var(--font-mono)"}}>{fmtNumber(14)}</strong>
           </div>
           <div style={{display:"flex", justifyContent:"space-between", fontSize:13, marginTop: 4}}>
-            <span style={{color:"var(--c-dim)"}}>Credits earned</span>
-            <strong style={{fontFamily:"var(--font-mono)", color:"var(--green-600)"}}>+1,847</strong>
+            <span style={{color:"var(--c-dim)"}}>{t("sidebar.creditsEarned")}</span>
+            <strong style={{fontFamily:"var(--font-mono)", color:"var(--green-600)"}}>+{fmtNumber(1847)}</strong>
           </div>
         </div>
       )}
@@ -416,7 +425,7 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
           display:"flex", alignItems:"center", justifyContent:"space-between",
         }}
       >
-        Log out
+        {t("common.logOut")}
         <Icon name="arrow" size={14} />
       </button>
     </nav>
@@ -473,15 +482,21 @@ function useNotifications() {
   return { items, unread, markAll, markRead };
 }
 
+/* Relative "time ago" — the unit word/order is localized (EN "5m ago",
+   ES "hace 5 min", AR "قبل ٥ د"); numerals go through fmtNumber so Arabic
+   shows Arabic-Indic digits. Reads the active locale via module-level t();
+   NotificationBell (its only caller) subscribes via useLocale, so a locale
+   switch re-renders it and these strings re-translate. */
 function notifTimeAgo(iso) {
   const s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return s + "s ago";
-  const m = Math.floor(s / 60); if (m < 60) return m + "m ago";
-  const h = Math.floor(m / 60); if (h < 24) return h + "h ago";
-  return Math.floor(h / 24) + "d ago";
+  if (s < 60) return t("notif.ago.seconds", { count: fmtNumber(s) });
+  const m = Math.floor(s / 60); if (m < 60) return t("notif.ago.minutes", { count: fmtNumber(m) });
+  const h = Math.floor(m / 60); if (h < 24) return t("notif.ago.hours", { count: fmtNumber(h) });
+  return t("notif.ago.days", { count: fmtNumber(Math.floor(h / 24)) });
 }
 
 function NotificationBell() {
+  const { t } = useLocale();
   const { items, unread, markAll, markRead } = useNotifications();
   const [open, setOpen] = useShellState(false);
   const openItem = (n) => {
@@ -492,7 +507,7 @@ function NotificationBell() {
   return (
     <div style={{position:"relative"}}>
       <button onClick={() => setOpen((o) => !o)}
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-label={unread > 0 ? t("notif.ariaUnread", { count: unread }) : t("notif.title")}
         aria-haspopup="dialog" aria-expanded={open}
         style={{position:"relative", width:32, height:32, borderRadius:9, border:"1px solid var(--c-line)",
           background:"var(--c-card)", cursor:"pointer", display:"inline-flex", alignItems:"center", justifyContent:"center", color:"var(--c-ink)"}}>
@@ -513,11 +528,11 @@ function NotificationBell() {
           <div style={{position:"absolute", right:0, top:40, width:340, maxHeight:420, overflowY:"auto", zIndex:41,
             background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:12, boxShadow:"var(--shadow-lg)"}}>
             <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:"1px solid var(--c-line)"}}>
-              <strong style={{fontSize:13}}>Notifications</strong>
-              {unread > 0 && <button onClick={markAll} className="btn btn--link" style={{fontSize:12}}>Mark all read</button>}
+              <strong style={{fontSize:13}}>{t("notif.title")}</strong>
+              {unread > 0 && <button onClick={markAll} className="btn btn--link" style={{fontSize:12}}>{t("notif.markAllRead")}</button>}
             </div>
             {items.length === 0 ? (
-              <div style={{padding:"28px 14px", textAlign:"center", color:"var(--c-faint)", fontSize:13}}>You're all caught up.</div>
+              <div style={{padding:"28px 14px", textAlign:"center", color:"var(--c-faint)", fontSize:13}}>{t("notif.empty")}</div>
             ) : items.map((n) => (
               <button key={n.id} onClick={() => openItem(n)}
                 style={{display:"block", width:"100%", textAlign:"left", border:"none", cursor:"pointer",
@@ -541,32 +556,38 @@ function NotificationBell() {
 }
 
 function TopBar({ portal, route, brandName, go }) {
+  const { t } = useLocale();
   const isClient = portal === "client";
   /* TopBar titles — eyebrows now match the rev-2 §2 section structure
-     (slash-joined section eyebrows that ARE the contents). */
+     (slash-joined section eyebrows that ARE the contents). Built from
+     i18n keys at render time via t(); the specialists title interpolates
+     a live count. Keys reuse the nav, section, team and admin namespaces
+     where wording is identical, plus a title namespace for TopBar-only
+     labels. */
   const titles = {
-    home:        ["Create",            "Create / Briefs"],
-    discovery:   ["Discovery",         "BIO / Library"],
-    bio:         ["BIO",               "BIO / Library"],
-    briefs:      ["Briefs",            "Create / Briefs"],
-    library:     ["Library",           "BIO / Library"],
-    "brief-detail":["Brief",           "Create / Briefs"],
-    board:       ["Brief",             "Create / Briefs"],
-    specialists: ["Specialists · 33 on shift", "Specialists / Humans"],
-    "specialist-new": ["New specialist", "Specialists / Humans"],
-    canvas:      ["Canvas",            "Create / Briefs"],
-    craft:       ["Humans",            "Specialists / Humans"],
-    credits:     ["Credits",           "Credits / Account"],
-    settings:    ["Account",           "Credits / Account"],
-    upgrade:     ["Plans",             "Credits / Account"],
-    team:        ["Job queue",         "Team portal"],
-    "team-craft":["Craft polish",       "Team portal"],
-    "team-job":  ["Active job",        "Team portal"],
-    "team-capacity":["Capacity & SLA", "Team portal"],
-    "team-clients":["Client roster",   "Team portal"],
-    "team-me":   ["My earnings",       "Team portal"],
-    "admin-specs":     ["Specs",            "Admin"],
-    "admin-brandolph": ["Brandolph memory", "Admin"],
+    home:        [t("nav.create"),      t("section.createBriefs")],
+    discovery:   [t("title.discovery"), t("section.bioLibrary")],
+    bio:         [t("nav.bio"),         t("section.bioLibrary")],
+    briefs:      [t("nav.briefs"),      t("section.createBriefs")],
+    library:     [t("nav.library"),     t("section.bioLibrary")],
+    "brief-detail":[t("title.brief"),   t("section.createBriefs")],
+    board:       [t("title.brief"),     t("section.createBriefs")],
+    specialists: [t("title.specialistsOnShift", { count: 33 }), t("section.specialistsHumans")],
+    "specialist-new": [t("title.specialistNew"), t("section.specialistsHumans")],
+    canvas:      [t("title.canvas"),    t("section.createBriefs")],
+    craft:       [t("nav.humans"),      t("section.specialistsHumans")],
+    credits:     [t("nav.credits"),     t("section.creditsAccount")],
+    settings:    [t("nav.account"),     t("section.creditsAccount")],
+    upgrade:     [t("title.plans"),     t("section.creditsAccount")],
+    team:        [t("team.jobQueue"),   t("section.teamPortal")],
+    "team-craft":[t("team.craftPolish"), t("section.teamPortal")],
+    "team-job":  [t("title.activeJob"), t("section.teamPortal")],
+    "team-capacity":[t("title.capacitySla"), t("section.teamPortal")],
+    "team-clients":[t("title.clientRoster"), t("section.teamPortal")],
+    "team-me":   [t("team.myEarnings"), t("section.teamPortal")],
+    "admin-specs":     [t("admin.specs"),           t("section.admin")],
+    "admin-languages": [t("admin.languages"),       t("section.admin")],
+    "admin-brandolph": [t("admin.brandolphMemory"), t("section.admin")],
   };
   const [title, crumb] = titles[route] || [route, ""];
   /* Breadcrumb workspace segment: the team portal is the only surface that
@@ -590,12 +611,12 @@ function TopBar({ portal, route, brandName, go }) {
               fontFamily:"var(--font-sans)", fontWeight:600, fontSize:13, letterSpacing:"-0.01em",
               cursor:"pointer", boxShadow:"0 2px 6px rgba(0,0,0,0.18)",
             }}>
-            <Icon name="plus" size={14} /> Start a brief
+            <Icon name="plus" size={14} /> {t("topbar.startBrief")}
           </button>
         )}
         {isClient && (
           <div style={{display:"flex", alignItems:"center", gap:6, fontFamily:"var(--font-mono)", fontSize:10.5, letterSpacing:"0.14em", textTransform:"uppercase", color:"rgba(48,48,48,0.7)"}}>
-            <BrandolphDot /> Brandolph is reading
+            <BrandolphDot /> {t("topbar.brandolphReading")}
           </div>
         )}
         <img src={isClient ? window.CI_USER.avatar : "caastor/assets/profile-1.jpg"} alt="" style={{width: 30, height: 30, borderRadius: "50%", objectFit:"cover", border:"1.5px solid rgba(0,0,0,0.12)"}} />
@@ -607,6 +628,7 @@ function TopBar({ portal, route, brandName, go }) {
 /* App-wide menu — a persistent, always-open sidebar with a prominent
    brand logo at the top. No collapse. */
 function AppDock({ portal, currentRoute, onNav, onLogout }) {
+  const { t } = useLocale();
   /* Admins see the client nav + the admin extras. Team users see their
      own nav unchanged. This keeps the admin's everyday surfaces intact
      and just adds operator tooling at the bottom of the dock. */
@@ -629,13 +651,13 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
   const isHome = currentRoute === homeRoute;
   const goHome = () => onNav(homeRoute);
   return (
-    <nav className="app-dock" aria-label="Navigation">
+    <nav className="app-dock" aria-label={t("a11y.navigation")}>
       <button
         className={"app-dock__logo" + (isHome ? "" : " app-dock__logo--linked")}
         onClick={isHome ? undefined : goHome}
         disabled={isHome}
-        title={isHome ? "CaastorOS" : "Back to dashboard"}
-        aria-label={isHome ? "CaastorOS" : "Back to dashboard"}
+        title={isHome ? "CaastorOS" : t("a11y.backToDashboard")}
+        aria-label={isHome ? "CaastorOS" : t("a11y.backToDashboard")}
       >
         {!isHome && (
           <span className="app-dock__back" aria-hidden="true"><Icon name="arrowLeft" size={13} /></span>
@@ -647,19 +669,19 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
       <div className="app-dock__items">
         {routes.map((r, i) => (
           <React.Fragment key={r.id}>
-            {(i === 0 || r.section !== routes[i - 1].section) && r.section && (
-              <div className="app-dock__section">{r.section}</div>
+            {(i === 0 || r.sectionKey !== routes[i - 1].sectionKey) && r.sectionKey && (
+              <div className="app-dock__section">{t(r.sectionKey)}</div>
             )}
             <button className={"app-dock__item" + (isActive(r.id) ? " app-dock__item--active" : "")} onClick={() => onNav(r.id)}>
               <span className="app-dock__icon"><Icon name={r.icon} size={18} /></span>
-              <span>{r.label}</span>
+              <span>{t(r.labelKey)}</span>
             </button>
           </React.Fragment>
         ))}
       </div>
       <button className="app-dock__item app-dock__logout" onClick={onLogout}>
         <span className="app-dock__icon"><Icon name="arrowLeft" size={18} /></span>
-        <span>Log out</span>
+        <span>{t("common.logOut")}</span>
       </button>
     </nav>
   );
@@ -720,6 +742,23 @@ function App() {
     if (session.role === "team"   && !isTeamRoute  ) go("team");
     if (session.role === "admin"  && !isClientRoute && !isAdminRoute) go("home");
   }, [session, route.id, route.param, onLoginRoute]);
+
+  /* Load DB translation overrides once, after auth resolves. Non-blocking:
+     any failure leaves the static JSON catalogs in place. applyOverrides()
+     re-renders subscribed components so the live copy swaps in. */
+  const i18nLoaded = React.useRef(false);
+  useShellEffect(() => {
+    if (!session || session._pending || i18nLoaded.current) return;
+    i18nLoaded.current = true;
+    (async () => {
+      try {
+        const r = await apiFetch("/api/i18n/translations");
+        if (!r.ok) return;
+        const j = await r.json();
+        if (j && j.overrides) applyOverrides(j.overrides);
+      } catch (e) { /* static catalogs remain */ }
+    })();
+  }, [session]);
 
   /* Not signed in → show the matching login screen.
      OR signed in but in PASSWORD_RECOVERY state (user clicked the
@@ -785,6 +824,7 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "team-clients": return <TeamClients />;
     case "team-me":      return <TeamMe />;
     case "admin-specs":     return <AdminSpecs />;
+    case "admin-languages": return <AdminLanguages />;
     case "admin-brandolph": return <AdminBrandolphMemory />;
     default:             return <BrandolphHome tweaks={tweaks} setTweak={setTweak} go={go} />;
   }
@@ -797,19 +837,19 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
    tier is highlighted. Upgrade CTAs are stubs (billing is P7 — Stripe
    not built). No prices: we have none yet. */
 const TIER_ORDER = ["00", "01", "02", "03"];
-const TIER_BLURBS = {
-  "00": "One brand, the full Brandolph crew, and your certified BIO.",
-  "01": "Run two brands side by side with shared specialist memory.",
-  "02": "Three brands plus priority human craft polish.",
-  "03": "Unlimited brands for studios running the whole roster.",
-};
+/* Tier blurbs live in the catalog under plans.blurb.<id>. Allowance uses a
+   plural key (plans.allowance) so the count agrees per locale — crucial for
+   Arabic, where Intl.PluralRules picks among 6 CLDR categories. Called from
+   UpgradeView's render (which subscribes via useLocale), so t() reads the
+   live locale. */
 function tierAllowance(tier) {
   const n = window.CI_BRAND_LIMITS[tier] ?? 1;
-  if (n === Infinity) return "Unlimited brands";
-  return n === 1 ? "1 brand" : `${n} brands`;
+  if (n === Infinity) return t("plans.allowanceUnlimited");
+  return t("plans.allowance", { count: n });
 }
 
 function UpgradeView({ go, param }) {
+  const { t } = useLocale();
   const fetchedTier = useWorkspaceTier();
   const [polledTier, setPolledTier] = useShellState(null);
   const currentTier = polledTier || fetchedTier;
@@ -852,27 +892,26 @@ function UpgradeView({ go, param }) {
 
   return (
     <div style={{maxWidth: 1080, margin:"0 auto", padding:"40px 32px 64px"}}>
-      <div className="eyebrow" style={{marginBottom: 12}}>Plans</div>
+      <div className="eyebrow" style={{marginBottom: 12}}>{t("plans.eyebrow")}</div>
       <h1 style={{
         fontFamily:"var(--font-serif)", fontStyle:"italic", fontWeight: 500,
         fontSize: "clamp(32px, 5vw, 52px)", lineHeight: 1.05, letterSpacing:"-0.02em",
         color:"var(--c-ink)", margin:"0 0 12px",
       }}>
-        Grow your studio.
+        {t("plans.headline")}
       </h1>
       <p style={{fontSize: 15, color:"var(--c-dim)", lineHeight: 1.5, maxWidth: 520, margin:"0 0 40px"}}>
-        Every plan ships the full Brandolph crew and a senior-certified BIO. Choose the
-        brand allowance that fits the work in front of you.
+        {t("plans.intro")}
       </p>
 
       {param === "success" && (
         <div className="card" style={{marginBottom: 24, padding:"14px 16px", fontSize: 13, color:"var(--c-ink)", boxShadow:"inset 0 0 0 1.5px var(--status-success)"}}>
-          Payment received — your plan is updating. This can take a few seconds.
+          {t("plans.success")}
         </div>
       )}
       {param === "cancel" && (
         <div className="card" style={{marginBottom: 24, padding:"14px 16px", fontSize: 13, color:"var(--c-dim)"}}>
-          No changes made. Pick a plan whenever you're ready.
+          {t("plans.cancel")}
         </div>
       )}
 
@@ -891,10 +930,10 @@ function UpgradeView({ go, param }) {
               {isCurrent && (
                 <span className="eyebrow eyebrow--yellow"
                   style={{position:"absolute", top: 16, right: 18}}>
-                  Current plan
+                  {t("plans.currentPlan")}
                 </span>
               )}
-              <div className="eyebrow">{`Tier ${id}`}</div>
+              <div className="eyebrow">{t("plans.tierLabel", { id })}</div>
               <div style={{
                 fontFamily:"var(--font-serif)", fontStyle:"italic", fontWeight: 500,
                 fontSize: 26, lineHeight: 1, color:"var(--c-ink)",
@@ -908,20 +947,20 @@ function UpgradeView({ go, param }) {
                 {tierAllowance(id)}
               </div>
               <div style={{fontSize: 13, color:"var(--c-dim)", lineHeight: 1.45, flex: 1}}>
-                {TIER_BLURBS[id]}
+                {t("plans.blurb." + id)}
               </div>
               <div style={{fontFamily:"var(--font-mono)", fontSize: 18, color:"var(--c-ink)"}} aria-hidden="true">—</div>
               {isCurrent ? (
                 <button className="btn" disabled
                   style={{width:"100%", justifyContent:"center", opacity: 0.55, cursor:"default"}}>
-                  Your plan
+                  {t("plans.yourPlan")}
                 </button>
               ) : isHigher ? (
                 !isAdmin ? (
                   <div style={{
                     fontSize: 12, color:"var(--c-dim)", lineHeight: 1.4,
                   }}>
-                    Plan changes are managed by your workspace admin.
+                    {t("plans.managedByAdmin")}
                   </div>
                 ) : (
                   <>
@@ -929,7 +968,7 @@ function UpgradeView({ go, param }) {
                       style={{width:"100%", justifyContent:"center"}}
                       disabled={busy === id}
                       onClick={() => startCheckout(id)}>
-                      {id === "03" ? "Talk to us" : busy === id ? "Starting…" : "Upgrade"}
+                      {id === "03" ? t("plans.talkToUs") : busy === id ? t("plans.starting") : t("plans.upgrade")}
                     </button>
                     {note === id && (
                       <div style={{
@@ -937,9 +976,7 @@ function UpgradeView({ go, param }) {
                         background:"var(--c-bg)", border:"1px solid var(--c-line)",
                         borderRadius: 8, padding:"8px 10px",
                       }}>
-                        {id === "03"
-                          ? "Reach your Caastor team to set up The Colony 🐜."
-                          : "Couldn't start the upgrade just now — please try again or contact your Caastor team."}
+                        {id === "03" ? t("plans.note03") : t("plans.noteFail")}
                       </div>
                     )}
                   </>
@@ -947,7 +984,7 @@ function UpgradeView({ go, param }) {
               ) : (
                 <button className="btn" disabled
                   style={{width:"100%", justifyContent:"center", opacity: 0.45, cursor:"default"}}>
-                  Included
+                  {t("plans.included")}
                 </button>
               )}
             </div>
@@ -957,7 +994,7 @@ function UpgradeView({ go, param }) {
 
       <button className="btn btn--link" style={{marginTop: 28, fontSize: 13}}
         onClick={() => go && go("home")}>
-        ← Back to Create
+        {t("plans.backToCreate")}
       </button>
     </div>
   );
