@@ -175,3 +175,136 @@ export function projectBio(assertions = []) {
     conflicts,
   };
 }
+
+// ── M4 · agent read-contract ────────────────────────────────────────────
+// getBioForAgent produces the cache-ordered BIO content blocks every agent
+// reads: a brand-constant CORE block (a shared cache prefix across all the
+// specialists), a per-department SLICE block, and provenance-as-exceptions
+// (low-confidence inline markers + a "do not invent these gaps" line) so the
+// BIO's honesty reaches the agent within the token budget. Depth lives in
+// T2 deep fields (param reserved); the always-injected CORE stays small.
+
+const AGENT_LABELS = {
+  "identity.positioning": "POSITIONING", "identity.category": "CATEGORY",
+  "identity.founded": "FOUNDED", "identity.pillars": "PILLARS",
+  "audience.primary": "PRIMARY AUDIENCE", "audience.secondary": "SECONDARY AUDIENCE",
+  "audience.tertiary": "TERTIARY AUDIENCE", "audience.jtbd": "JOBS-TO-BE-DONE",
+  "voice.register": "VOICE REGISTER", "voice.rhythm": "RHYTHM",
+  "voice.forbidden": "FORBIDDEN WORDS (never use)", "voice.signatures": "SIGNATURES",
+  "goals.northStar": "NORTH STAR", "goals.q2": "THIS QUARTER", "goals.q3": "NEXT QUARTER",
+  "strategic.watchouts": "WATCHOUTS", "strategic.notList": "WHAT THE BRAND IS NOT",
+  "visual.palette": "PALETTE", "visual.type": "TYPE", "visual.imagery": "IMAGERY", "visual.avoid": "AVOID",
+};
+
+// T0 CORE — injected for EVERY agent; brand-constant so it caches once and is
+// reused across all specialists of the brand.
+const CORE_KEYS = new Set([
+  "identity.positioning", "identity.category", "identity.pillars",
+  "voice.register", "voice.forbidden", "audience.primary", "goals.northStar",
+]);
+const LOW_CONF = 70;
+const isFilled = (v) => (Array.isArray(v) ? v.length > 0 : v != null && String(v).trim() !== "");
+
+function renderValue(kind, v) {
+  if (kind === "objlist") {
+    return v.map((o) => {
+      if (o == null || typeof o !== "object") return String(o ?? "");
+      if ("hex" in o) return `${o.name || ""} ${o.hex || ""}`.trim();
+      if ("family" in o) return `${o.kind || ""}: ${o.family || ""}`.trim();
+      return Object.values(o).filter(Boolean).join(" ");
+    }).filter(Boolean).join(", ");
+  }
+  return Array.isArray(v) ? v.join(", ") : String(v);
+}
+
+function renderAgentField(bio, field) {
+  const [s, k] = field.path;
+  const key = `${s}.${k}`;
+  const v = bio?.[s]?.[k];
+  if (!isFilled(v)) return null;
+  const conf = bio?.confidence?.[key]?.conf;
+  const marker = typeof conf === "number" && conf < LOW_CONF ? " (inferred — low confidence, do not assert as fact)" : "";
+  return `${AGENT_LABELS[key] || k}: ${renderValue(field.kind, v)}${marker}`;
+}
+
+/**
+ * Machine projection of provenance for an agent's field set — the registered
+ * fields it would read that the BIO does NOT carry (so the prompt can forbid
+ * inventing them). Distinct from computeFocus (the human Steward projection).
+ * @param {object} bio
+ * @param {Set<string>} keys  "section.key" set the agent reads
+ * @returns {{ missing: string[] }}
+ */
+export function computeAgentProvenance(bio, keys) {
+  const b = normalizeBio(bio);
+  const missing = [];
+  for (const f of BIO_FIELDS) {
+    const key = `${f.path[0]}.${f.path[1]}`;
+    if (!keys.has(key)) continue;
+    if (!isFilled(b?.[f.path[0]]?.[f.path[1]])) missing.push(AGENT_LABELS[key] || f.path[1]);
+  }
+  return { missing };
+}
+
+function gapLine(bio, keys) {
+  const { missing } = computeAgentProvenance(bio, keys);
+  return missing.length
+    ? `\nThe BIO does not specify: ${missing.join("; ")}. Do not invent these — if the task needs one, say so plainly.`
+    : "";
+}
+
+/**
+ * The single agent-facing BIO read. Returns cache-ordered content blocks that
+ * replace the hand-rendered BIO layer in both the specialist and Brandolph
+ * prompt builders.
+ * @param {object} args
+ * @param {object} args.bio                 BIO payload (normalized internally)
+ * @param {"specialist"|"brandolph"} args.audience
+ * @param {string[]} [args.slices]          spec.payload.bioSlices (specialist T1 selector)
+ * @param {string[]} [args.refusals]        brand-global refusals
+ * @param {string[]} [args.deepFields]      T2 keyed fields (reserved; none wired yet)
+ * @returns {{ blocks: {type:string,text:string,cache_control?:object}[] }}
+ */
+export function getBioForAgent({ bio, audience = "specialist", slices = [], refusals = [], deepFields = [] } = {}) {
+  const b = normalizeBio(bio);
+  const sliceSet = new Set(Array.isArray(slices) && slices.length ? slices : ["positioning", "voice", "audience"]);
+  const ver = b.version != null ? ` · v${b.version}` : "";
+
+  // CORE (T0) — every agent, brand-constant.
+  const coreLines = [];
+  for (const f of BIO_FIELDS) {
+    if (!CORE_KEYS.has(`${f.path[0]}.${f.path[1]}`)) continue;
+    const line = renderAgentField(b, f);
+    if (line) coreLines.push(line);
+  }
+  let coreText = `## BRAND INTELLIGENCE OBJECT${ver} — core\n${coreLines.join("\n") || "(core fields not yet specified)"}${gapLine(b, CORE_KEYS)}`;
+  if (Array.isArray(refusals) && refusals.length) {
+    coreText += `\n\nBRAND-GLOBAL REFUSALS (never violate):\n${refusals.map((r, i) => `${i + 1}. ${r}`).join("\n")}`;
+  }
+  const blocks = [{ type: "text", text: coreText, cache_control: { type: "ephemeral" } }];
+
+  // SLICE (T1) — per department for specialists; the full BIO for Brandolph.
+  const sliceKeys = new Set();
+  const sliceLines = [];
+  for (const f of BIO_FIELDS) {
+    const key = `${f.path[0]}.${f.path[1]}`;
+    if (CORE_KEYS.has(key)) continue;
+    if (!(audience === "brandolph" || sliceSet.has(f.slice))) continue;
+    sliceKeys.add(key);
+    const line = renderAgentField(b, f);
+    if (line) sliceLines.push(line);
+  }
+  if (sliceKeys.size) {
+    blocks.push({
+      type: "text",
+      text: `## BIO — detail\n${sliceLines.join("\n") || "(no additional fields specified)"}${gapLine(b, sliceKeys)}`,
+      cache_control: { type: "ephemeral" },
+    });
+  }
+
+  // T2 deep fields — keyed fetch; none wired until the deep-schema follow-up.
+  // ponytail: add a block per deep field when one actually exists.
+  void deepFields;
+
+  return { blocks };
+}

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   normalizeBio,
   projectBio,
+  getBioForAgent,
+  computeAgentProvenance,
   SCORED_PATHS,
   SECTIONS,
   SCHEMA_VERSION,
@@ -81,7 +83,8 @@ test("buildBrandolphSystem does not throw on a partial BIO", () => {
   assert.doesNotThrow(() => {
     blocks = buildBrandolphSystem({ brand: { name: "X" }, bio, refusals: [], routeId: null });
   });
-  assert.equal(blocks.length, 4);
+  // PLATFORM + N BIO blocks (tiered getBioForAgent) + SPEC + TASK.
+  assert.ok(blocks.length >= 4, `expected >= 4 blocks, got ${blocks.length}`);
   assert.match(blocks[1].text, /BRAND INTELLIGENCE OBJECT/);
 });
 
@@ -90,11 +93,12 @@ test("buildBrandolphSystem renders a full BIO intact (no regression)", () => {
   const blocks = buildBrandolphSystem({
     brand: VINILO_BRAND, bio, refusals: VINILO_REFUSALS, routeId: "home",
   });
-  const text = blocks[1].text;
-  assert.match(text, /Specialty coffee for slow Tuesdays\./);
-  assert.match(text, /Provenance, Routine, Patience, Café-as-rest/); // pillars joined
-  assert.match(text, /Espresso #1F1A14/);                            // palette rendered
-  assert.match(text, /Q3: Honduras/);                                // goals rendered
+  // Content is spread across the tiered BIO blocks now — assert on the union.
+  const text = blocks.map((b) => b.text).join("\n");
+  assert.match(text, /Specialty coffee for slow Tuesdays\./);        // positioning (core)
+  assert.match(text, /Provenance, Routine, Patience, Café-as-rest/); // pillars joined (core)
+  assert.match(text, /Espresso #1F1A14/);                            // palette rendered (detail)
+  assert.match(text, /Honduras/);                                    // goals.q3 rendered (detail)
 });
 
 // ── projectBio (event-sourced projection) ───────────────────────────
@@ -148,4 +152,55 @@ test("projectBio output payload is canonical (all sections present)", () => {
   const { payload } = projectBio([A("goals.northStar", "Win", { seq: 1 })]);
   for (const s of SECTIONS) assert.ok(payload[s], `${s} present`);
   assert.equal(payload.goals.northStar, "Win");
+});
+
+// ── getBioForAgent + computeAgentProvenance (M4 agent read-contract) ──
+
+const SAMPLE = {
+  version: 4,
+  identity: { positioning: "P", category: "C", pillars: ["a", "b"] },
+  audience: { primary: "A", secondary: "S" },
+  voice: { register: "R", rhythm: "Ry", forbidden: ["x"], signatures: ["sig"] },
+  goals: { northStar: "N" },
+  confidence: { "identity.category": { conf: 40 }, "voice.register": { conf: 90 } },
+};
+
+test("getBioForAgent specialist: core + slice blocks, cache-aware, refusals in core", () => {
+  const { blocks } = getBioForAgent({ bio: SAMPLE, audience: "specialist", slices: ["voice"], refusals: ["never lie"] });
+  assert.equal(blocks.length, 2);
+  assert.ok(blocks[0].cache_control && blocks[1].cache_control, "both blocks cached");
+  assert.match(blocks[0].text, /POSITIONING: P/);
+  assert.match(blocks[0].text, /FORBIDDEN WORDS.*x/);
+  assert.match(blocks[0].text, /never lie/);       // brand-global refusals ride in core
+  assert.match(blocks[1].text, /RHYTHM: Ry/);      // voice-slice detail
+});
+
+test("getBioForAgent marks low-confidence fields, leaves high-confidence unmarked", () => {
+  const text = getBioForAgent({ bio: SAMPLE, audience: "specialist", slices: [] }).blocks.map((b) => b.text).join("\n");
+  assert.match(text, /CATEGORY: C \(inferred/);           // conf 40 → flagged
+  assert.doesNotMatch(text, /VOICE REGISTER: R \(inferred/); // conf 90 → not flagged
+});
+
+test("getBioForAgent emits a do-not-invent gap line naming absent fields", () => {
+  const text = getBioForAgent({ bio: SAMPLE, audience: "brandolph" }).blocks.map((b) => b.text).join("\n");
+  assert.match(text, /Do not invent these/);
+  assert.match(text, /WHAT THE BRAND IS NOT/);            // strategic.notList absent → named
+});
+
+test("getBioForAgent brandolph reads the full BIO (non-core fields present)", () => {
+  const text = getBioForAgent({ bio: SAMPLE, audience: "brandolph" }).blocks.map((b) => b.text).join("\n");
+  assert.match(text, /BRAND INTELLIGENCE OBJECT/);
+  assert.match(text, /SECONDARY AUDIENCE: S/);
+});
+
+test("getBioForAgent tolerates an empty BIO (no throw)", () => {
+  let blocks;
+  assert.doesNotThrow(() => { blocks = getBioForAgent({ bio: {}, audience: "specialist", slices: ["voice"] }).blocks; });
+  assert.ok(blocks.length >= 1);
+});
+
+test("computeAgentProvenance lists only absent registered fields in the key set", () => {
+  const { missing } = computeAgentProvenance(SAMPLE, new Set(["voice.signatures", "strategic.notList"]));
+  assert.ok(!missing.includes("SIGNATURES"));            // present
+  assert.ok(missing.some((m) => /NOT/.test(m)));         // notList absent
 });
