@@ -37,8 +37,8 @@ assert.equal(hits, "", `server still references seed brand data:\n${hits}`);
 const loader = readFileSync(`${root}server/src/lib/load-brand-bio.js`, "utf8");
 const noBioBlock = loader.slice(loader.indexOf("if (!bioRow)"));
 assert.match(
-  noBioBlock.slice(0, 400),
-  /throw err/,
+  noBioBlock.slice(0, 600),
+  /throw\s+(?:err|bioError\()/,
   "load-brand-bio no-BIO path must throw, not return a fallback BIO",
 );
 assert.doesNotMatch(
@@ -53,30 +53,32 @@ console.log("ok — no seed-brand leak on the server");
 // Static guards (steward.js needs a live DB to exercise) that the patch path
 // keeps score + metadata in sync with the values instead of hardcoding them.
 const steward = readFileSync(`${root}server/src/routes/steward.js`, "utf8");
-const patchBlock = steward.slice(steward.indexOf("if (body.bioPatch"));
+const patchStart = steward.indexOf("const hasBioPatch");
+assert.notEqual(patchStart, -1, "steward patch handling must be present");
+const patchBlock = steward.slice(patchStart);
 
 assert.doesNotMatch(
-  patchBlock.slice(0, 900),
+  patchBlock.slice(0, 1800),
   /score:\s*75\b/,
   "steward patch must not hardcode score: 75 — use scoreBio(merged)",
 );
 assert.match(
-  patchBlock.slice(0, 900),
-  /score:\s*scoreBio\(/,
+  patchBlock.slice(0, 1800),
+  /(?:score|p_score):\s*scoreBio\(/,
   "steward patch must score the merged payload with scoreBio()",
 );
 assert.match(
-  patchBlock.slice(0, 900),
+  patchBlock.slice(0, 1800),
   /deepMerge\(/,
   "steward patch must deep-merge the bioPatch so sibling fields survive",
 );
 assert.match(
-  patchBlock.slice(0, 900),
+  patchBlock.slice(0, 1800),
   /normalizeBioEvidence\(/,
   "steward patch must re-derive confidence/missing/evidence via normalizeBioEvidence()",
 );
 assert.doesNotMatch(
-  patchBlock.slice(0, 900),
+  patchBlock.slice(0, 1800),
   /\{\s*\.\.\.bio\.payload,\s*\.\.\.body\.bioPatch\s*\}/,
   "steward patch must not shallow-spread the bioPatch (drops sibling subtrees)",
 );
@@ -84,14 +86,15 @@ assert.doesNotMatch(
 // ── CAA-25 regression: tier-2 gate mechanism is wired ───────────────
 assert.match(
   loader,
-  /requireHumanCert/,
-  "load-brand-bio must expose the tier-2 (human cert) gate",
+  /bioQuery\.eq\("certified", true\)/,
+  "load-brand-bio must filter production reads to human-certified BIOs",
 );
 assert.match(
   loader,
-  /REQUIRE_HUMAN_CERT/,
-  "loadBioForRun must read REQUIRE_HUMAN_CERT to enforce human certification",
+  /loadBrandBio\(\{ workspaceId, brandId, requireCertified: true \}\)/,
+  "loadBioForRun must always enforce human certification",
 );
+assert.match(loader, /cert_valid_until/, "the human-cert gate must honor certification TTL");
 
 console.log("ok — CAA-25 steward-patch integrity + tier-2 gate wired");
 
@@ -100,17 +103,6 @@ console.log("ok — CAA-25 steward-patch integrity + tier-2 gate wired");
 // stated honestly: the BIO is human-certified; outputs are optionally
 // human-finished — NOT "every output is certified". Guard both.
 
-const env = readFileSync(`${root}server/.env.example`, "utf8");
-assert.match(
-  env,
-  /PRODUCTION ENFORCES/,
-  ".env.example must record the CAA-25 decision that prod enforces tier-2",
-);
-assert.match(
-  env,
-  /docs\/tier2-enforcement-runbook\.md/,
-  ".env.example must point ops at the enforcement runbook",
-);
 assert.equal(
   existsSync(`${root}docs/tier2-enforcement-runbook.md`),
   true,
@@ -149,13 +141,13 @@ const compileBio = readFileSync(
 );
 assert.match(
   compileBio,
-  /materials\.synthesis/,
-  "compile-bio must flag a materials.synthesis 'missing' entry when V2 is off but materials were provided",
+  /gather-upload-sources/,
+  "compile-bio must gather uploaded materials before synthesis",
 );
 assert.match(
   compileBio,
-  /synthesized:\s*V2 &&/,
-  "compile-bio must record whether user materials were actually synthesized",
+  /independent of DISCOVERY_V2/,
+  "compile-bio must not drop uploaded materials when Discovery V2 is disabled",
 );
 
 console.log("ok — CAA-25 enforcement decision recorded, claim aligned, materials signalled");

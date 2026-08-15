@@ -209,7 +209,7 @@ function TeamQueue({ go }) {
 
           <div className="eyebrow" style={{marginBottom: 12}}>{t("team.aboutJobs")}</div>
           <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.55}}>
-            {t("team.aboutJobsBody")}<em>"{t("team.certifiedByName", { name: you?.first_name || "Marina" })}"</em>.
+            {t("team.aboutJobsBody")}<em>"{t("team.certifiedByName", { name: you?.first_name || "Your steward" })}"</em>.
             <div style={{marginTop: 12, fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>rev-2 §5 · P1.5</div>
           </div>
         </div>
@@ -825,7 +825,7 @@ function TeamJob({ id, go }) {
                   {list.map(s => (
                     <div key={s.id} className="card card--inset" style={{padding:"8px 10px"}}>
                       <div style={{fontSize: 12, color:"var(--c-ink)", wordBreak:"break-all"}}>
-                        {s.raw_ref ? <a href={s.raw_ref} target="_blank" rel="noreferrer" style={{color:"var(--c-ink)"}}>{s.src}</a> : s.src}
+                        {s.evidence_url ? <a href={s.evidence_url} target="_blank" rel="noreferrer" style={{color:"var(--c-ink)"}}>{s.src} <span aria-hidden="true">↗</span></a> : s.src}
                       </div>
                       {s.signals?.title && <div style={{fontSize: 11, color:"var(--c-dim)", marginTop: 2}}>{s.signals.title}</div>}
                       {s.signals?.size && <div style={{fontSize: 10.5, color:"var(--c-faint)", marginTop: 2, fontFamily:"var(--font-mono)"}}>{Math.round(s.signals.size/1024).toLocaleString()} KB · {s.signals.mime || s.signals.ext}</div>}
@@ -1059,7 +1059,7 @@ function TeamCapacity() {
 function TeamClients() {
   const { t } = useLocale();
   const clients = [
-    { name:"Marés Studio",    bio: 91, tier:"02", active: 4, lifetime: 38, last:"2h ago",   primary:"Marina Reyes" },
+    { name:"Your brand",   bio: 91, tier:"02", active: 4, lifetime: 38, last:"2h ago",   primary:"Demo user" },
     { name:"Plaza Hortelana", bio: 78, tier:"03", active: 2, lifetime: 22, last:"yesterday", primary:"Pere Sallés" },
     { name:"Bandera",         bio: 84, tier:"02", active: 2, lifetime: 31, last:"4h ago",    primary:"Joana Vidal" },
     { name:"Faro Lab",        bio: 66, tier:"02", active: 2, lifetime: 19, last:"yesterday", primary:"Alma Castro" },
@@ -1152,7 +1152,7 @@ function TeamMe() {
           <div className="eyebrow" style={{marginBottom: 14}}>{t("team.topClientsMonth")}</div>
           <div style={{display:"flex", flexDirection:"column", gap: 12}}>
             {[
-              { name:"Marés Studio", hrs: 14 },
+              { name:"Your brand", hrs: 14 },
               { name:"Faro Lab", hrs: 11 },
               { name:"Plaza Hortelana", hrs: 9 },
               { name:"Bandera", hrs: 4 },
@@ -1175,7 +1175,7 @@ function TeamMe() {
         <div className="eyebrow" style={{marginBottom: 14}}>{t("team.recentDeliveries")}</div>
         <div style={{display:"flex", flexDirection:"column", gap: 6}}>
           {[
-            { title:"Hero KV finish · Marés Studio", state:"delivered", time:"38m ago", cr: 220 },
+            { title:"Hero KV finish · Your brand pricing", state:"delivered", time:"38m ago", cr: 220 },
             { title:"Packaging dieline · Faro Lab",    state:"in-progress", time:"yesterday", cr: 700 },
             { title:"Brand guidelines · Olivar Real",  state:"in-progress", time:"3d ago", cr: 650 },
             { title:"Identity finalisation · Plaza",   state:"delivered",  time:"5d ago", cr: 550 },

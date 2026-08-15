@@ -31,7 +31,7 @@ test("validateUpload rejects a disallowed mime even with an ok-ish name", () => 
 });
 
 test("assertPublicUrl allows public http(s)", () => {
-  assert.doesNotThrow(() => assertPublicUrl("https://vinilo.coffee"));
+  assert.doesNotThrow(() => assertPublicUrl("https://brand.example"));
   assert.doesNotThrow(() => assertPublicUrl("http://example.com/path?q=1"));
 });
 

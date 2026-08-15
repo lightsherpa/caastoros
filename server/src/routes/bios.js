@@ -108,40 +108,43 @@ app.post("/:brandId/sources/upload", requireAuth, async (c) => {
   const bucket = String(form.get("bucket") || "").trim();
   if (!file || typeof file === "string") return c.json({ error: "file required" }, 400);
   if (!["foundations","visual","voice"].includes(bucket)) return c.json({ error: "bucket must be foundations|visual|voice" }, 400);
-
   const filename = file.name || "upload.bin";
   // Untrusted upload — validate type + size BEFORE buffering the whole file
   // into memory (evidence is parsed by an LLM, so it is an injection surface).
   const vUp = validateUpload({ mime: file.type, size: file.size, filename });
   if (!vUp.ok) return c.json({ error: vUp.message, code: vUp.code }, vUp.code === "TOO_LARGE" ? 413 : 400);
-  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
+  const ext = vUp.ext || "bin";
+  const mime = file.type || "application/octet-stream";
   const safeName = filename.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80);
   const objectPath = `${workspaceId}/${brandId}/${crypto.randomUUID()}-${safeName}`;
 
   const buf = new Uint8Array(await file.arrayBuffer());
   const { data: uploadData, error: uploadErr } = await supabaseAdmin
     .storage.from("bio-sources")
-    .upload(objectPath, buf, { contentType: file.type || "application/octet-stream", upsert: false });
+    .upload(objectPath, buf, { contentType: mime, upsert: false });
   if (uploadErr) return c.json({ error: `Storage upload failed: ${uploadErr.message}` }, 500);
 
-  /* Sign a 1-year URL for retrieval. RLS on the storage.objects table
-     could replace this with per-request signing later. */
+  /* Store the durable object path, not an expiring signed URL. */
   const { data: signed } = await supabaseAdmin
     .storage.from("bio-sources")
-    .createSignedUrl(objectPath, 60 * 60 * 24 * 365);
+    .createSignedUrl(objectPath, 60 * 60);
 
-  const { data: uploadRow } = await supabaseAdmin
+  const { data: uploadRow, error: uploadRowErr } = await supabaseAdmin
     .from("uploads")
     .insert({
       workspace_id: workspaceId,
       user_id: userId,
       brand_id: brandId,
-      url: signed?.signedUrl || objectPath,
-      mime: file.type || null,
+      url: objectPath,
+      mime,
       bucket_hint: bucket,
     })
     .select("id, url")
     .single();
+  if (uploadRowErr) {
+    await supabaseAdmin.storage.from("bio-sources").remove([objectPath]);
+    return c.json({ error: `Upload metadata failed: ${uploadRowErr.message}` }, 500);
+  }
 
   const { data: sourceRow, error: sourceErr } = await supabaseAdmin
     .from("bio_sources")
@@ -150,14 +153,20 @@ app.post("/:brandId/sources/upload", requireAuth, async (c) => {
       kind: "file_upload",
       bucket,
       src: filename,
-      signals: { size: file.size, mime: file.type, upload_id: uploadRow?.id, ext },
-      raw_ref: uploadRow?.url,
+      signals: { size: file.size, mime, upload_id: uploadRow?.id, ext },
+      raw_ref: objectPath,
     })
     .select("id, bucket, src, signals, raw_ref")
     .single();
-  if (sourceErr) return c.json({ error: sourceErr.message }, 500);
+  if (sourceErr) {
+    await Promise.all([
+      supabaseAdmin.from("uploads").delete().eq("id", uploadRow.id),
+      supabaseAdmin.storage.from("bio-sources").remove([objectPath]),
+    ]);
+    return c.json({ error: sourceErr.message }, 500);
+  }
 
-  return c.json({ source: sourceRow, signedUrl: uploadRow?.url });
+  return c.json({ source: sourceRow, signedUrl: signed?.signedUrl || null });
 });
 
 /* PATCH /api/bios/:brandId
@@ -177,23 +186,14 @@ app.patch("/:brandId", requireAuth, async (c) => {
   if (!body.payload || typeof body.payload !== "object") return c.json({ error: "payload required" }, 400);
   const cleanPayload = sanitizeClientPayload(body.payload); // strip client-authored confidence (P3 C-1)
 
-  const { data: latest } = await supabaseAdmin
-    .from("bios").select("version").eq("brand_id", brandId)
-    .order("version", { ascending: false }).limit(1).maybeSingle();
-  const nextVersion = (latest?.version || 0) + 1;
-
   const { data: newRow, error } = await supabaseAdmin
-    .from("bios")
-    .insert({
-      brand_id: brandId,
-      version: nextVersion,
-      payload: cleanPayload,
-      score: scoreBio(cleanPayload),
-      certified: false,
-      created_by: userId,
-    })
-    .select("id, version, payload, score, certified, created_at")
-    .single();
+    .rpc("append_bio_version", {
+      p_brand_id: brandId,
+      p_payload: cleanPayload,
+      p_score: scoreBio(cleanPayload),
+      p_created_by: userId,
+      p_discovery_id: null,
+    });
   if (error) return c.json({ error: error.message }, 500);
 
   /* P1.5-005 — every BIO edit enqueues a drift_check Steward job so a
@@ -236,7 +236,7 @@ app.get("/:brandId", requireAuth, async (c) => {
 
   const { data: bio } = await supabaseAdmin
     .from("bios")
-    .select("id, version, payload, score, certified, certified_by, certified_at, cert_kind, steward_notes, self_certified, self_certified_at, created_at, created_by")
+    .select("id, version, payload, score, certified, certified_by, certified_at, cert_kind, steward_notes, self_certified, self_certified_at, discovery_id, created_at, created_by")
     .eq("brand_id", brandId)
     .order("version", { ascending: false })
     .limit(1)
@@ -380,7 +380,16 @@ app.post("/:brandId/request-review", requireAuth, async (c) => {
     .insert({ bio_id: bio.id, brand_id: brandId, kind: "drift_check", status: "queued" })
     .select("id")
     .single();
-  if (error) return c.json({ error: error.message }, 500);
+  if (error) {
+    if (error.code === "23505") {
+      const { data: raced } = await supabaseAdmin.from("steward_jobs")
+        .select("id, status").eq("bio_id", bio.id)
+        .in("status", ["queued", "in_review", "pending_lead_review"])
+        .limit(1).maybeSingle();
+      if (raced) return c.json({ ok: true, jobId: raced.id, status: raced.status, reused: true });
+    }
+    return c.json({ error: error.message }, 500);
+  }
 
   try { await assignSteward(job.id); } catch (e) { console.warn("[request-review] assignSteward failed:", e?.message || e); }
 

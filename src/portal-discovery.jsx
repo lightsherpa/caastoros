@@ -1,15 +1,17 @@
 import React from "react";
 import { useLocale, t as tr } from "./lib/i18n.js";
 import { apiFetch, supabase } from "./lib/supabase-browser.js";
+import { BrandolphLine } from "./portal-shared.jsx";
 const { BrandolphAvatar, BrandolphDot, Confidence, Counter, Icon, Reveal } = window;
 /* Discovery (3-step intake) + BIO viewer. */
 
 const { useState: useDState, useEffect: useDEffect } = React;
+const SOURCE_FILE_ACCEPT = ".pdf,.doc,.docx,.txt,.md,image/*";
 
 /* useLiveBio — fetches the user's first brand + latest BIO + cert state.
    Polls every `pollMs` while `pendingCert` is true (BIO not yet certified
    by Steward, or no BIO at all yet). Returns { brandId, bio, cert, refresh }. */
-function useLiveBio({ pollMs = 6000 } = {}) {
+function useLiveBio({ pollMs = 6000, brandId: fixedBrandId = null } = {}) {
   const [state, setState] = useDState({ brandId: null, brandName: null, brandUrl: null, bio: null, cert: null, review: null, diff: [], reviewPending: false, focusCount: 0, error: null, loading: true });
 
   const tick = React.useCallback(async () => {
@@ -17,11 +19,15 @@ function useLiveBio({ pollMs = 6000 } = {}) {
       /* Resolve current user's brand. Prefers the workspace switcher's
          selection (from localStorage); falls back to the first brand. RLS
          scopes results to the user's workspaces. */
-      const wantedId = window.getCurrentBrandId?.();
+      const wantedId = fixedBrandId || window.getCurrentBrandId?.();
       let brand = null;
       if (wantedId) {
         const { data } = await supabase.from("brands").select("id, name, url").eq("id", wantedId).maybeSingle();
         brand = data;
+      }
+      if (fixedBrandId && !brand) {
+        setState((s) => ({ ...s, brandId: fixedBrandId, bio: null, cert: null, loading: false, error: "Brand is not available in this workspace" }));
+        return;
       }
       if (!brand) {
         const { data: brands, error: bErr } = await supabase
@@ -50,7 +56,7 @@ function useLiveBio({ pollMs = 6000 } = {}) {
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e?.message || String(e) }));
     }
-  }, []);
+  }, [fixedBrandId]);
 
   useDEffect(() => {
     let alive = true;
@@ -153,6 +159,7 @@ function BucketDropZone({ bucket, files, onAdd, onRemove }) {
       </div>
       <div style={{fontSize:12, color:"var(--c-dim)", lineHeight:1.45, marginBottom: files.length ? 10 : 4}}>
         {t("discovery.bucket." + bucket.key + ".help")}
+        {bucket.key === "visual" && <> Visual files are stored for Steward review; automated extraction currently reads the website only.</>}
       </div>
       {files.length > 0 && (
         <div style={{display:"flex", flexWrap:"wrap", gap:6, marginTop: 8}}>
@@ -188,6 +195,8 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
   const [busy, setBusy] = useDState(false);
   const [error, setError] = useDState(null);
   const [uploading, setUploading] = useDState(false);
+  const [createdBrandId, setCreatedBrandId] = useDState(null);
+  const uploadedFilesRef = React.useRef(new Set());
   const addToBucket = (key) => (newFiles) =>
     setUploadsByBucket(prev => ({ ...prev, [key]: [...prev[key], ...newFiles] }));
   const removeFromBucket = (key) => (idx) =>
@@ -201,8 +210,8 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
       /* New-brand mode: create the brand first, then run the same
          discovery flow targeting it. Existing onboarding (newBrand=false)
          skips this block entirely and behaves exactly as before. */
-      let newBrandId = null;
-      if (newBrand) {
+      let newBrandId = createdBrandId;
+      if (newBrand && !newBrandId) {
         const created = await apiFetch("/api/brands", {
           method: "POST",
           body: JSON.stringify({ name: brandName.trim() }),
@@ -218,23 +227,32 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
         }
         const { brand } = await created.json();
         newBrandId = brand.id;
+        setCreatedBrandId(brand.id);
         window.setCurrentBrandId?.(brand.id);
       }
-      const res = await apiFetch("/api/discovery/start", {
-        method: "POST",
-        body: JSON.stringify({ url: targetUrl, instagram, ...(newBrandId ? { brandId: newBrandId } : {}) }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(err.error || `HTTP ${res.status}`);
+      let brandId = newBrandId || window.getCurrentBrandId?.();
+      if (!brandId) {
+        const { data: brands, error: brandErr } = await supabase.from("brands")
+          .select("id").order("created_at", { ascending: true }).limit(1);
+        if (brandErr) throw brandErr;
+        brandId = brands?.[0]?.id;
       }
-      const { eventId, brandId } = await res.json();
+      if (!brandId) throw new Error("No brand is available for Discovery.");
+
+      let baselineVersion = 0;
+      const baselineRes = await apiFetch(`/api/bios/${brandId}`);
+      if (baselineRes.ok) {
+        const baseline = await baselineRes.json();
+        baselineVersion = Number(baseline.bio?.version) || 0;
+      }
       const filesToUpload = BUCKETS.flatMap((bucket) =>
         uploadsByBucket[bucket.key].map((file) => ({ bucket: bucket.key, file }))
       );
       if (brandId && filesToUpload.length) {
         setUploading(true);
         for (const item of filesToUpload) {
+          const uploadKey = `${item.bucket}:${item.file.name}:${item.file.size}:${item.file.lastModified}`;
+          if (uploadedFilesRef.current.has(uploadKey)) continue;
           const form = new FormData();
           form.set("bucket", item.bucket);
           form.set("file", item.file);
@@ -246,10 +264,22 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
             const err = await up.json().catch(() => ({ error: `HTTP ${up.status}` }));
             throw new Error(`Upload failed for ${item.file.name}: ${err.error || `HTTP ${up.status}`}`);
           }
+          uploadedFilesRef.current.add(uploadKey);
         }
       }
-      console.log("[Discovery] fired", { eventId, brandId, url: targetUrl });
-      onNext();
+      const res = await apiFetch("/api/discovery/start", {
+        method: "POST",
+        body: JSON.stringify({ url: targetUrl, instagram, brandId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const { discoveryId, eventId } = await res.json();
+      const runId = discoveryId || eventId;
+      if (!runId) throw new Error("Discovery started without a correlation id. Please retry.");
+      console.log("[Discovery] fired", { discoveryId: runId, brandId, url: targetUrl });
+      onNext({ discoveryId: runId, eventId, brandId, baselineVersion });
     } catch (err) {
       setError(err?.message || String(err));
     } finally {
@@ -285,7 +315,8 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
                 <label style={{display:"block", fontSize:12, fontWeight:500, color:"var(--c-ink)", marginBottom: 8}}>
                   {t("discovery.step1.brandNameLabel")} <span style={{color:"var(--pink-500)"}}>·</span>
                 </label>
-                <input className="input" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder={t("discovery.step1.brandNamePlaceholder")} />
+                <input className="input" value={brandName} disabled={!!createdBrandId} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. North Star Studio" />
+                {createdBrandId && <div style={{fontSize:11.5, color:"var(--c-faint)", marginTop:6}}>Brand created. Retrying will reuse this brand and any sources already uploaded.</div>}
               </div>
             )}
             <div>
@@ -350,7 +381,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
   );
 }
 
-function DiscoveryStep2Running({ onDone }) {
+function DiscoveryStep2Running({ onDone, onExit, runContext }) {
   /* Real BIO-compile polling. Captures the current latest BIO version
      on mount; polls /api/bios/:brandId every 3s until a new (higher)
      version appears — that's the Inngest compile-bio function finishing.
@@ -359,6 +390,8 @@ function DiscoveryStep2Running({ onDone }) {
   const { t } = useLocale();
   const [stage, setStage] = useDState("scrape");                /* scrape → vision → compile → done */
   const [elapsed, setElapsed] = useDState(0);
+  const [error, setError] = useDState(null);
+  const [retryNonce, setRetryNonce] = useDState(0);
 
   const lines = [
     { state: stage === "scrape" ? "running" : "ok", text: t("discovery.step2.reading1") },
@@ -369,8 +402,11 @@ function DiscoveryStep2Running({ onDone }) {
 
   useDEffect(() => {
     let alive = true;
-    let baselineVersion = null;
+    const discoveryId = runContext?.discoveryId;
     const startedAt = Date.now();
+    setError(null);
+    setElapsed(0);
+    setStage("scrape");
 
     const tick = async () => {
       if (!alive) return;
@@ -384,21 +420,12 @@ function DiscoveryStep2Running({ onDone }) {
       else setStage("compile");
 
       try {
-        const wantedId = window.getCurrentBrandId?.();
-        let brandId = wantedId;
-        if (!brandId) {
-          const { data: brands } = await supabase.from("brands").select("id").order("created_at", { ascending: true }).limit(1);
-          brandId = brands?.[0]?.id;
-        }
+        const brandId = runContext?.brandId;
         if (!brandId) return;
         const res = await apiFetch(`/api/bios/${brandId}`);
         if (!res.ok) return;
         const { bio } = await res.json();
-        const v = bio?.version ?? null;
-        if (baselineVersion === null) {
-          /* First poll just records what version (if any) exists right now. */
-          baselineVersion = v ?? 0;
-        } else if ((v ?? 0) > baselineVersion) {
+        if (discoveryId && bio?.discovery_id === discoveryId) {
           setStage("done");
           alive = false;                 /* stop further polling */
           clearTimeout(fallback);        /* the 90s safety net is no longer needed */
@@ -414,10 +441,16 @@ function DiscoveryStep2Running({ onDone }) {
 
     tick();
     const id = setInterval(tick, 3000);
-    /* Safety fallback: if we hit 90s without a new BIO, advance anyway. */
-    const fallback = setTimeout(() => { if (alive) { alive = false; onDone(); } }, 90000);
+    /* A timeout is a recoverable error, never a successful extraction. */
+    const fallback = setTimeout(() => {
+      if (alive) {
+        alive = false;
+        clearInterval(id);
+        setError("We haven't confirmed this extraction yet. It may still finish in the background; check again or open the BIO without activating this run.");
+      }
+    }, 90000);
     return () => { alive = false; clearInterval(id); clearTimeout(fallback); };
-  }, [onDone]);
+  }, [onDone, retryNonce, runContext?.brandId, runContext?.discoveryId]);
 
   const pct = Math.min(95, Math.round(elapsed * 4));            /* visual progress only */
   return (
@@ -426,6 +459,13 @@ function DiscoveryStep2Running({ onDone }) {
         <BrandolphDot state={stage === "done" ? "ok" : "thinking"} size={12} />
         <h2 style={{margin: 0, fontSize: 20}}>{stage === "done" ? t("discovery.step2.compiledTitle") : t("discovery.step2.readingTitle")}</h2>
       </div>
+      {error && <div className="card" style={{padding:14, marginBottom:14, borderColor:"var(--pink-500)"}}>
+        <div style={{color:"var(--pink-600)", marginBottom:10}}>{error}</div>
+        <div style={{display:"flex", gap:8}}>
+          <button className="btn btn--ghost btn--sm" onClick={() => setRetryNonce(n => n + 1)}>Check again</button>
+          <button className="btn btn--link" onClick={onExit}>Open current BIO</button>
+        </div>
+      </div>}
       <div className="card" style={{padding: 0, overflow:"hidden"}}>
         <div style={{padding:"16px 20px", borderBottom:"1px solid var(--c-line)", background:"var(--c-bg)"}}>
           <div style={{display:"flex", justifyContent:"space-between", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)", letterSpacing:"0.06em"}}>
@@ -740,11 +780,11 @@ function DiscoDelegatePanel({ brandId, chapter }) {
   );
 }
 
-function DiscoveryStep2Results({ onConfirm }) {
+function DiscoveryStep2Results({ onConfirm, runContext }) {
   const { t } = useLocale();
   /* Live brand + cert + score — drives the Steward chip (flips in real
      time if certification lands) and the completion meter. */
-  const live = useLiveBio({ pollMs: 6000 });
+  const live = useLiveBio({ pollMs: 6000, brandId: runContext?.brandId });
   const brandId = live.brandId;
 
   /* Discovery-session state, hydrated from GET /session on mount. */
@@ -1122,8 +1162,11 @@ function DiscoveryStep2Results({ onConfirm }) {
   );
 }
 
-function DiscoveryStep3({ go }) {
+function DiscoveryStep3({ go, runContext }) {
   const { t } = useLocale();
+  const live = useLiveBio({ pollMs: 10000, brandId: runContext?.brandId });
+  const positioning = live.bio?.payload?.identity?.positioning || "the clearest supported version of your positioning";
+  const gapCount = Array.isArray(live.bio?.payload?.missing) ? live.bio.payload.missing.length : 0;
   return (
     <div style={{maxWidth: 580, margin:"80px auto 0", textAlign:"center"}}>
       <div style={{display:"flex", justifyContent:"center", marginBottom: 22}}>
@@ -1131,8 +1174,8 @@ function DiscoveryStep3({ go }) {
       </div>
       <h1 style={{fontSize: 28, letterSpacing:"-0.01em", marginBottom: 14}}>{t("discovery.step3.title")}</h1>
       <div className="stream" style={{display:"flex", flexDirection:"column", gap: 12, marginBottom: 28, textAlign:"left"}}>
-        <BrandolphLine html="*I've read the site, the IG, and three competitors.* You sell coffee. You also sell a decision to slow down on purpose. Most people in the category sell the first; almost none sell the second. That's your unfair advantage." />
-        <BrandolphLine html="*Two things to know before we go further.* One — the BIO is editable. If I got something wrong, fix it. Two — I don't pretend to know what I don't know. I left three fields flagged amber. I'd rather ask you than guess." />
+        <BrandolphLine html={`*I've read the sources for ${live.brandName || "your brand"}.* The BIO now anchors on: ${positioning}`} />
+        <BrandolphLine html={`*Two things to know before we go further.* One — the BIO is editable. If I got something wrong, fix it. Two — I don't pretend to know what I don't know. I left ${gapCount} ${gapCount === 1 ? "field" : "fields"} flagged for evidence or Steward review.`} />
         <BrandolphLine html="*The first brief is on you.* When you have something to ship, brief me on the change you want — not the deliverable. I'll do the deliverable part." />
       </div>
       <button className="btn btn--primary btn--lg" onClick={() => go("home")}>
@@ -1145,13 +1188,14 @@ function DiscoveryStep3({ go }) {
 function Discovery({ go, newBrand = false }) {
   const [step, setStep] = useDState(1);
   const [phase, setPhase] = useDState("form"); // form | running | results
+  const [runContext, setRunContext] = useDState(null);
   return (
     <div style={{padding:"24px 36px 60px", maxWidth: 1180, margin:"0 auto"}}>
       <DiscoveryStepper step={step} />
-      {step === 1 && <DiscoveryStep1 newBrand={newBrand} onNext={() => { setStep(2); setPhase("running"); }} />}
-      {step === 2 && phase === "running"  && <DiscoveryStep2Running onDone={() => setPhase("results")} />}
-      {step === 2 && phase === "results"  && <DiscoveryStep2Results onConfirm={() => setStep(3)} />}
-      {step === 3 && <DiscoveryStep3 go={go} />}
+      {step === 1 && <DiscoveryStep1 newBrand={newBrand} onNext={(context) => { setRunContext(context); setStep(2); setPhase("running"); }} />}
+      {step === 2 && phase === "running"  && <DiscoveryStep2Running runContext={runContext} onDone={() => setPhase("results")} onExit={() => go("bio")} />}
+      {step === 2 && phase === "results"  && <DiscoveryStep2Results runContext={runContext} onConfirm={() => setStep(3)} />}
+      {step === 3 && <DiscoveryStep3 go={go} runContext={runContext} />}
     </div>
   );
 }
@@ -1171,34 +1215,51 @@ function payloadToFields(payload) {
      Old BIOs have no map → cf() returns {} → conf/source stay undefined and the
      downstream Confidence/EditableField components render exactly as before. */
   const cmap = p.confidence || {};
+  const fieldMeta = p.fieldMeta || {};
   const cf = (section, key) => cmap[`${section}.${key}`] || {};
   const field = (section, key, label, extra = {}) => {
     const { conf, source } = cf(section, key);
-    return { label, conf, source, ...extra };
+    const meta = fieldMeta?.[section]?.[key] || {};
+    return { key, label: meta.label || label, conf, source, ...extra, ...(typeof meta.multi === "boolean" ? { multi: meta.multi } : {}) };
   };
+  const humanize = (key) => String(key)
+    .replace(/^custom_/, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/^./, (c) => c.toUpperCase());
+  const customFields = (section, known) => Object.entries(p[section] || {})
+    .filter(([key]) => !known.includes(key))
+    .map(([key, value]) => ({
+      ...field(section, key, humanize(key), { multi: Array.isArray(value) }),
+      value,
+    }));
   return {
     identity: [
       { ...field("identity", "positioning", "Positioning", { italic: true }), value: p.identity?.positioning || "" },
       { ...field("identity", "category", "Category"), value: p.identity?.category || "" },
       { ...field("identity", "founded", "Founded"),   value: p.identity?.founded || "" },
       { ...field("identity", "pillars", "Pillars", { multi: true }), value: p.identity?.pillars || [] },
+      ...customFields("identity", ["positioning", "category", "founded", "pillars"]),
     ],
     audience: [
       { ...field("audience", "primary", "Primary"),     value: p.audience?.primary || "" },
       { ...field("audience", "secondary", "Secondary"), value: p.audience?.secondary || "" },
       { ...field("audience", "tertiary", "Tertiary"),   value: p.audience?.tertiary || "" },
       { ...field("audience", "jtbd", "Jobs to be done", { multi: true }), value: p.audience?.jtbd || [] },
+      ...customFields("audience", ["primary", "secondary", "tertiary", "jtbd"]),
     ],
     voice: [
       { ...field("voice", "register", "Register"),    value: p.voice?.register || "" },
       { ...field("voice", "forbidden", "Forbidden", { multi: true }), value: p.voice?.forbidden || [] },
       { ...field("voice", "rhythm", "Rhythm"),        value: p.voice?.rhythm || "" },
       { ...field("voice", "signatures", "Signatures", { multi: true }), value: p.voice?.signatures || [] },
+      ...customFields("voice", ["register", "forbidden", "rhythm", "signatures"]),
     ],
     goals: [
       { ...field("goals", "northStar", "North star"), value: p.goals?.northStar || "" },
       { ...field("goals", "q2", "This quarter"),      value: p.goals?.q2 || "" },
       { ...field("goals", "q3", "Next quarter"),      value: p.goals?.q3 || "" },
+      ...customFields("goals", ["northStar", "q2", "q3"]),
     ],
     strategic: {
       watchouts: p.strategic?.watchouts || [],
@@ -1210,59 +1271,58 @@ function payloadToFields(payload) {
       gaps:      (p.missing || []).map(m =>
                    typeof m === "string" ? m
                    : [m?.field, m?.why].filter(Boolean).join(" — ")),
-      diagnosis: "",
+      diagnosis: p.strategic?.diagnosis || "",
     },
     /* Visual tab consumes these arrays directly. */
     palette: p.visual?.palette || [],
     type:    p.visual?.type || [],
     imagery: p.visual?.imagery || [],
     avoid:   p.visual?.avoid || [],
-    grade:   "",
+    grade:   p.visual?.grade || "",
   };
 }
 
 function fieldsToPayload(bio, prevPayload) {
-  const getStr = (fields, label) => fields.find(f => f.label === label)?.value || "";
-  const getArr = (fields, label) => fields.find(f => f.label === label)?.value || [];
-  /* Confidence + missing are Brandolph/Steward-side metadata, not user-editable
-     here. Carry them through on save so a user edit never clobbers them. */
-  const carry = {};
-  if (prevPayload?.confidence) carry.confidence = prevPayload.confidence;
-  if (prevPayload?.missing) carry.missing = prevPayload.missing;
+  const toSection = (fields) => Object.fromEntries((fields || []).map((f) => [f.key, f.value]));
+  const confidence = { ...(prevPayload?.confidence || {}) };
+  const fieldMeta = { ...(prevPayload?.fieldMeta || {}) };
+  for (const [section, fields] of [["identity", bio.identity], ["audience", bio.audience], ["voice", bio.voice], ["goals", bio.goals]]) {
+    for (const key of Object.keys(confidence)) {
+      if (key.startsWith(`${section}.`)) delete confidence[key];
+    }
+    fieldMeta[section] = {};
+    for (const f of fields || []) {
+      const parsedConfidence = Number(f.conf);
+      if (Number.isFinite(parsedConfidence)) confidence[`${section}.${f.key}`] = { conf: parsedConfidence, source: f.source || "manual entry" };
+      fieldMeta[section][f.key] = { label: f.label || f.key, multi: !!f.multi };
+    }
+  }
+  const missing = (bio.strategic?.gaps || []).filter(Boolean).map((entry) => {
+    const [field, ...why] = String(entry).split(" — ");
+    return { field: why.length ? field : "manual", why: why.length ? why.join(" — ") : field };
+  });
   return {
-    ...carry,
-    identity: {
-      positioning: getStr(bio.identity, "Positioning"),
-      category:    getStr(bio.identity, "Category"),
-      founded:     getStr(bio.identity, "Founded"),
-      pillars:     getArr(bio.identity, "Pillars"),
-    },
-    audience: {
-      primary:   getStr(bio.audience, "Primary"),
-      secondary: getStr(bio.audience, "Secondary"),
-      tertiary:  getStr(bio.audience, "Tertiary"),
-      jtbd:      getArr(bio.audience, "Jobs to be done"),
-    },
-    voice: {
-      register:   getStr(bio.voice, "Register"),
-      forbidden:  getArr(bio.voice, "Forbidden"),
-      rhythm:     getStr(bio.voice, "Rhythm"),
-      signatures: getArr(bio.voice, "Signatures"),
-    },
-    goals: {
-      northStar: getStr(bio.goals, "North star"),
-      q2:        getStr(bio.goals, "This quarter"),
-      q3:        getStr(bio.goals, "Next quarter"),
-    },
+    ...(prevPayload || {}),
+    confidence,
+    fieldMeta,
+    missing,
+    identity: toSection(bio.identity),
+    audience: toSection(bio.audience),
+    voice: toSection(bio.voice),
+    goals: toSection(bio.goals),
     strategic: {
+      ...(prevPayload?.strategic || {}),
       watchouts: bio.strategic?.watchouts || [],
       notList:   bio.strategic?.notList || [],
+      diagnosis: bio.strategic?.diagnosis || "",
     },
     visual: {
+      ...(prevPayload?.visual || {}),
       palette: bio.palette || [],
       type:    bio.type || [],
       imagery: bio.imagery || [],
       avoid:   bio.avoid || [],
+      grade:   bio.grade || "",
     },
   };
 }
@@ -1493,6 +1553,7 @@ function BioViewer({ go, bioScore = 91 }) {
   const [saving, setSaving] = useDState(false);
   const [saveErr, setSaveErr] = useDState(null);
   const [reviewBusy, setReviewBusy] = useDState(false);
+  const [hasUnappliedSourceChanges, setHasUnappliedSourceChanges] = useDState(false);
 
   /* Live cert state + payload — polls /api/bios/:brandId. The BIO body
      below renders from `live.bio.payload`; the cert chip from `live.cert`. */
@@ -1549,6 +1610,10 @@ function BioViewer({ go, bioScore = 91 }) {
      Enqueues a Steward job server-side (idempotent). */
   const requestReview = async () => {
     if (!live.brandId || reviewBusy) return;
+    if (hasUnappliedSourceChanges) {
+      flash("Update the BIO with pending evidence before requesting review");
+      return;
+    }
     setReviewBusy(true);
     try {
       const res = await apiFetch(`/api/bios/${live.brandId}/request-review`, { method: "POST" });
@@ -1577,6 +1642,7 @@ function BioViewer({ go, bioScore = 91 }) {
       /* Optimistic prepend so user sees it immediately; the next poll
          will hydrate the real signals/markdown_chars. */
       setSources(s => [{ src: ref, date: t("discovery.sources.justNow"), n: 0, fresh: true }, ...s]);
+      setHasUnappliedSourceChanges(true);
       flash(t("discovery.bio.added", { ref: ref.slice(0, 40) }));
     } catch (e) {
       flash(t("discovery.bio.couldntAdd", { error: e?.message || e }));
@@ -1661,7 +1727,7 @@ function BioViewer({ go, bioScore = 91 }) {
       {/* Hero */}
       <div style={{display:"grid", gridTemplateColumns:"1fr 320px", gap: 28, marginBottom: 28, alignItems:"end"}}>
         <div>
-          <div className="eyebrow" style={{marginBottom: 6}}>{t("discovery.bio.eyebrow")} · {live.brandName || "Your Brand"}</div>
+          <div className="eyebrow" style={{marginBottom: 6}}>{t("discovery.bio.eyebrow")} · {live.brandName || "Your brand"}</div>
           <div style={{display:"flex", alignItems:"baseline", gap: 14}}>
             <span style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 88, lineHeight: 1, color: tone.color, fontWeight: 500}}>
               <Counter to={conf} />
@@ -1706,8 +1772,8 @@ function BioViewer({ go, bioScore = 91 }) {
           </button>
           {live.bio && (
             <button className="btn btn--ghost btn--sm" onClick={requestReview}
-              disabled={reviewBusy || live.reviewPending}
-              title={live.reviewPending ? t("discovery.bio.reviewInProgressTitle") : t("discovery.bio.requestReviewTitle")}>
+              disabled={reviewBusy || live.reviewPending || hasUnappliedSourceChanges}
+              title={hasUnappliedSourceChanges ? "Update the BIO with pending evidence before requesting review" : live.reviewPending ? t("discovery.bio.reviewInProgressTitle") : t("discovery.bio.requestReviewTitle")}>
               <Icon name="mail" size={14} /> {live.reviewPending ? t("discovery.bio.inReviewShort") : reviewBusy ? t("discovery.bio.sending") : t("discovery.bio.requestHumanReview")}
             </button>
           )}
@@ -1718,6 +1784,12 @@ function BioViewer({ go, bioScore = 91 }) {
         <div className="card" style={{padding:"10px 16px", marginBottom:14, borderLeft:"3px solid var(--brand, var(--yellow-500))", display:"flex", alignItems:"center", gap:10}}>
           <Icon name="edit" size={15} />
           <span style={{fontSize:13, color:"var(--c-ink)"}}>{t("discovery.bio.editingBanner")}</span>
+        </div>
+      )}
+      {hasUnappliedSourceChanges && (
+        <div className="card" style={{padding:"10px 14px", marginBottom:14, borderLeft:"3px solid var(--yellow-500)", display:"flex", justifyContent:"space-between", alignItems:"center", gap:12}}>
+          <span style={{fontSize:13}}>Review the changes before requesting certification.</span>
+          <button className="btn btn--primary btn--sm" onClick={() => go("discovery")}>Update BIO</button>
         </div>
       )}
       {saveErr && (
@@ -1774,7 +1846,7 @@ function BioViewer({ go, bioScore = 91 }) {
             {tab === "visual"      && <BioVisual bio={bio} patch={patch} editing={editing} />}
             {tab === "goals"       && <BioFieldList items={bio.goals}       editing={editing} onChange={v => patch("goals", v)} />}
             {tab === "strategic"   && <BioStrategic strat={bio.strategic} patchStrategic={patchStrategic} editing={editing} />}
-            {tab === "sources"     && <BioSources sources={sources} setSources={setSources} feed={feed} setFeed={setFeed} reading={reading} addReference={addReference} editing={editing} go={go} />}
+            {tab === "sources"     && <BioSources brandId={live.brandId} sources={sources} setSources={setSources} feed={feed} setFeed={setFeed} reading={reading} addReference={addReference} onSourceAdded={() => setHasUnappliedSourceChanges(true)} editing={editing} go={go} />}
           </div>
         </div>
       )}
@@ -1877,10 +1949,10 @@ function BioFieldList({ items, editing, onChange }) {
   const { t } = useLocale();
   const upd = (i, p) => onChange(items.map((x, j) => j === i ? { ...x, ...p } : x));
   const rm = (i) => onChange(items.filter((_, j) => j !== i));
-  const add = (multi) => onChange([...items, { label: "New field", value: multi ? [] : "", conf: 50, source: "manual entry", multi }]);
+  const add = (multi) => onChange([...items, { key: `custom_${Date.now().toString(36)}`, label: "New field", value: multi ? [] : "", conf: 50, source: "manual entry", multi }]);
   return (
     <div>
-      {items.map((f, i) => <EditableField key={i} f={f} editing={editing} onChange={(p) => upd(i, p)} onRemove={() => rm(i)} />)}
+      {items.map((f, i) => <EditableField key={f.key || i} f={f} editing={editing} onChange={(p) => upd(i, p)} onRemove={() => rm(i)} />)}
       {editing && (
         <div style={{display:"flex", gap:8, marginTop:14}}>
           <button className="btn btn--ghost btn--sm" onClick={() => add(false)}><Icon name="plus" size={13} /> {t("discovery.editPrimitive.addField")}</button>
@@ -1915,7 +1987,7 @@ function BioVisual({ bio, patch, editing }) {
     <div style={{display:"flex", flexDirection:"column", gap:30}}>
       {/* PALETTE */}
       <section>
-        <BioSectionHead label={t("discovery.visual.paletteHead")} source={t("discovery.visual.paletteSource")} conf={94} />
+        <BioSectionHead label={t("discovery.visual.paletteHead")} source="visual extraction" />
         <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))", gap:12}}>
           {bio.palette.map((c, i) => (
             <div key={i} className="card" style={{padding:0, overflow:"hidden"}}>
@@ -1971,7 +2043,7 @@ function BioVisual({ bio, patch, editing }) {
                     : <span className="pill" style={{height:18, padding:"0 8px", fontSize:9.5}}>{tf.license}</span>}
                 </div>
                 <div style={{fontFamily:ff, fontSize:52, lineHeight:1, color:"var(--c-ink)", fontWeight:600, letterSpacing:"-0.02em"}}>Aa Gg</div>
-                <div style={{fontFamily:ff, fontSize:15, color:"var(--c-dim)", marginTop:8, lineHeight:1.4}}>The decision to slow down, on purpose.</div>
+                <div style={{fontFamily:ff, fontSize:15, color:"var(--c-dim)", marginTop:8, lineHeight:1.4}}>ABCDEFGHIJKLMNOPQRSTUVWXYZ · 0123456789</div>
                 <div style={{marginTop:14, paddingTop:12, borderTop:"1px dashed var(--c-line-2)"}}>
                   {editing
                     ? <div style={{display:"flex", flexDirection:"column", gap:6}}>
@@ -2004,7 +2076,7 @@ function BioVisual({ bio, patch, editing }) {
 
       {/* IMAGERY */}
       <section>
-        <BioSectionHead label={t("discovery.visual.imageryHead")} source={t("discovery.visual.imagerySource")} conf={84} />
+        <BioSectionHead label={t("discovery.visual.imageryHead")} source="visual evidence" />
         <div className="card card--inset" style={{padding:"14px 16px", marginBottom:12}}>
           <div className="eyebrow" style={{marginBottom:6}}>{t("discovery.visual.grade")}</div>
           {editing
@@ -2071,10 +2143,28 @@ function BioStrategic({ strat, patchStrategic, editing }) {
     </div>
   );
 }
-function BioSources({ sources, setSources, feed, setFeed, reading, addReference, editing, go }) {
+function BioSources({ brandId, sources, setSources, feed, setFeed, reading, addReference, onSourceAdded, editing, go }) {
   const { t } = useLocale();
+  const fileRef = React.useRef(null);
+  const [uploadingFile, setUploadingFile] = useDState(false);
   const total = sources.reduce((a, s) => a + s.n, 0);
   const onKey = (e) => { if (e.key === "Enter") { e.preventDefault(); addReference(); } };
+  const uploadFile = async (file) => {
+    if (!file || !brandId || uploadingFile) return;
+    setUploadingFile(true);
+    try {
+      const form = new FormData();
+      form.set("bucket", "foundations");
+      form.set("file", file);
+      const res = await apiFetch(`/api/bios/${brandId}/sources/upload`, { method:"POST", body:form });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setSources(s => [{ src:file.name, date:t("discovery.sources.justNow"), n:0, fresh:true }, ...s]);
+      onSourceAdded?.();
+    } finally {
+      setUploadingFile(false);
+    }
+  };
   return (
     <div>
       {/* Feed composer */}
@@ -2100,9 +2190,8 @@ function BioSources({ sources, setSources, feed, setFeed, reading, addReference,
           </button>
         </div>
         <div style={{display:"flex", gap:8, marginTop:12, flexWrap:"wrap"}}>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Document upload · brand-deck.pdf", "doc")}><Icon name="files" size={13} /> {t("discovery.sources.uploadDoc")}</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Instagram · latest 30 posts")}><Icon name="refresh" size={13} /> {t("discovery.sources.repullSocial")}</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Competitor · example.com")}><Icon name="plus" size={13} /> {t("discovery.sources.addCompetitor")}</button>
+          <input ref={fileRef} type="file" accept={SOURCE_FILE_ACCEPT} style={{display:"none"}} onChange={(e) => { uploadFile(e.target.files?.[0]); e.target.value = ""; }} />
+          <button className="btn btn--ghost btn--sm" disabled={reading || uploadingFile} onClick={() => fileRef.current?.click()}><Icon name="files" size={13} /> {uploadingFile ? "Uploading…" : t("discovery.sources.uploadDoc")}</button>
         </div>
       </div>
 

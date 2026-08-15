@@ -10,15 +10,13 @@
 //   • read-only (Brandolph Q&A)                   → neither flag: latest version;
 //     throws NO_BIO (409) if the brand has no BIO at all.
 //
-// The Vinilo seed is NEVER returned for a real request — silently answering
-// as a fictional coffee brand was the worst failure mode in the system. It
-// is available only behind ALLOW_SEED_BIO=1 for local dev.
+// Missing BIO data always fails closed. A request is never answered with a
+// different brand's fixture or fallback content.
 //
 // Returns { brand, bio, refusals } shaped for prompt.js consumption; the bio
 // is always run through normalizeBio, so every consumer gets a CanonicalBio.
 
 import { supabaseAdmin } from "./supabase.js";
-import { VINILO_BIO, VINILO_REFUSALS, VINILO_BRAND } from "../data/vinilo.js";
 import { normalizeBio } from "./bio-schema.js";
 
 function bioError(code, message, status = 409) {
@@ -82,23 +80,15 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
   if (bioErr) throw new Error(`BIO lookup failed: ${bioErr.message}`);
 
   if (!bioRow) {
+    let err;
     if (requireCertified) {
-      throw bioError("BIO_NOT_CERTIFIED", `BIO for brand ${brandRow.id} is not certified by a Brand Steward`);
+      err = bioError("BIO_NOT_CERTIFIED", `BIO for brand ${brandRow.id} is not certified by a Brand Steward`);
+    } else if (requireSelfCertified) {
+      err = bioError("NOT_SELF_CERTIFIED", `BIO for brand ${brandRow.id} has not been self-certified`);
+    } else {
+      err = bioError("NO_BIO", `Brand ${brandRow.id} has no BIO yet — run Discovery`);
     }
-    if (requireSelfCertified) {
-      throw bioError("NOT_SELF_CERTIFIED", `BIO for brand ${brandRow.id} has not been self-certified`);
-    }
-    // No gate, but the brand genuinely has no BIO. Fail closed — never
-    // substitute the fictional seed for a real request.
-    if (process.env.ALLOW_SEED_BIO === "1") {
-      console.warn(`[load-brand-bio] ALLOW_SEED_BIO — returning Vinilo seed for brand ${brandRow.id} (dev only)`);
-      return {
-        brand:    { ...VINILO_BRAND, id: brandRow.id, name: brandRow.name || VINILO_BRAND.name },
-        bio:      normalizeBio(VINILO_BIO),
-        refusals: brandRow.refusals?.length ? brandRow.refusals : VINILO_REFUSALS,
-      };
-    }
-    throw bioError("NO_BIO", `Brand ${brandRow.id} has no BIO yet — run Discovery`);
+    throw err;
   }
 
   return {
@@ -116,7 +106,7 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
       self_certified:    bioRow.self_certified,
       self_certified_at: bioRow.self_certified_at,
     }),
-    refusals: brandRow.refusals?.length ? brandRow.refusals : VINILO_REFUSALS,
+    refusals: Array.isArray(brandRow.refusals) ? brandRow.refusals : [],
   };
 }
 

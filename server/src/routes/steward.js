@@ -22,6 +22,8 @@ import { computeFocus } from "../lib/bio-focus.js";
 import { scoreBio, scoreBioBreakdown } from "../lib/score-bio.js";
 import { evaluateCertification, DEFAULT_RUBRIC } from "../lib/evaluate-certification.js";
 import { payloadHash } from "../lib/bio-hash.js";
+import { deepMerge } from "../lib/deep-merge.js";
+import { normalizeBioEvidence } from "../lib/bio-evidence.js";
 import { notify, brandOwnerUserId } from "../lib/notify.js";
 
 const app = new Hono();
@@ -92,17 +94,33 @@ app.get("/jobs/:id", requireAuth, requireSteward, async (c) => {
 
   const { data: sources } = await supabaseAdmin
     .from("bio_sources")
-    .select("id, kind, bucket, src, signals, created_at")
+    .select("id, kind, bucket, src, signals, raw_ref, created_at")
     .eq("brand_id", job.brand_id)
     .order("created_at", { ascending: false });
 
+  /* Keep private storage private while giving the assigned Steward a
+     short-lived, authenticated way to inspect the evidence. Never return
+     durable object paths to the browser. */
+  const reviewableSources = await Promise.all((sources || []).map(async ({ raw_ref, ...source }) => {
+    if (raw_ref) {
+      if (/^https?:\/\//i.test(raw_ref)) return { ...source, evidence_url: raw_ref };
+      const { data } = await supabaseAdmin.storage
+        .from("bio-sources")
+        .createSignedUrl(raw_ref, 60 * 60);
+      return { ...source, evidence_url: data?.signedUrl || null };
+    }
+    return {
+      ...source,
+      evidence_url: /^https?:\/\//i.test(source.src || "") ? source.src : null,
+    };
+  }));
   const rubric = await loadActiveRubric();
   const autoSignals = scoreBioBreakdown(job?.bio?.payload || {});
 
   return c.json({
     job,
     focus: computeFocus(job?.bio?.payload || {}),
-    sources: sources || [],
+    sources: reviewableSources,
     rubric: rubric.config,
     autoSignals: { coverage: autoSignals.coverage, avgConf: autoSignals.avgConf, sourceDiversity: autoSignals.sourceDiversity },
     you: { id: steward.id, name: steward.name, first_name: steward.first_name, roles: steward.roles },
@@ -142,8 +160,9 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
     // Four-eyes: a Lead cannot approve their own submission.
     if (job.assigned_to === steward.id) return c.json({ error: "You submitted this — a different Lead must review it (four-eyes)." }, 409);
 
-    const { data: bioRow } = await supabaseAdmin
+    const { data: bioRow, error: bioErr } = await supabaseAdmin
       .from("bios").select("id, version, payload").eq("id", job.bio_id).single();
+    if (bioErr || !bioRow) return c.json({ error: "Candidate BIO not found" }, 404);
 
     if (body.leadApprove === false) {
       await supabaseAdmin.from("steward_jobs").update({
@@ -156,10 +175,9 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
       return c.json({ ok: true, status: "changes_requested", action: "sent_back" });
     }
 
-    // Approve → finalize the certification the submitter proposed.
     await supabaseAdmin.from("bios").update({
       certified: true,
-      certified_by: job.assigned_to,     // the submitting Steward gets the attribution
+      certified_by: job.assigned_to,
       certified_at: new Date().toISOString(),
       cert_kind: job.kind,
       cert_valid_until: ttlFromNow(),
@@ -172,7 +190,7 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
     }).eq("id", jobId);
     await writeDecision({ job, bioRow, actor: steward, actorRole: "lead_steward", decision: job.decision || "approve", narrative: body.leadNotes });
     await notifyCertified(job.brand_id);
-    return c.json({ ok: true, status: "completed", action: "approved", certifiedVersion: bioRow?.version });
+    return c.json({ ok: true, status: "completed", action: "approved", certifiedVersion: bioRow.version });
   }
 
   /* ─── Cancel ────────────────────────────────────────────────────────── */
@@ -199,34 +217,18 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
     return c.json({ error: "Job assigned to another Steward" }, 403);
   }
 
-  const { data: bio } = await supabaseAdmin
+  const { data: bio, error: bioErr } = await supabaseAdmin
     .from("bios").select("id, payload, version, brand_id").eq("id", job.bio_id).single();
+  if (bioErr || !bio) return c.json({ error: "Candidate BIO not found" }, 404);
 
-  // Optional edit → a new BIO version becomes the thing under review.
-  let workingPayload = bio.payload || {};
+  // The route owns recursive BIO patch semantics. Arrays replace and nested
+  // objects merge without dropping untouched evidence-backed fields.
+  const hasBioPatch = body.bioPatch && typeof body.bioPatch === "object" && !Array.isArray(body.bioPatch);
+  const workingPayload = hasBioPatch
+    ? normalizeBioEvidence(deepMerge(bio.payload || {}, body.bioPatch))
+    : (bio.payload || {});
   let targetBioId = bio.id;
   let targetVersion = bio.version;
-  if (body.bioPatch && typeof body.bioPatch === "object") {
-    workingPayload = { ...bio.payload, ...body.bioPatch };
-    const { data: newRow, error: insErr } = await supabaseAdmin
-      .from("bios")
-      .insert({
-        brand_id: bio.brand_id,
-        version: (bio.version || 0) + 1,
-        payload: workingPayload,
-        score: scoreBio(workingPayload),
-        certified: false,
-        steward_notes: body.notes || null,
-      })
-      .select("id, version")
-      .single();
-    if (insErr) return c.json({ error: insErr.message }, 500);
-    targetBioId = newRow.id;
-    targetVersion = newRow.version;
-    // Point the job at the version actually being certified.
-    await supabaseAdmin.from("steward_jobs").update({ bio_id: targetBioId }).eq("id", jobId);
-    job.bio_id = targetBioId;
-  }
 
   // Evaluate the rubric.
   const rubric = await loadActiveRubric();
@@ -242,7 +244,21 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
   const needsLeadApproval = calibration && !isLead && approves;  // non-Lead approvals go to calibration
   const finalCertified = approves && !needsLeadApproval;
 
-  // Persist the BIO's cert state (only certify on a finalized approval).
+  if (hasBioPatch) {
+    // Version allocation stays serialized even though the richer rubric and
+    // append-only audit flow remain authoritative for certification state.
+    const { data: appended, error: appendErr } = await supabaseAdmin.rpc("append_bio_version", {
+      p_brand_id: bio.brand_id,
+      p_payload: workingPayload,
+      p_score: scoreBio(workingPayload),
+      p_created_by: null,
+      p_discovery_id: null,
+    });
+    if (appendErr || !appended) return c.json({ error: appendErr?.message || "BIO version append failed" }, 500);
+    targetBioId = appended.id;
+    targetVersion = appended.version;
+  }
+
   await supabaseAdmin.from("bios").update({
     certified: finalCertified,
     certified_by: finalCertified ? steward.id : null,
@@ -259,6 +275,7 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
     "completed";
 
   await supabaseAdmin.from("steward_jobs").update({
+    bio_id: targetBioId,
     status: newStatus,
     decision,
     composite_score: result.composite,

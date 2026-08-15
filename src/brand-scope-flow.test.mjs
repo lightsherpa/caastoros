@@ -9,7 +9,7 @@ const floaterUrl = new URL("./portal-floater.jsx", import.meta.url);
 test("brief sharpening and handoff pin the selected brand", async () => {
   const source = await readFile(homeUrl, "utf8");
   assert.match(source, /JSON\.stringify\(\{ briefText: input\.trim\(\), brandId: activeBrandId \}\)/);
-  assert.match(source, /brandId:\s+briefBrandId,/);
+  assert.match(source, /brandId:\s+activeBrandId,/);
   assert.match(source, /brandId:\s+briefBrandId \|\| activeBrandId,/);
 });
 

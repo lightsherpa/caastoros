@@ -196,6 +196,53 @@ function renderBioForSharpener(brand, bio, refusals) {
   return lines.join("\n");
 }
 
+const BIO_SECTION_KEYWORDS = [
+  "positioning", "category", "pillar", "audience", "primary", "secondary",
+  "jtbd", "voice", "register", "rhythm", "signature", "forbidden", "tone",
+  "north star", "goal", "watchout", "tension", "refus", "brand is not", "palette",
+];
+
+const CITATION_STOPWORDS = new Set([
+  "this", "that", "with", "from", "your", "their", "about", "which", "would",
+  "could", "brand", "brands", "content", "piece", "brief", "because", "should",
+  "matter", "matters", "what", "when", "where", "have", "need", "into", "them",
+  "they", "then", "than", "here", "does", "doing", "will", "being", "there",
+  "these", "those", "some", "more", "most", "also", "audience", "voice",
+]);
+
+function citationTokens(value) {
+  return String(value || "").toLowerCase().match(/[a-z0-9]{4,}/g) || [];
+}
+
+function bioTextForCitation(bio, refusals = []) {
+  if (!bio || typeof bio !== "object" || Object.keys(bio).length === 0) return "";
+  const parts = [];
+  const push = (value) => { if (value) parts.push(String(value)); };
+  push(bio.identity?.positioning); push(bio.identity?.category);
+  (bio.identity?.pillars || []).forEach(push);
+  push(bio.audience?.primary); push(bio.audience?.secondary);
+  (bio.audience?.jtbd || []).forEach(push);
+  push(bio.voice?.register); push(bio.voice?.rhythm);
+  (bio.voice?.signatures || []).forEach(push);
+  (bio.voice?.forbidden || []).forEach(push);
+  push(bio.goals?.northStar); push(bio.goals?.q2); push(bio.goals?.q3);
+  (bio.strategic?.watchouts || []).forEach(push);
+  (bio.strategic?.notList || []).forEach(push);
+  (refusals || []).forEach(push);
+  return parts.join(" ").toLowerCase();
+}
+
+export function questionCitesBio(question, bio, refusals = []) {
+  const why = typeof question?.why === "string" ? question.why.trim() : "";
+  if (why.length < 8) return false;
+  const bioText = bioTextForCitation(bio, refusals);
+  if (!bioText) return true;
+  const lower = why.toLowerCase();
+  if (BIO_SECTION_KEYWORDS.some((keyword) => lower.includes(keyword))) return true;
+  const bioTokens = new Set(citationTokens(bioText));
+  return citationTokens(why).some((token) => !CITATION_STOPWORDS.has(token) && bioTokens.has(token));
+}
+
 /**
  * Calls a02 Sharpener.
  * @param {object} args
@@ -258,11 +305,14 @@ export async function sharpenBrief({ briefText, brand, bio, refusals = [], memor
     plan = wrapLegacy(legacyIds);
   }
 
+  const rawQuestions = Array.isArray(parsed.questions) ? parsed.questions.slice(0, 3) : [];
+  const citingQuestions = rawQuestions.filter((question) => questionCitesBio(question, bio, refusals));
+
   return {
     title:               parsed.title || "",
     tension:             parsed.tension || "",
     sharpenedBrief:      parsed.sharpenedBrief || "",
-    questions:           Array.isArray(parsed.questions) ? parsed.questions.slice(0, 3) : [],
+    questions:           citingQuestions.length ? citingQuestions : rawQuestions,
     deliveryPlan:        plan,                          // { deliverableGroups, proposedSpecialists }
     proposedSpecialists: plan.proposedSpecialists,      // back-compat for the current client
     refusals:            Array.isArray(parsed.refusals) ? parsed.refusals : [],

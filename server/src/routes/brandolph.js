@@ -15,9 +15,8 @@ const app = new Hono();
    SSE events: token | done (normalized usage) | error
 
    The brand + BIO now come from Supabase (loadBrandBio). If the
-   user's brand has no BIO yet, the loader falls back to the Vinilo
-   seed so the endpoint still works pre-P1 Discovery. Once P1.5
-   Steward lands, set requireCertified=true here.                       */
+   user's brand has no BIO yet, the loader fails closed rather than using a
+   fixture. Read-only Brandolph requests use the latest real BIO.       */
 app.post("/ask", requireAuth, async (c) => {
   const route = BRANDOLPH_SYNTHETIC_SPEC.payload.modelRouting.primary;
   if (!isRouteAvailable(route)) {

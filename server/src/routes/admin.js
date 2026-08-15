@@ -65,43 +65,15 @@ app.patch("/specs/:specialistId", async (c) => {
     return c.json({ error: "payload object required" }, 400);
   }
 
-  // Fetch current latest row
-  const { data: current, error: curErr } = await supabaseAdmin
-    .from("specs")
-    .select("id, specialist_id, version, active, payload")
-    .eq("specialist_id", sid)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (curErr || !current) return c.json({ error: `Spec ${sid} not found` }, 404);
-
-  // Merge — partial patch, preserves untouched fields
-  const nextPayload = { ...current.payload, ...patch };
-  const nextVersion = (current.version || 0) + 1;
-
-  // Insert new version
-  const { data: inserted, error: insErr } = await supabaseAdmin
-    .from("specs")
-    .insert({
-      specialist_id: sid,
-      version: nextVersion,
-      active: current.active,                    // preserve live-ness
-      payload: nextPayload,
-    })
-    .select("id, specialist_id, version, active, payload, created_at")
-    .single();
-  if (insErr) return c.json({ error: `Insert failed: ${insErr.message}` }, 500);
-
-  // Deactivate prior row if it was the active one (defensive — keep
-  // only one active per specialist)
-  if (current.active) {
-    await supabaseAdmin
-      .from("specs")
-      .update({ active: false })
-      .eq("id", current.id);
+  const { data: inserted, error } = await supabaseAdmin.rpc("switch_active_spec_version", {
+    p_specialist_id: sid,
+    p_payload: patch,
+  });
+  if (error) {
+    const status = (error.message || "").includes("SPEC_NOT_FOUND") ? 404 : 500;
+    return c.json({ error: error.message }, status);
   }
-
-  return c.json({ spec: inserted, prior_version: current.version });
+  return c.json({ spec: inserted, prior_version: Number(inserted.version) - 1 });
 });
 
 /* GET /api/admin/brandolph/brands

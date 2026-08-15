@@ -375,8 +375,10 @@ function HomeCreate({ tweaks, go }) {
       totalCr:       realAssembly.totalCr,
       /* Carry the current brand so canvas re-runs forward a real brandId
          instead of undefined. The server still re-derives brand from briefId,
-         but forwarding it removes the fragile "works only by coincidence". */
-      brandId:       briefBrandId,
+         but forwarding it removes the fragile "works only by coincidence".
+         briefBrandId === activeBrandId here (guarded above), so use the
+         canonical activeBrandId — the pinned selected brand. */
+      brandId:       activeBrandId,
       ts:            Date.now(),
     };
     try { sessionStorage.setItem("ci_run_context", JSON.stringify(ctx)); } catch (e) {}

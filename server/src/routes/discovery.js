@@ -22,6 +22,7 @@ app.post("/start", requireAuth, async (c) => {
   const url = typeof body.url === "string" ? body.url.trim() : "";
   const instagram = typeof body.instagram === "string" ? body.instagram.trim() : undefined;
   if (!url) return c.json({ error: "url required" }, 400);
+  const discoveryId = crypto.randomUUID();
 
   // SSRF guard — the URL is scraped server-side. Block non-public targets
   // before it reaches the scrape pipeline.
@@ -54,14 +55,14 @@ app.post("/start", requireAuth, async (c) => {
   try {
     ({ ids } = await inngest.send({
       name: "discovery/start",
-      data: { brandId, url, workspaceId, instagram },
+      data: { brandId, url, workspaceId, instagram, discoveryId },
     }));
   } catch (err) {
     console.error("[discovery] inngest.send failed:", err?.message || err);
     return c.json({ error: "Discovery queue unavailable — try again shortly" }, 503);
   }
 
-  return c.json({ eventId: ids?.[0] || null, brandId, url, status: "queued" });
+  return c.json({ eventId: ids?.[0] || null, discoveryId, brandId, url, status: "queued" });
 });
 
 export default app;

@@ -148,14 +148,14 @@ function getContextLine(routeId, t) {
 
 /* Stream tokens from POST /api/brandolph/ask. Throws on network/HTTP
    error so the caller can fall back to fakeReply.                       */
-async function streamBrandolph({ history, routeId, onToken, signal }) {
+async function streamBrandolph({ history, routeId, brandId, onToken, signal }) {
   /* apiFetch attaches the session JWT — /api/brandolph/ask is requireAuth,
      so a raw fetch() (no Authorization header) 401s and silently drops the
      floater to the mock reply. apiFetch also returns the streaming Response
      untouched, so SSE reading below is unchanged. */
   const res = await apiFetch("/api/brandolph/ask", {
     method: "POST",
-    body: JSON.stringify({ messages: history, routeId }),
+    body: JSON.stringify({ messages: history, routeId, brandId }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -194,19 +194,19 @@ async function streamBrandolph({ history, routeId, onToken, signal }) {
 function fakeReply(msg) {
   const m = msg.toLowerCase();
   if (/status|going on|in flight|what'?s up|running/.test(m))
-    return "*Two things are in flight.* One brief is in production and needs one more pass before it ships. Another is with a teammate for a finishing pass. Everything else is on you to push.";
+    return "*Two things alive.* Spring campaign is in production — Email 2 reads dutiful and needs one more pass before it ships. Collection essay is with Lia for a finishing pass. Everything else is on you to push.";
   if (/next|brief.*next|what.*ship|new brief/.test(m))
-    return "*A new brief.* You sketched it recently. I have two sharpening questions before we assemble: who's in scope, and is this an organic-only push or do we have paid?";
+    return "*Seasonal campaign.* You sketched it on Friday. I have two sharpening questions before we assemble: in or out for wholesale, and is this an organic-only push or do we have paid?";
   if (/bio|read.*me|positioning|brand/.test(m))
-    return "*Your positioning is the promise the brand keeps.* The writing earns the conviction. The visual system doesn't yet. If you ask me what to do next, it's the brand book — not new campaigns.";
+    return "*Your BIO is the source of truth for this answer.* If it is incomplete, finish Discovery before asking Brandolph to make a strategic recommendation.";
   if (/block|stuck|wait/.test(m))
-    return "*One thing is actively stuck.* A pricing decision gates five outputs in flight. Until you decide, I'm holding the outputs that depend on it.";
+    return "*One thing is actively stuck.* The pricing decision gates the outputs in flight. Until you decide, I'm holding the email and pricing hero.";
   if (/cost|credit|spend|budget/.test(m))
-    return "*337 cr spent this cycle. 563 left, 14 days to reset.* The split: 41% AI work, 33% human craft, 8% QA. If you're heavy on craft this cycle it's because a couple of high-touch outputs both landed with the team.";
+    return "*337 cr spent this cycle. 563 left, 14 days to reset.* The split: 41% AI work, 33% human craft, 8% QA. If you're heavy on craft this cycle it's because the Hero KV and the Collection essay both landed with Aitana and Lia.";
   if (/team|aitana|marc|lia|diego/.test(m))
-    return "*The team has two of your jobs.* One teammate on the Hero KV — delivered v3, you commented this morning. Another on a finishing pass. Both on track.";
+    return "*The team has two of your jobs.* Aitana on the Hero KV — delivered v3, you commented this morning. Lia on the Collection essay — finishing pass. Both on track.";
   if (/refuse|not doing|kill/.test(m))
-    return "*I'd kill the lowest-converting page.* It converts at 0.4% and dilutes the core story. Doing that frees a Sonnet pass for the flow you've been deferring.";
+    return "*I'd kill the brewing-kit page.* It converts at 0.4% and dilutes the subscription story. Doing that frees a Sonnet pass for the wholesale flow you've been deferring.";
   if (/who|specialist|agent/.test(m))
     return "*For your next brief I'd assemble The Sharpener, The Strategist, Conversion Copy, Email Sequence, and Brand Consistency QA.* That's 36 cr and the smallest crew that earns the brief.";
   return "*Heard.* Give me a beat — I'd rather come back with a brief or a question than an answer. Probably a question.";
@@ -373,6 +373,7 @@ function FloatingBrandolph() {
       await streamBrandolph({
         history,
         routeId,
+        brandId: currentBrandId,
         onToken: (delta) => {
           setMessages(prev => {
             const copy = prev.slice();

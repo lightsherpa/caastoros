@@ -722,7 +722,7 @@ function SpecialistsDirectory({ go }) {
       {/* Most used for this brand */}
       {mostUsed.length > 0 && !q && (
         <section style={{marginBottom: 26}}>
-          <div className="eyebrow" style={{marginBottom: 10}}>{t("briefs.spec.mostUsedFor")} this brand</div>
+          <div className="eyebrow" style={{marginBottom: 10}}>{t("briefs.spec.mostUsedFor")} Your brand</div>
           <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap: 10}}>
             {mostUsed.map(a => (
               <button key={a.id} onClick={() => setOpenId(a.id)} className="card"
@@ -1125,7 +1125,7 @@ function SpecialistDrawer({ open, agent, onClose }) {
         ))}
       </div>
 
-      <div className="eyebrow" style={{marginBottom: 8}}>{t("briefs.drawer.exampleOutputs")} this brand</div>
+      <div className="eyebrow" style={{marginBottom: 8}}>{t("briefs.drawer.exampleOutputs")} Your brand</div>
       <div style={{display:"flex", flexDirection:"column", gap: 12}}>
         {window.CI_OUTPUTS.filter(o => o.agentId === agent.id).slice(0,2).map(o => <OutputCard key={o.id} output={o} />)}
         {window.CI_OUTPUTS.filter(o => o.agentId === agent.id).length === 0 && (
@@ -1144,15 +1144,15 @@ function SpecialistDrawer({ open, agent, onClose }) {
 
 const CANVAS_NODES = [
   { id:"bio",      x:40,   y:60,  w:260, kind:"bio",       title:"Brand Intelligence Object",        sub:"BIO · 91%" },
-  { id:"brief",    x:360,  y:50,  w:260, kind:"brief",     title:"Sample brief",                     sub:"L1 · Brandolph" },
-  { id:"t1",       x:680,  y:20,  w:240, kind:"territory", title:"Territory · concept A",            sub:"L2-06 · Territory Mapper" },
-  { id:"t2",       x:680,  y:130, w:240, kind:"territory", title:"Territory · concept B",            sub:"L2-06 · Territory Mapper" },
-  { id:"t3",       x:680,  y:240, w:240, kind:"territory", title:"Territory · concept C",            sub:"L2-06 · Territory Mapper" },
-  { id:"copy1",    x:960,  y:50,  w:260, kind:"copy",      title:"Landing page hero",                sub:"L2-12 · Conversion Copy" },
+  { id:"brief",    x:360,  y:50,  w:260, kind:"brief",     title:"Spring campaign · brief",         sub:"L1 · Brandolph" },
+  { id:"t1",       x:680,  y:20,  w:240, kind:"territory", title:"Territory · 'It costs the Tuesday'", sub:"L2-06 · Territory Mapper" },
+  { id:"t2",       x:680,  y:130, w:240, kind:"territory", title:"Territory · '1-in-12'",            sub:"L2-06 · Territory Mapper" },
+  { id:"t3",       x:680,  y:240, w:240, kind:"territory", title:"Territory · 'Don't unsubscribe'",  sub:"L2-06 · Territory Mapper" },
+  { id:"copy1",    x:960,  y:50,  w:260, kind:"copy",      title:"Pricing page hero",                sub:"L2-12 · Conversion Copy" },
   { id:"copy2",    x:960,  y:170, w:260, kind:"copy",      title:"Email sequence ×3",                sub:"L2-13 · Email Sequence" },
   { id:"copy3",    x:960,  y:290, w:260, kind:"copy",      title:"Subject lines ×6",                 sub:"L2-14 · Subject Lines" },
   { id:"asset",    x:1260, y:170, w:260, kind:"asset",     title:"Hero KV draft",                    sub:"L2-20 · Hero KV" },
-  { id:"feedback", x:400,  y:330, w:260, kind:"feedback",  title:"Draft needs another pass",         sub:"Brandolph · feedback" },
+  { id:"feedback", x:400,  y:330, w:260, kind:"feedback",  title:"Email 2 reads dutiful",            sub:"Brandolph · feedback" },
 ];
 
 const CANVAS_EDGES = [
@@ -1858,6 +1858,7 @@ function BriefRunCanvas({ context, onClear, go }) {
           await streamSpecialistRun({
             specialistId: agent.id,
             briefText: `${context.rawBrief || context.title || ""} — mood board tile: ${FACETS[i]}`,
+            brandId: context.brandId,
             briefId: sharedBriefId,
             onProgress: () => {},
             onDone: (img) => {
@@ -1897,6 +1898,7 @@ function BriefRunCanvas({ context, onClear, go }) {
       await streamSpecialistRun({
         specialistId: agent.id,
         briefText:    context.composedBrief,
+        brandId:      context.brandId,
         briefId:      sharedBriefId,
         briefMeta,
         deliverableSpec: dspec ? { ...dspec, withVisualDirection: hasVisual } : undefined,
@@ -1993,6 +1995,7 @@ function BriefRunCanvas({ context, onClear, go }) {
             await streamSpecialistRun({
               specialistId: visualId,
               briefText: context.rawBrief || context.title || "",
+              brandId: context.brandId,
               briefId: sharedBriefId,
               deliverableSpec: { type: group.type, part: "image", count: 1, platform, sourceText: items[i].body, artDirection: items[i].visualDirection || null },
               onProgress: () => {},
@@ -2742,10 +2745,10 @@ function CanvasView({ go }) {
   if (ctx?.mode === "view" && ctx.briefId) {
     return <BriefViewCanvas briefId={ctx.briefId} onClear={clearCtx} go={go} />;
   }
-  if (ctx && Array.isArray(ctx.specialistIds) && ctx.specialistIds.length > 0) {
+  if (ctx && Array.isArray(ctx.specialistIds) && ctx.specialistIds.length > 0 && ctx.brandId) {
     return <BriefRunCanvas context={ctx} onClear={clearCtx} go={go} />;
   }
-  return <InteractiveCanvas nodeData={CANVAS_NODES} edges={CANVAS_EDGES} exportName="canvas" />;
+  return <InteractiveCanvas nodeData={CANVAS_NODES} edges={CANVAS_EDGES} exportName="demo-brand-canvas" />;
 }
 
 /* ── BriefViewCanvas — loads an existing brief's runs/outputs from DB

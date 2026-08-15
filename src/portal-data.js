@@ -1,17 +1,10 @@
-/* Caastor Intelligence — neutral demo data shared across all screens. */
-/* Loaded as a regular script so all globals attach to window.          */
-/*                                                                       */
-/* IMPORTANT — no real / client brand identity in here. Every value is a */
-/* generic placeholder on the RFC-2606 reserved `.example` TLD so it can */
-/* never collide with a live brand and reads unmistakably as demo data.  */
-/* The live run path (Supabase `brands` + certified BIO via /api/bios)   */
-/* is the source of truth; these globals are the pre-auth / empty-state  */
-/* fallback only. Guarded by scripts/test-no-seed-leak.mjs (CAA-28).     */
+/* Neutral demo data for pre-auth and empty-state surfaces. Live workspace
+   data replaces these globals after authentication. */
 
 window.CI_BRAND = {
   id: "demo-brand",
   name: "Your brand",
-  tagline: "A neutral placeholder brand for the demo.",
+  tagline: "Your positioning appears here after Discovery.",
   website: "yourbrand.example",
   bioCompleteness: 0,
   bioVersion: 1,                                      /* rev-2 §5.5 — surfaces on OutputCard footer */
@@ -19,9 +12,9 @@ window.CI_BRAND = {
   tier: "Tier 02 — The River 🌊",
   /* Brand Steward — the senior human who certified this brand's BIO.
      Per rev-2 §5.1: a Steward is a team_member with role 'steward'.
-     Neutral placeholder; the live cert record comes from team_members.
+     This mock represents the certification record post-onboarding.
      The OutputCard footer reads `firstName + certifiedAt` (rev-2 §5.5). */
-  steward: { firstName: "Your", fullName: "Your steward", role: "Senior designer", certifiedAt: "—" },
+  steward: { firstName: "Your steward", fullName: "Your steward", role: "Senior designer", certifiedAt: "—" },
 };
 
 window.CI_USER = {
@@ -187,9 +180,9 @@ window.CI_PINS = {
 /* Brand workspaces — multi-brand is a higher-plan (Suite) feature. The
    first is the active/seeded one; the rest demonstrate the switcher. */
 window.CI_WORKSPACES = [
-  { id:"demo-brand",   name:"Your brand",    initial:"Y", bio:0,  plan:"Tier 02 · The River 🌊", campaigns:0 },
-  { id:"demo-second",  name:"Second brand",  initial:"S", bio:0,  plan:"Tier 01 · The Dam 🦫",    campaigns:0 },
-  { id:"demo-third",   name:"Third brand",   initial:"T", bio:0,  plan:"Tier 02 · The River 🌊", campaigns:0 },
+  { id:"demo-brand", name:"Your brand",          initial:"Y", bio:0,  plan:"Tier 02 · The River 🌊", campaigns:0 },
+  { id:"lumen",  name:"Lúmen Studio",    initial:"L", bio:64, plan:"Tier 01 · The Dam 🦫",    campaigns:3 },
+  { id:"otono",  name:"Otoño Skincare",  initial:"O", bio:78, plan:"Tier 02 · The River 🌊", campaigns:6 },
 ];
 
 /* ── Specialist prompting (Phase A) ───────────────────────────────── */
@@ -198,8 +191,8 @@ window.CI_WORKSPACES = [
    patterns the QA output already checks. */
 window.CI_BRAND_REFUSALS = [
   "Never use the words “unlock”, “limited”, or “exclusive” — they cheapen the brand.",
-  "Hold the brand's published price; never invent a discount the brand hasn't approved.",
-  "Reference provenance only where the BIO marks it mandatory — once, never as decoration.",
+  "Respect the published price; never invent a discount.",
+  "Reference provenance (origin, grower) only where the BIO marks it mandatory — once, never as decoration.",
   "Refuse anything that contradicts the BIO; flag the conflict instead of complying.",
   "Keep voice-drift ≤ 0.20 against the brand voice — no hype, no manufactured urgency.",
 ];
@@ -282,7 +275,7 @@ window.CI_SPECIALIST_SPECS = {
   /* ── Strategy ─────────────────────────────────────────────── */
   a34: {
     role: "an audience profiler who reads a brand's people like a senior CMO would describe them — not as a CRM segment",
-    objective: "Produce a deep, opinionated read of the primary audience (and any specifically named secondary) — what they believe, what they're tired of, what they'd pay a premium for.",
+    objective: "Produce a deep, opinionated read of the primary audience (and any specifically named secondary) — what they believe, what they're tired of, and what they'd pay a premium for.",
     method: ["Read the BIO audience + JTBD + voice fields", "Name the unspoken belief that makes them the AUDIENCE, not a market", "Surface the wedge — what competitors mis-read about them", "Translate that into 1-2 lines a specialist crew can actually write to"],
     outputContract: "≤ 220 words. Two named segments max, each with: belief · tension · what to never say · what they'd quote back.",
     voice: "Conviction over hedging. A senior who'd rather be wrong with reason than safe with caveats.",
@@ -396,7 +389,7 @@ window.CI_SPECIALIST_SPECS = {
     method: ["Read BIO imagery direction + avoid list", "Specify lens, light direction, set styling, depth of field", "Render with the brand's visual register", "Avoid 'mood photography' clichés"],
     outputContract: "Image(s) at the brief's spec. Lifestyle or product, owned visual identity.",
     voice: "Editorial. Specific. The light feels like it could only be this brand's.",
-    refusals: ["Won't render generic 'happy people using the product' stock clichés if the brand's imagery direction is editorial-restrained."],
+    refusals: ["Won't render generic 'happy people drinking coffee' if the brand's imagery direction is editorial-restrained."],
   },
 
   /* ── Web & UX ─────────────────────────────────────────────── */
@@ -490,69 +483,69 @@ window.CI_SPECIALIST_SPECS = {
 window.CI_BRIEFS = [
   {
     id: "b-pricing-relaunch",
-    title: "Spring campaign",
+    title: "Spring campaign — Tuesday",
     type: "Conversion",
-    smp: "We are the brand you choose on purpose, not by default.",
+    smp: "We are the coffee for the Tuesday you decide to slow down on purpose.",
     background: "Quarterly spring campaign. Subscription tier consolidation plus a new annual option.",
     objective: "Lift annual conversion +25% over Q1 baseline. Hold churn below 2.4%.",
-    audience: "Existing subscribers (warm), trial-ending cohort (lukewarm), inbound leads (cold).",
-    strategy: "Reframe price as the cost of commitment, not a number. The objection isn't dollars; it's the decision to commit.",
-    tone: "Calm conviction. No urgency manipulation. A little warm, never cute.",
+    audience: "Existing subscribers (warm), trial-ending cohort (lukewarm), wholesale leads (cold).",
+    strategy: "Reframe price as cost-of-pause. The objection isn't dollars; it's the implicit promise to commit to a slower Tuesday.",
+    tone: "Calm conviction. No urgency manipulation. A little funny, never cute.",
     direction: "Pricing page lead with editorial pull quote. Email sequence three-part. Subjects under 40 chars.",
-    mandatories: "Avoid 'unlock' / 'limited'. Lead with the annual option.",
+    mandatories: "Mention provenance once (Collection). Avoid 'unlock' / 'limited'. Lead with annual option.",
     deliverables: ["Pricing page hero (web)","Email 1: announce","Email 2: case for annual","Email 3: last call","Subjects ×6","Brand consistency QA"],
     metrics: "Annual conversion %, time-on-page, sequence open + click, churn delta.",
-    notDoing: "Not 'limited-time' urgency. Not a discount. Not a referral push.",
-    watchouts: ["Hold the published annual price; don't invent a discount.","Trial-ending cohort opens twice as much; don't waste subject line position 1 on subscribers."],
-    assumptions: ["Lifecycle email is the channel. No paid social spend this push.","Cold leads receive sequence variant B only."],
+    notDoing: "Not 'limited-time' urgency. Not a discount. Not a referral push. Not bundling with the brewing kit.",
+    watchouts: ["Use the published annual price consistently.","Trial-ending cohort opens twice as much; don't waste subject line position 1 on subscribers."],
+    assumptions: ["Klaviyo flow is the channel. No paid social spend this push.","Wholesale audience receives sequence variant B only."],
     status: "in-production",
     credits: 37,
     agents: ["a02","a03","a12","a13","a14","a18","a24"],
     clarifications: [
-      { q:"Annual as one-month-free, or a flat discount?", why:"A flat discount competes with your own monthly. One-month-free reads as a decision, not a markdown." },
-      { q:"Is the cold-lead audience in or out of this push?", why:"They convert on email differently. In → I route sequence variant B. Out → we don't spend a Sonnet pass on copy that won't land." },
+      { q:"Annual as one month free, or a flat discount?", why:"A flat discount competes with your monthly plan. One month free reads as a decision, not a markdown." },
+      { q:"Is the wholesale audience in or out of this push?", why:"They convert on email differently. In → I route sequence variant B. Out → we don't spend a Sonnet pass on copy that won't land." },
     ],
     createdAt: "Mon · 14 May",
   },
   {
-    id: "b-collection-launch",
+    id: "b-collection-microlot",
     title: "New collection launch",
     type: "Story",
-    smp: "Sometimes a product deserves the story of how it was made.",
-    background: "Quarterly collection launch. The maker relationship is the story, not the spec sheet.",
-    objective: "Sell through the run in 21 days. Establish the launch cadence as a brand pillar.",
-    audience: "Existing customers + specialty buyers on third-party platforms.",
-    strategy: "Lead with the maker, not the product. Long-form story sets up the buy.",
+    smp: "Sometimes a coffee deserves to be named after the person who grew it.",
+    background: "Quarterly microlot launch. Producer relationship is the story, not the tasting notes.",
+    objective: "Sell through 480kg in 21 days. Establish microlot cadence as a brand pillar.",
+    audience: "Existing subscribers + specialty subscribers on third-party platforms.",
+    strategy: "Lead with the producer, not the coffee. Long-form story sets up the buy.",
     tone: "Editorial. Slightly elevated. Patient.",
     direction: "Long-form web piece, single product page, accompanying email + IG.",
-    mandatories: "Maker's name on the hero. No 'exotic' / 'rare' / 'limited'.",
+    mandatories: "Producer's name on hero. No 'exotic' / 'rare' / 'limited' (we'll do limited differently).",
     deliverables: ["Long-form essay (web)","Product page hero","Email announce","IG caption series (5)","Hero image direction"],
     metrics: "Sell-through rate, average order value, scroll depth on essay.",
-    notDoing: "Not a 'limited release' frame. Not spec-led. Not bundled with the accessories store.",
-    watchouts: ["Maker profile photos need licensing review before publication.","Avoid certification claims we can't stand behind."],
-    assumptions: ["Production schedule aligns to ship-by-week-3."],
+    notDoing: "Not a 'limited release' frame. Not flavor-note led. Not bundled with the equipment store.",
+    watchouts: ["Producer profile photos need licensing review before publication.","Avoid 'fair trade' phrasing — we're not the right certifier."],
+    assumptions: ["Roasting schedule aligns to ship-by-week-3."],
     status: "approved",
     credits: 52,
     agents: ["a02","a04","a15","a13","a20","a18"],
     createdAt: "Fri · 10 May",
   },
   {
-    id: "b-summer-campaign",
-    title: "Summer campaign",
+    id: "b-summer-tuesdays",
+    title: "Seasonal campaign — seasonal campaign",
     type: "Campaign",
-    smp: "Summer is when the routine stretches, not breaks.",
-    background: "Seasonal campaign covering June–August. Retail footfall + subscription lifts.",
-    objective: "Build mid-week visit cadence. Lift weekday store visits by 18%.",
-    audience: "Locals within 2.5km of the two stores. Subscribers as halo.",
+    smp: "Summer is when we earn the slow Tuesday back.",
+    background: "Seasonal campaign covering June–August. Café footfall + subscription lifts.",
+    objective: "Build mid-week visit cadence. Lift Tuesday DAU at café by 18%.",
+    audience: "Locals within 2.5km of the two cafés. Subscribers as halo.",
     strategy: "Reframe summer as the season the routine stretches, not breaks.",
     tone: "Warm. Less editorial than the launch — more conversational.",
-    direction: "In-store posters, IG, two pieces of merch, an email.",
-    mandatories: "Store address + opening hours on every printed surface.",
+    direction: "Café posters, IG, two pieces of merch, an email.",
+    mandatories: "Café address + opening hours on every printed surface.",
     deliverables: ["Poster set (A2)","IG carousel (3)","Email","Merch sketch — tote + ceramic"],
-    metrics: "Weekday store footfall, subscription net adds, IG saves.",
-    notDoing: "Not a discount summer. Not a 'free gift with X'. Not influencer-led.",
+    metrics: "Café Tuesday footfall, subscription net adds, IG saves.",
+    notDoing: "Not a discount summer. Not a 'free coffee with X'. Not influencer-led.",
     watchouts: ["Print proof needed by 28 May."],
-    assumptions: ["Both stores agree the weekday slot. Confirm with operations."],
+    assumptions: ["Both cafés agree the Tuesday slot. Confirm with operations."],
     status: "draft",
     credits: 0,
     agents: ["a02","a06","a09","a20","a16"],
@@ -562,18 +555,18 @@ window.CI_BRIEFS = [
     id: "b-investor-deck",
     title: "Investor deck — pre-seed close",
     type: "Internal",
-    smp: "The platform is the rail; the stores are the proof.",
-    background: "Closing pre-seed. Need a deck that doesn't apologise for the retail revenue.",
+    smp: "The platform is the rail; the cafés are the cathedral.",
+    background: "Closing pre-seed. Need a deck that doesn't apologise for the café revenue.",
     objective: "Get to YES on the remaining €420k.",
     audience: "Three angels + one micro-VC. Pre-read materials matter more than the deck itself.",
-    strategy: "Lead with the rail. Stores are operational proof, not the thesis.",
+    strategy: "Lead with the rail. Cafés are operational proof, not the thesis.",
     tone: "Direct. No founder-myth. Numbers in front.",
     direction: "12 slides. One-pager appendix.",
     mandatories: "Founder bios on slide 11. Use of funds explicit on slide 9.",
     deliverables: ["12-slide deck","One-pager (PDF)","Speaker notes"],
     metrics: "Close rate. Not a marketing brief.",
-    notDoing: "Not a customer narrative. Not a hockey stick. Not a lazy analogy pitch.",
-    watchouts: ["Operations lead signoff on the operations slide."],
+    notDoing: "Not a customer narrative. Not a hockey stick. Not 'we are the Substack for coffee'.",
+    watchouts: ["Specialist café operator (TL) signoff on operations slide."],
     assumptions: ["Pre-read is sent 48h before."],
     status: "shipped",
     credits: 64,
@@ -601,76 +594,76 @@ window.CI_OUTPUTS = [
   {
     id:"o1", briefId:"b-pricing-relaunch", kind:"page",
     type:"PRICING PAGE · HERO", agentId:"a12", status:"approved",
-    body:"Stay for the year, and the price stays put. Annual is one month lighter — but the point isn't the saving; the point is the decision to commit on purpose.",
+    body:"Stay for the year, and the coffee stays the price. Annual takes 1 in 12 off the bill — but the point isn't the dollar; the point is the decision to commit to a slower Tuesday on purpose.",
     meta:"38 words · est. 9.4 readability",
-    rationale:"Led with the commitment, not the saving — the BIO forbids urgency and frames price as the cost of commitment, so the hero sells the decision and lets the one-month-free sit as a quiet proof, never the headline."
+    rationale:"Led with the commitment, not the discount — the BIO forbids urgency and frames price as cost-of-pause, so the hero sells the decision and lets the 1-in-12 sit as a quiet proof, never the headline."
   },
   {
     id:"o2", briefId:"b-pricing-relaunch", kind:"email",
     type:"EMAIL 1 · ANNOUNCE", agentId:"a13", status:"in-production",
-    body:"Annual is now an option. It isn't cheaper because we ran the numbers and got generous; it's cheaper because we asked you to commit to something. Annual customers told us they don't want flexibility — they want the thing to just show up on the same day each month.",
+    body:"Annual is now an option. It isn't cheaper because we ran the numbers and got generous; it's cheaper because we asked you to commit to something. Annual subscribers told us they don't want flexibility — they want the bag on the kitchen counter on the same day each month.",
     meta:"247 words · 3-part sequence",
     rationale:"Opened by naming the objection out loud (“it isn't cheaper because we got generous”) — the audience is warm and skeptical of pricing emails, so disarming the cynicism earns the read before the case for annual is even made."
   },
   {
     id:"o3", briefId:"b-pricing-relaunch", kind:"copy",
     type:"SUBJECT LINES · ×6", agentId:"a14", status:"approved",
-    body:"01 · A quieter way to pay for this  ·  02 · Annual is now an option  ·  03 · A small case for committing  ·  04 · One month lighter, on us  ·  05 · The yearly plan  ·  06 · Re: that subscription",
+    body:"01 · There's a slower Tuesday in here  ·  02 · Annual is now an option  ·  03 · A small case for committing  ·  04 · One-in-twelve, on us  ·  05 · The Tuesday plan  ·  06 · Re: that subscription",
     meta:"6 variants · A/B intent split",
     rationale:"Kept every subject under 40 characters and split them by intent — the trial-ending cohort opens twice as much, so the watchout said don't waste position 1 on subscribers; variants 1 and 4 are aimed at the cohort that actually opens."
   },
   {
     id:"o4", briefId:"b-pricing-relaunch", kind:"qa",
     type:"BRAND CONSISTENCY QA", agentId:"a24", status:"approved",
-    body:"Pass. No use of 'unlock' or 'limited'. Annual price holds the published rate — no invented discount. Provenance referenced once in Email 1 paragraph 3, in line with mandatory. Voice drift index 0.14 (target ≤0.20).",
+    body:"Pass. No use of 'unlock' or 'limited'. Annual price matches the approved rate. Provenance is referenced once in Email 1 paragraph 3, in line with the mandatory. Voice drift index 0.14 (target ≤0.20).",
     meta:"1 page · QA gate green"
   },
   {
     id:"o6", briefId:"b-pricing-relaunch", kind:"image",
     type:"PRICING HERO · KEY VISUAL", agentId:"a18", status:"in-production",
-    body:"A single product on a sunlit counter, early-morning light. Annual band wraps the lower third in a warm tone. No price on the visual — the price lives in the copy.",
+    body:"A single bag on a sunlit kitchen counter, Tuesday-morning light. Annual band wraps the lower third in warm amber. No price on the visual — the price lives in the copy.",
     meta:"1600×900 · 3 crops · Flux 2",
-    rationale:"No price on the visual — the BIO keeps price in copy, not image. Chose everyday morning light over studio product shots so the frame says “routine” not “sale”, matching the cost-of-commitment strategy."
+    rationale:"No price on the visual — the BIO keeps price in copy, not image. Chose Tuesday-morning kitchen light over studio product shots so the frame says “ritual” not “sale”, matching the cost-of-pause strategy."
   },
 
-  /* ── New collection launch ── */
+  /* ── New collection ── */
   {
-    id:"o5", briefId:"b-collection-launch", kind:"longform",
+    id:"o5", briefId:"b-collection-microlot", kind:"longform",
     type:"LONG-FORM · ESSAY OPENER", agentId:"a15", status:"review",
-    body:"Someone made this by hand. They have a small workshop and the inheritance of a craft that, where they're from, you don't explain because everyone already knows it. We don't need to tell you the dimensions or the material. We need to tell you the piece is named after the person who made it, and that's where you'll start.",
+    body:"Don José grew this. He has 1.4 hectares and the inheritance of a name that, in his town, you don't introduce because everyone knows it already. We don't need to tell you the elevation or the variety. We need to tell you that the coffee is named after the person, and that's where you'll start.",
     meta:"1,840 words · editorial register",
-    rationale:"Started on the maker, not the spec — the BIO marks provenance as mandatory but warns against decoration, so the essay leads with the person and earns the spec details later instead of front-loading them."
+    rationale:"Started on the grower's name, not the elevation or varietal — the BIO marks provenance as mandatory but warns against decoration, so the essay leads with the person and earns the spec details later instead of front-loading them."
   },
   {
-    id:"o7", briefId:"b-collection-launch", kind:"image",
-    type:"PRODUCT LABEL · FRONT", agentId:"a20", status:"draft",
-    body:"Hand-set serial number, the maker's signature reproduced under the lot code. Uncoated stock, single-colour. The label is the provenance — nothing decorative.",
+    id:"o7", briefId:"b-collection-microlot", kind:"image",
+    type:"BAG LABEL · FRONT", agentId:"a20", status:"draft",
+    body:"Hand-set serial number, Don José's signature reproduced under the lot code. Kraft stock, single-colour amber. The label is the provenance — nothing decorative.",
     meta:"label dieline · print-ready"
   },
   {
-    id:"o8", briefId:"b-collection-launch", kind:"social",
+    id:"o8", briefId:"b-collection-microlot", kind:"social",
     type:"INSTAGRAM · CAROUSEL ×4", agentId:"a14", status:"draft",
-    body:"Slide 1: the name. Slide 2: the workshop. Slide 3: the piece. Slide 4: where to get it. No 'link in bio' energy — it reads like a short letter.",
+    body:"Slide 1: the name. Slide 2: the hectares. Slide 3: the cup. Slide 4: where to get it. No 'link in bio' energy — it reads like a short letter.",
     meta:"4 frames · caption + alt text"
   },
 
-  /* ── Summer campaign ── */
+  /* ── Seasonal campaign ── */
   {
-    id:"o9", briefId:"b-summer-campaign", kind:"copy",
+    id:"o9", briefId:"b-summer-tuesdays", kind:"copy",
     type:"TERRITORY · ×3 CONCEPTS", agentId:"a06", status:"draft",
-    body:"01 · 'The slow afternoon, on purpose.'  02 · 'Everyday, but make it a ritual.'  03 · 'Summer is when the routine stretches, not breaks.' — recommend 03, it ladders to the BIO positioning.",
+    body:"01 · 'The slow afternoon, on purpose.'  02 · 'Iced, but make it a ritual.'  03 · 'Summer is when we earn the slow Tuesday back.' — recommend 03, it ladders to the BIO positioning.",
     meta:"3 territories · 1 recommended"
   },
   {
-    id:"o10", briefId:"b-summer-campaign", kind:"image",
+    id:"o10", briefId:"b-summer-tuesdays", kind:"image",
     type:"CAMPAIGN HERO · KV", agentId:"a18", status:"draft",
-    body:"A cold drink sweating on a shaded balcony table, afternoon shadow long across the wood. Editorial, not stocky. Type lockup bottom-left.",
+    body:"Cold brew sweating on a shaded balcony table, afternoon shadow long across the wood. Editorial, not stocky. Amber type lockup bottom-left.",
     meta:"1920×1080 · 2 ratios"
   },
   {
-    id:"o11", briefId:"b-summer-campaign", kind:"email",
+    id:"o11", briefId:"b-summer-tuesdays", kind:"email",
     type:"TEASER · PRE-LAUNCH", agentId:"a13", status:"draft",
-    body:"Something slower is coming for the warm months. Not a sale. A reason to keep the routine even when the city speeds up. Watch this space — or don't, and we'll tell you when it lands.",
+    body:"Something slower is coming for the warm months. Not a sale. A reason to keep the Tuesday even when the city speeds up. Watch this space — or don't, and we'll tell you when it lands.",
     meta:"96 words · single send"
   },
 
@@ -678,33 +671,33 @@ window.CI_OUTPUTS = [
   {
     id:"o12", briefId:"b-investor-deck", kind:"deck",
     type:"DECK · 12-SLIDE OUTLINE", agentId:"a09", status:"shipped",
-    body:"Cold open on the retention curve, not the team slide. Problem framed as 'subscriptions churn because they're a commodity relationship.' The bet: provenance + ritual = a brand, not a SKU.",
+    body:"Cold open on the retention curve, not the team slide. Problem framed as 'subscription coffee churns because it's a commodity relationship.' The bet: provenance + ritual = a brand, not a SKU.",
     meta:"12 slides · narrative spine"
   },
   {
     id:"o13", briefId:"b-investor-deck", kind:"copy",
     type:"ONE-LINER · ×5", agentId:"a02", status:"shipped",
-    body:"'We sell the ritual, not the SKU.' · 'A product with a name attached.' · 'The anti-commodity subscription.' · 'Provenance you can feel, a ritual you can keep.' · 'A brand, not a SKU.'",
+    body:"'We sell the Tuesday, not the bag.' · 'Coffee with a name attached.' · 'The anti-commodity subscription.' · 'Provenance you can taste, ritual you can keep.' · 'A brand, not a SKU.'",
     meta:"5 lines · for cover + cold email"
   },
   {
     id:"o14", briefId:"b-investor-deck", kind:"image",
     type:"MARKET MAP · DIAGRAM", agentId:"a18", status:"review",
-    body:"2×2 with 'commodity ↔ provenance' on x and 'transactional ↔ ritual' on y. Competitors clustered bottom-left; the brand alone top-right. Clean, no gradient soup.",
+    body:"2×2 with 'commodity ↔ provenance' on x and 'transactional ↔ ritual' on y. Competitors clustered bottom-left; Your brand alone top-right. Clean, no gradient soup.",
     meta:"vector · light + dark variants"
   },
 
   /* ── Client uploads (reference material the brand brought in) ── */
   {
-    id:"u1", briefId:"b-collection-launch", kind:"upload", source:"upload",
-    type:"UPLOAD · WORKSHOP PHOTOS", agentId:null, status:"draft",
-    body:"12 photos from the maker's workshop — the bench, the tools, the signature on the lot ledger. Source material for the product label and the essay.",
+    id:"u1", briefId:"b-collection-microlot", kind:"upload", source:"upload",
+    type:"UPLOAD · FARM PHOTOS", agentId:null, status:"draft",
+    body:"12 photos from Don José's farm — harvest, drying beds, the signature on the lot ledger. Source material for the bag label and the essay.",
     meta:"12 images · 48 MB · client upload"
   },
   {
     id:"u2", briefId:"b-pricing-relaunch", kind:"upload", source:"upload",
     type:"UPLOAD · BRAND GUIDELINES", agentId:null, status:"draft",
-    body:"Brand book v2 (PDF). Type, colour, the pricing rules, the forbidden-words list Brandolph QAs against.",
+    body:"Your brand book v2 (PDF). Type, colour, approved pricing, and the forbidden-words list Brandolph QAs against.",
     meta:"PDF · 18 pp · client upload"
   },
 ];
@@ -717,11 +710,51 @@ window.CI_BRANDOLPH_OPENERS = {
   fresh:    "*Welcome back.* The BIO is current. Nothing is in flight. The fastest way to start is to tell me what you're trying to ship this month — not the deliverable, the change you want made.",
 };
 
+/* Discovery — extraction signals (used in /discovery results) ----- */
+window.CI_DISCOVERY = {
+  brand: "Your brand",
+  url:   "yourbrand.example",
+  confidence: 91,
+  duration: "38.4s",
+  signals: 94,
+  flags: 1,
+  identity: [
+    { key:"Brand name",    val:"Your brand",                       conf:99 },
+    { key:"One-liner",     val:"Specialty coffee for slow Tuesdays.", conf:88 },
+    { key:"Origin year",   val:"2021",                                conf:94 },
+    { key:"Headquarters",  val:"Barcelona, Spain",                    conf:96 },
+  ],
+  palette: [
+    { hex:"#1F1A14", name:"Espresso", conf:96, wcag:"AA+" },
+    { hex:"#C97B3F", name:"Ember",    conf:94, wcag:"AA" },
+    { hex:"#F4ECDD", name:"Cream",    conf:91, wcag:"—" },
+    { hex:"#7FA37A", name:"Sage",     conf:78, wcag:"AA" },
+    { hex:"#E8A020", name:"Honey",    conf:62, wcag:"AA" },
+  ],
+  type: [
+    { kind:"Display", family:"Söhne Breit", size:"variable 32–80", license:"paid", suggest:"Söhne Breit (kept)" },
+    { kind:"Body",    family:"GT Sectra Display", size:"16/26", license:"paid", suggest:"Söhne (kept)" },
+  ],
+  voice: [
+    { dim:"Formality", val:0.4, sample:"Annual is now an option." },
+    { dim:"Warmth",    val:0.75, sample:"We'll be here on a Tuesday." },
+    { dim:"Play",      val:0.45, sample:"You can stop reading. The coffee is ready." },
+    { dim:"Urgency",   val:0.15, sample:"Take the week to decide." },
+  ],
+  imagery: ["Hands + craft tools","Café interiors low light","Producer portraits","Coffee bag detail (no model)"],
+  avoid: ["B&W documentary","Latte art top-down","Group lifestyle shots"],
+  audience: {
+    segments: ["Café-warm regulars","Online subscribers","Wholesale buyers"],
+    channels: ["Klaviyo email","Instagram","In-café"],
+    languages: ["Catalan","Spanish","English"],
+  },
+};
+
 /* Team queue (jobs) ----------------------------------------------- */
 window.CI_JOBS = [
-  { id:"j-9f2a1c", client:"Sample Client",   type:"Hero KV finish",      cr:220, submitted:"2h ago",  sla:"48h",     status:"unassigned", assignee:null },
-  { id:"j-d4e8b7", client:"Sample Client",   type:"Email build polish",  cr:120, submitted:"5h ago",  sla:"32h",     status:"in-progress", assignee:"Aitana V." },
-  { id:"j-3b6c2a", client:"Sample Client",   type:"Pricing page review", cr:80,  submitted:"yesterday", sla:"18h overdue", status:"review",  assignee:"Marc P." },
+  { id:"j-9f2a1c", client:"Your brand",   type:"Hero KV finish",      cr:220, submitted:"2h ago",  sla:"48h",     status:"unassigned", assignee:null },
+  { id:"j-d4e8b7", client:"Your brand",   type:"Email build polish",  cr:120, submitted:"5h ago",  sla:"32h",     status:"in-progress", assignee:"Aitana V." },
+  { id:"j-3b6c2a", client:"Your brand",   type:"Pricing page review", cr:80,  submitted:"yesterday", sla:"18h overdue", status:"review",  assignee:"Marc P." },
   { id:"j-77a9d1", client:"Plaza Hortelana", type:"Identity finalisation",cr:550,submitted:"3d ago", sla:"8h",      status:"delivered",  assignee:"Aitana V." },
   { id:"j-22e6f5", client:"Plaza Hortelana", type:"Deck polish",         cr:300, submitted:"4d ago", sla:"24h",      status:"in-progress", assignee:"Diego M." },
   { id:"j-55c0a3", client:"Bandera",         type:"Minor polish",        cr:80,  submitted:"1h ago", sla:"40h",      status:"unassigned",  assignee:null },
@@ -762,10 +795,10 @@ window.CI_LEDGER = [
   { date:"14 May · 11:42", desc:"Spring campaign — Email sequence",  who:"Email Sequence · L2-13",  cr:-12, layer:"L2" },
   { date:"14 May · 11:42", desc:"Spring campaign — Subject lines",   who:"Subject Lines · L2-14",   cr:-2,  layer:"L2" },
   { date:"14 May · 11:43", desc:"Spring campaign — Brand QA",        who:"Brand Consistency QA · L2-24", cr:-2,  layer:"L2" },
-  { date:"13 May · 17:08", desc:"Hero KV finish — Your brand",        who:"Aitana V. · Senior designer", cr:-220, layer:"L3" },
-  { date:"12 May · 09:31", desc:"Discovery compile — Your brand",     who:"BIO Compiler · L2-30",    cr:-10, layer:"L2" },
+  { date:"13 May · 17:08", desc:"Hero KV finish — Your brand",            who:"Aitana V. · Senior designer", cr:-220, layer:"L3" },
+  { date:"12 May · 09:31", desc:"Discovery compile — Your brand",         who:"BIO Compiler · L2-30",    cr:-10, layer:"L2" },
   { date:"11 May · 14:55", desc:"Brandolph turn — assembly proposal", who:"Brandolph",   cr:-3,  layer:"L1" },
   { date:"08 May · 10:12", desc:"Investor deck — Build",              who:"Deck Build · L2-27",       cr:-12, layer:"L2" },
-  { date:"06 May · 16:40", desc:"Collection essay — Long-form",       who:"Long-form Editor · L2-15",cr:-14, layer:"L2" },
+  { date:"06 May · 16:40", desc:"Collection essay — Long-form",         who:"Long-form Editor · L2-15",cr:-14, layer:"L2" },
   { date:"05 May · 09:00", desc:"Cycle credit refresh",                who:"—",          cr:900, layer:"—" },
 ];
