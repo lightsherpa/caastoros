@@ -1,5 +1,6 @@
 import React from "react";
 import { apiFetch } from "./lib/supabase-browser.js";
+import { LOCALES, useLocale } from "./lib/i18n.js";
 const { BrandolphAvatar, BrandolphDot, Counter, Drawer, Icon, LayerTag, ModelChip, PageHeader } = window;
 /* Craft marketplace + Credits ledger + Settings. */
 
@@ -370,7 +371,66 @@ function NotificationPrefs() {
   );
 }
 
+/* Platform language — Profile → Language. Mirrors NotificationPrefs. The
+   enabled locales come from the workspace policy (/api/i18n/policy); choosing
+   one flips the whole shell via setLocale() and persists to the user's account
+   (/api/i18n/me-locale). Optimistic: on PATCH failure the local switch stands
+   and a small inline error shows. */
+function LanguagePrefs() {
+  const { locale, setLocale, t } = useLocale();
+  const [enabled, setEnabled] = useCState(LOCALES.map((l) => l.code));
+  const [error, setError] = useCState(null);
+  useCEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await apiFetch("/api/i18n/policy");
+        if (r.ok && alive) {
+          const d = await r.json();
+          if (Array.isArray(d.enabled_locales) && d.enabled_locales.length) setEnabled(d.enabled_locales);
+        }
+      } catch (e) { /* fall back to all locales */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+  const choose = async (code) => {
+    if (code === locale) return;
+    setError(null);
+    setLocale(code);                                               // optimistic, platform-wide
+    try {
+      const r = await apiFetch("/api/i18n/me-locale", { method: "PATCH", body: JSON.stringify({ locale: code }) });
+      if (!r.ok) throw new Error("locale save failed");
+    } catch (e) { setError(t("settings.language.saveError")); }    // keep the local switch
+  };
+  const options = LOCALES.filter((l) => enabled.includes(l.code));
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap: 4, maxWidth: 520}}>
+      <h3 style={{margin: "0 0 4px"}}>{t("settings.language.title")}</h3>
+      <p style={{fontSize:13, color:"var(--c-dim)", margin:"0 0 12px", lineHeight:1.5}}>
+        {t("settings.language.desc")}
+      </p>
+      <div style={{display:"flex", flexDirection:"column", gap: 8}}>
+        {options.map((l) => {
+          const active = l.code === locale;
+          return (
+            <button key={l.code} type="button" onClick={() => choose(l.code)} aria-pressed={active}
+              style={{display:"flex", alignItems:"center", justifyContent:"space-between", gap:12,
+                padding:"12px 14px", borderRadius:10, cursor:"pointer", textAlign:"left", width:"100%",
+                border: active ? "1.5px solid var(--brand)" : "1px solid var(--c-line)",
+                background: active ? "rgba(var(--brand-glow),0.06)" : "var(--c-card)"}}>
+              <span style={{fontSize:14, fontWeight:500, color:"var(--c-ink)"}}>{l.native}</span>
+              {active && <Icon name="check" size={15} />}
+            </button>
+          );
+        })}
+      </div>
+      {error && <div style={{fontSize:12, color:"var(--pink-500)", marginTop:10}}>{error}</div>}
+    </div>
+  );
+}
+
 function SettingsView() {
+  const { t } = useLocale();
   const [tab, setTab] = useCState("workspace");
   return (
     <div style={{padding:"24px 36px 60px"}}>
@@ -386,6 +446,7 @@ function SettingsView() {
             ["bio","BIO governance"],
             ["integrations","Integrations"],
             ["notifications","Notifications"],
+            ["language", t("settings.language.nav")],
             ["api","API & MCP (Tier 03)"],
             ["danger","Danger"],
           ].map(([k, l]) => (
@@ -397,6 +458,7 @@ function SettingsView() {
 
         <section className="card" style={{padding: 28}}>
           {tab === "notifications" && <NotificationPrefs />}
+          {tab === "language" && <LanguagePrefs />}
           {tab === "workspace" && (
             <div style={{display:"flex", flexDirection:"column", gap: 18, maxWidth: 480}}>
               <h3 style={{margin: 0}}>Workspace</h3>

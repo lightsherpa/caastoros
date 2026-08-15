@@ -27,7 +27,32 @@
   },
   "admin": {
     "specs": "Specs",
-    "brandolphMemory": "Brandolph memory"
+    "languages": "Languages",
+    "brandolphMemory": "Brandolph memory",
+    "lang": {
+      "title": "Languages",
+      "sub": "Translation coverage, inline fixes, and which languages this workspace offers.",
+      "reload": "Reload",
+      "coverage": "Coverage",
+      "complete": "Fully translated",
+      "missing": "Missing keys",
+      "fixInline": "Fix inline",
+      "fixDesc": "Edit any translation and save it straight to the live catalog. Keys with no translation are flagged and sorted first.",
+      "key": "Key",
+      "reference": "English reference",
+      "save": "Save",
+      "saving": "Saving…",
+      "saveError": "Couldn't save just now — please try again.",
+      "saved": "Saved.",
+      "runtimeGaps": "Runtime gaps",
+      "runtimeGapsDesc": "Keys the app requested in the active language but had no translation for, collected as the team browses.",
+      "noGaps": "No runtime gaps recorded yet.",
+      "governance": "Governance",
+      "governanceDesc": "Choose which languages this workspace offers and which one is the default. English is always available.",
+      "enabledLocales": "Enabled languages",
+      "defaultLocale": "Default language",
+      "saveGovernance": "Save governance"
+    }
   },
   "common": {
     "brandolph": "Brandolph",
@@ -104,6 +129,14 @@
       "01": "Run two brands side by side with shared specialist memory.",
       "02": "Three brands plus priority human craft polish.",
       "03": "Unlimited brands for studios running the whole roster."
+    }
+  },
+  "settings": {
+    "language": {
+      "nav": "Language",
+      "title": "Language",
+      "desc": "Choose the language CaastorOS speaks to you in. It applies across every surface and is saved to your account.",
+      "saveError": "We couldn't save this to your account, but the switch applied here."
     }
   },
   "locale": {

@@ -32,7 +32,32 @@
   },
   "admin": {
     "specs": "Especificaciones",
-    "brandolphMemory": "Memoria de Brandolph"
+    "languages": "Idiomas",
+    "brandolphMemory": "Memoria de Brandolph",
+    "lang": {
+      "title": "Idiomas",
+      "sub": "Cobertura de traducción, correcciones en línea y qué idiomas ofrece este espacio de trabajo.",
+      "reload": "Recargar",
+      "coverage": "Cobertura",
+      "complete": "Totalmente traducido",
+      "missing": "Claves faltantes",
+      "fixInline": "Corregir en línea",
+      "fixDesc": "Edita cualquier traducción y guárdala directamente en el catálogo activo. Las claves sin traducción se marcan y aparecen primero.",
+      "key": "Clave",
+      "reference": "Referencia en inglés",
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "saveError": "No se pudo guardar ahora mismo: inténtalo de nuevo.",
+      "saved": "Guardado.",
+      "runtimeGaps": "Huecos en tiempo de ejecución",
+      "runtimeGapsDesc": "Claves que la app pidió en el idioma activo sin traducción disponible, recopiladas mientras el equipo navega.",
+      "noGaps": "Aún no se han registrado huecos en tiempo de ejecución.",
+      "governance": "Gobernanza",
+      "governanceDesc": "Elige qué idiomas ofrece este espacio de trabajo y cuál es el predeterminado. El inglés siempre está disponible.",
+      "enabledLocales": "Idiomas habilitados",
+      "defaultLocale": "Idioma predeterminado",
+      "saveGovernance": "Guardar gobernanza"
+    }
   },
   "common": {
     "brandolph": "Brandolph",
@@ -109,6 +134,14 @@
       "01": "Gestiona dos marcas en paralelo con memoria de especialistas compartida.",
       "02": "Tres marcas más pulido artesanal humano prioritario.",
       "03": "Marcas ilimitadas para estudios que gestionan toda la plantilla."
+    }
+  },
+  "settings": {
+    "language": {
+      "nav": "Idioma",
+      "title": "Idioma",
+      "desc": "Elige el idioma en el que CaastorOS te habla. Se aplica en todas las pantallas y se guarda en tu cuenta.",
+      "saveError": "No pudimos guardarlo en tu cuenta, pero el cambio se aplicó aquí."
     }
   },
   "locale": {

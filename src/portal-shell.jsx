@@ -1,7 +1,7 @@
 import React from "react";
 import { supabase, apiFetch } from "./lib/supabase-browser.js";
-import { useLocale, setLocale, t, fmtNumber, LOCALES } from "./lib/i18n.js";
-const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory } = window;
+import { useLocale, t, fmtNumber, applyOverrides } from "./lib/i18n.js";
+const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory, AdminLanguages } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
 
@@ -54,6 +54,7 @@ const TEAM_ROUTES = [
    role:'admin'. Keeps the admin's client view intact; adds tools. */
 const ADMIN_ROUTES = [
   { id:"admin-specs",     labelKey:"admin.specs",           icon:"settings", sectionKey:"section.admin" },
+  { id:"admin-languages", labelKey:"admin.languages",       icon:"settings", sectionKey:"section.admin" },
   { id:"admin-brandolph", labelKey:"admin.brandolphMemory", icon:"sparkles", sectionKey:"section.admin" },
 ];
 
@@ -585,6 +586,7 @@ function TopBar({ portal, route, brandName, go }) {
     "team-clients":[t("title.clientRoster"), t("section.teamPortal")],
     "team-me":   [t("team.myEarnings"), t("section.teamPortal")],
     "admin-specs":     [t("admin.specs"),           t("section.admin")],
+    "admin-languages": [t("admin.languages"),       t("section.admin")],
     "admin-brandolph": [t("admin.brandolphMemory"), t("section.admin")],
   };
   const [title, crumb] = titles[route] || [route, ""];
@@ -677,57 +679,11 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
           </React.Fragment>
         ))}
       </div>
-      <LocaleSwitcher />
       <button className="app-dock__item app-dock__logout" onClick={onLogout}>
         <span className="app-dock__icon"><Icon name="arrowLeft" size={18} /></span>
         <span>{t("common.logOut")}</span>
       </button>
     </nav>
-  );
-}
-
-/* Locale switcher ──────────────────────────────────────────────────
-   Compact EN / ES / العربية segmented control. Sits in the dock footer,
-   just above Log out (the account area). Calls setLocale(), which
-   persists the choice, flips <html lang/dir>, and re-renders every
-   component subscribed via useLocale — so the whole shell re-labels
-   (and RTL kicks in for Arabic) without a reload. Inline styles keyed to
-   existing DS tokens so it needs no new CSS. */
-function LocaleSwitcher() {
-  const { locale, t } = useLocale();
-  return (
-    <div
-      role="group"
-      aria-label={t("a11y.language")}
-      style={{
-        display:"flex", gap:4, margin:"0 16px 8px", padding:4,
-        border:"1px solid var(--c-line)", borderRadius:10, background:"var(--c-bg)",
-      }}
-    >
-      {LOCALES.map((l) => {
-        const active = locale === l.code;
-        return (
-          <button
-            key={l.code}
-            type="button"
-            onClick={() => setLocale(l.code)}
-            aria-pressed={active}
-            title={l.native}
-            style={{
-              flex:1, minWidth:0, padding:"5px 6px", cursor:"pointer",
-              border:"none", borderRadius:7,
-              fontFamily:"var(--font-mono)", fontSize:11, letterSpacing:"0.04em",
-              whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
-              background: active ? "var(--yellow-500)" : "transparent",
-              color: active ? "var(--neutral-900)" : "var(--c-dim)",
-              fontWeight: active ? 600 : 500,
-            }}
-          >
-            {l.short}
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -786,6 +742,23 @@ function App() {
     if (session.role === "team"   && !isTeamRoute  ) go("team");
     if (session.role === "admin"  && !isClientRoute && !isAdminRoute) go("home");
   }, [session, route.id, route.param, onLoginRoute]);
+
+  /* Load DB translation overrides once, after auth resolves. Non-blocking:
+     any failure leaves the static JSON catalogs in place. applyOverrides()
+     re-renders subscribed components so the live copy swaps in. */
+  const i18nLoaded = React.useRef(false);
+  useShellEffect(() => {
+    if (!session || session._pending || i18nLoaded.current) return;
+    i18nLoaded.current = true;
+    (async () => {
+      try {
+        const r = await apiFetch("/api/i18n/translations");
+        if (!r.ok) return;
+        const j = await r.json();
+        if (j && j.overrides) applyOverrides(j.overrides);
+      } catch (e) { /* static catalogs remain */ }
+    })();
+  }, [session]);
 
   /* Not signed in → show the matching login screen.
      OR signed in but in PASSWORD_RECOVERY state (user clicked the
@@ -851,6 +824,7 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "team-clients": return <TeamClients />;
     case "team-me":      return <TeamMe />;
     case "admin-specs":     return <AdminSpecs />;
+    case "admin-languages": return <AdminLanguages />;
     case "admin-brandolph": return <AdminBrandolphMemory />;
     default:             return <BrandolphHome tweaks={tweaks} setTweak={setTweak} go={go} />;
   }

@@ -42,6 +42,14 @@ const SUPPORTED = LOCALES.map((l) => l.code);
 const STORAGE_KEY = "locale";
 const listeners = new Set();
 
+// A monotonically-increasing store version, bumped on every locale change AND
+// every override merge. useLocale() snapshots THIS (not the bare locale) so a
+// subscribed component re-renders on both — a locale-string snapshot wouldn't
+// fire when only the DB overrides changed. notify() fans the change out.
+let storeVersion = 0;
+function notify() { storeVersion += 1; for (const fn of listeners) fn(); }
+function getStoreVersion() { return storeVersion; }
+
 function detectInitialLocale() {
   // 1) explicit prior choice, 2) browser language, 3) fallback.
   try {
@@ -88,7 +96,7 @@ export function setLocale(loc) {
   currentLocale = loc;
   try { localStorage.setItem(STORAGE_KEY, loc); } catch (e) { /* ignore */ }
   applyDocumentLocale(loc);
-  for (const fn of listeners) fn();
+  notify();
 }
 
 /**
@@ -103,6 +111,82 @@ export function initI18n() {
 // Apply once at module-eval time too, so lang/dir are right even if a
 // caller forgets initI18n() (defensive; both paths are idempotent).
 applyDocumentLocale(currentLocale);
+
+// ── DB translation overrides + coverage tracking ────────────────────
+// OVERRIDES holds admin-authored translations fetched from the server as
+// FLAT dotted-key → string maps, per locale. They win over the static JSON
+// catalogs at lookup time (see t()), so the team can fix copy live without a
+// redeploy. MISSING records keys the running app requested in a non-en locale
+// but had no translation for — the real gaps, as actually browsed.
+let OVERRIDES = { en: {}, es: {}, ar: {} };
+const MISSING = new Set();
+
+/**
+ * Merge server-fetched overrides into OVERRIDES and re-render subscribers.
+ * Shape: { en:{"a.b":"…"}, es:{…}, ar:{…} } — any subset of locales. Each
+ * provided locale bucket replaces the prior one, so a full re-fetch reflects
+ * deletions; buckets not present in `map` are left untouched.
+ */
+export function applyOverrides(map) {
+  if (!map || typeof map !== "object") return;
+  for (const code of SUPPORTED) {
+    if (map[code] && typeof map[code] === "object") OVERRIDES[code] = { ...map[code] };
+  }
+  notify();
+}
+
+// Every leaf key (a string, or a { plural } object) in a nested catalog, as
+// dotted paths. `_notes` metadata blocks are skipped. Powers coverage + admin.
+function flattenKeys(obj, prefix = "") {
+  const out = [];
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === "_notes") continue;
+    const dotted = prefix ? prefix + "." + k : k;
+    if (v && typeof v === "object" && !v.plural) out.push(...flattenKeys(v, dotted));
+    else out.push(dotted);
+  }
+  return out;
+}
+
+// Sorted list of every translatable key, keyed off the en source of truth.
+export function getAllKeys() {
+  return flattenKeys(CATALOGS[FALLBACK]).sort();
+}
+
+// The en source string for a key — the reference the admin translates against.
+// Plural leaves surface their `other` form (overrides are plain strings).
+export function getSourceText(key) {
+  const v = lookup(CATALOGS[FALLBACK], key);
+  if (v == null) return "";
+  if (typeof v === "object" && v.plural) return v.plural.other || v.plural.one || "";
+  return typeof v === "string" ? v : String(v);
+}
+
+/**
+ * Translation coverage for a locale against the en source catalog.
+ * A key counts as translated if it has a DB override OR a static leaf in the
+ * locale's own catalog. Returns { total, translated, missing:[keys] }.
+ */
+export function getCoverage(locale) {
+  const keys = flattenKeys(CATALOGS[FALLBACK]);
+  const total = keys.length;
+  if (locale === FALLBACK) return { total, translated: total, missing: [] };
+  const over = OVERRIDES[locale] || {};
+  const cat = CATALOGS[locale] || {};
+  const missing = [];
+  let translated = 0;
+  for (const key of keys) {
+    if (over[key] || lookup(cat, key) !== undefined) translated += 1;
+    else missing.push(key);
+  }
+  return { total, translated, missing };
+}
+
+// Keys the running app requested in a non-en locale with no translation
+// available — accumulated as the user browses. Returns a sorted copy.
+export function getMissingKeys() {
+  return [...MISSING].sort();
+}
 
 // ── message lookup + formatting ─────────────────────────────────────
 
@@ -151,12 +235,32 @@ function render(value, vars, loc) {
  */
 export function t(key, vars) {
   const active = CATALOGS[currentLocale] || CATALOGS[FALLBACK];
-  let value = lookup(active, key);
-  if (value === undefined && currentLocale !== FALLBACK) {
-    value = lookup(CATALOGS[FALLBACK], key);
+
+  // 1) DB override in the active locale (flat dotted key). Overrides are
+  //    always plain strings — interpolate {vars}, no plural handling.
+  const overActive = OVERRIDES[currentLocale] ? OVERRIDES[currentLocale][key] : undefined;
+  // 2) static active-locale catalog (nested lookup; supports plurals).
+  const staticActive = lookup(active, key);
+
+  // Missing-key tracking: a non-en key with neither an active override nor a
+  // static active leaf has fallen back to en (or the key) — record the gap.
+  if (currentLocale !== FALLBACK && overActive == null && staticActive === undefined) {
+    MISSING.add(key);
   }
-  if (value === undefined) return key; // last-resort: surface the key
-  return render(value, vars, currentLocale);
+
+  if (overActive != null) return interpolate(overActive, vars);
+  if (staticActive !== undefined) return render(staticActive, vars, currentLocale);
+
+  // 3) DB override in the fallback (en) locale.
+  const overFallback = OVERRIDES[FALLBACK] ? OVERRIDES[FALLBACK][key] : undefined;
+  if (overFallback != null) return interpolate(overFallback, vars);
+
+  // 4) static en catalog.
+  const staticFallback = currentLocale !== FALLBACK ? lookup(CATALOGS[FALLBACK], key) : undefined;
+  if (staticFallback !== undefined) return render(staticFallback, vars, currentLocale);
+
+  // 5) last-resort: surface the key itself.
+  return key;
 }
 
 // ── Intl number / date helpers, keyed to the active locale ──────────
@@ -185,6 +289,9 @@ function subscribe(cb) {
  * component re-translates whenever setLocale() fires anywhere.
  */
 export function useLocale() {
-  const locale = useSyncExternalStore(subscribe, getLocale, () => FALLBACK);
-  return { locale, setLocale, t };
+  // Snapshot the store version, not the locale string: this re-renders on BOTH
+  // locale changes and override merges (either bumps the version via notify()).
+  // `locale`/`t` read the live module state, so the returned shape is unchanged.
+  useSyncExternalStore(subscribe, getStoreVersion, getStoreVersion);
+  return { locale: currentLocale, setLocale, t };
 }

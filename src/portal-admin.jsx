@@ -1,5 +1,6 @@
 import React from "react";
 import { apiFetch } from "./lib/supabase-browser.js";
+import { LOCALES, useLocale, getCoverage, getMissingKeys, getAllKeys, getSourceText, applyOverrides } from "./lib/i18n.js";
 const { Icon, BrandolphDot } = window;
 
 const { useState, useEffect, useMemo, useCallback } = React;
@@ -636,4 +637,284 @@ function AdminBrandolphMemory() {
   );
 }
 
-Object.assign(window, { AdminSpecs, AdminBrandolphMemory });
+/* ─────────────────────────────────────────────────────────────────
+   /admin/languages — the client half of the language-management feature.
+
+   Four sections:
+     • Coverage    — translated/total per non-en locale + missing keys.
+     • Fix inline  — edit any locale value and POST it to the live catalog.
+     • Runtime gaps— keys the app requested live but had no translation for.
+     • Governance  — which locales this workspace offers + the default.
+   Talks to /api/i18n/* ; coverage/runtime-gaps read the in-browser i18n lib.
+   ───────────────────────────────────────────────────────────────── */
+
+const langThCell = {
+  textAlign:"left", padding:"8px 12px", fontFamily:"var(--font-mono)", fontSize: 10,
+  fontWeight: 600, letterSpacing:"0.08em", textTransform:"uppercase", color:"var(--c-faint)",
+};
+
+function AdminLanguages() {
+  const { t } = useLocale();
+  const nonEn = LOCALES.filter((l) => l.code !== "en");     // es, ar — en is the source
+  const [overrides, setOverrides] = useState({ en:{}, es:{}, ar:{} });
+  const [drafts, setDrafts] = useState({});                 // "loc::key" -> uncommitted value
+  const [saving, setSaving] = useState(null);               // "loc::key" being POSTed
+  const [error, setError] = useState(null);
+
+  const reload = useCallback(async () => {
+    try {
+      const r = await apiFetch("/api/i18n/translations");
+      const j = await r.json();
+      if (r.ok && j && j.overrides) {
+        applyOverrides(j.overrides);                          // live coverage + runtime t()
+        setOverrides({ en:{}, es:{}, ar:{}, ...j.overrides });
+      }
+    } catch (e) { /* keep prior */ }
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  const dk = (loc, key) => loc + "::" + key;
+  const valueFor = (loc, key) => {
+    const k = dk(loc, key);
+    return k in drafts ? drafts[k] : (overrides[loc]?.[key] ?? "");
+  };
+  const dirty = (loc, key) => {
+    const k = dk(loc, key);
+    return (k in drafts) && drafts[k] !== (overrides[loc]?.[key] ?? "");
+  };
+  const save = async (loc, key) => {
+    const value = valueFor(loc, key);
+    setSaving(dk(loc, key)); setError(null);
+    try {
+      const r = await apiFetch("/api/i18n/admin/translations", {
+        method: "POST",
+        body: JSON.stringify({ locale: loc, key, value }),
+      });
+      if (!r.ok) throw new Error("save failed");
+      setDrafts((d) => { const n = { ...d }; delete n[dk(loc, key)]; return n; });
+      await reload();                                          // coverage updates live
+    } catch (e) { setError(t("admin.lang.saveError")); }
+    finally { setSaving(null); }
+  };
+
+  const allKeys = getAllKeys();
+  const missingSet = new Set([...getCoverage("es").missing, ...getCoverage("ar").missing]);
+  const ordered = [...allKeys].sort((a, b) =>
+    ((missingSet.has(b) ? 1 : 0) - (missingSet.has(a) ? 1 : 0)) || a.localeCompare(b));
+  const runtimeGaps = getMissingKeys();
+
+  return (
+    <div style={{padding:"24px 36px 80px"}}>
+      <PageHeader
+        eyebrow="Admin · Languages"
+        title={t("admin.lang.title")}
+        sub={t("admin.lang.sub")}
+        right={<button className="btn btn--ghost btn--sm" onClick={reload}><Icon name="refresh" size={13} /> {t("admin.lang.reload")}</button>}
+      />
+
+      {error && (
+        <div className="card" style={{padding:"10px 14px", marginBottom: 14, borderLeft:"3px solid var(--pink-500)", fontSize: 13}}>{error}</div>
+      )}
+
+      {/* 1 · Coverage */}
+      <section style={{marginBottom: 32}}>
+        <h2 style={{margin:"0 0 12px", fontSize: 16, fontWeight: 600}}>{t("admin.lang.coverage")}</h2>
+        <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(260px, 1fr))", gap: 12}}>
+          {nonEn.map((l) => {
+            const c = getCoverage(l.code);
+            const pct = c.total ? Math.round((c.translated / c.total) * 100) : 100;
+            const done = c.missing.length === 0;
+            return (
+              <div key={l.code} className="card" style={{padding: 16}}>
+                <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline"}}>
+                  <strong style={{fontSize: 14}}>{l.native}</strong>
+                  <span className="eyebrow">{l.code}</span>
+                </div>
+                <div style={{fontFamily:"var(--font-mono)", fontSize: 22, marginTop: 8, color:"var(--c-ink)"}}>
+                  {c.translated}/{c.total} <span style={{fontSize: 13, color:"var(--c-faint)"}}>({pct}%)</span>
+                </div>
+                <div style={{height: 6, background:"var(--c-line)", borderRadius: 999, overflow:"hidden", marginTop: 10}}>
+                  <div style={{height:"100%", width: pct + "%", background: done ? "var(--green-500)" : "var(--yellow-500)", borderRadius: 999}} />
+                </div>
+                {done ? (
+                  <div style={{fontSize: 12.5, color:"var(--green-600)", marginTop: 10, fontWeight: 500}}>✓ {t("admin.lang.complete")}</div>
+                ) : (
+                  <details style={{marginTop: 10}}>
+                    <summary style={{fontSize: 12.5, color:"var(--c-dim)", cursor:"pointer"}}>{t("admin.lang.missing")} · {c.missing.length}</summary>
+                    <div style={{marginTop: 8, maxHeight: 160, overflowY:"auto", display:"flex", flexDirection:"column", gap: 2}}>
+                      {c.missing.map((k) => <code key={k} style={{fontSize: 10.5, color:"var(--c-faint)"}}>{k}</code>)}
+                    </div>
+                  </details>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 2 · Fix inline */}
+      <section style={{marginBottom: 32}}>
+        <h2 style={{margin:"0 0 6px", fontSize: 16, fontWeight: 600}}>{t("admin.lang.fixInline")}</h2>
+        <p style={{margin:"0 0 12px", fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5, maxWidth: 640}}>{t("admin.lang.fixDesc")}</p>
+        <div className="card" style={{padding: 0, overflow:"hidden"}}>
+          <table style={{width:"100%", borderCollapse:"collapse", fontSize: 12.5}}>
+            <thead>
+              <tr style={{background:"var(--c-bg)", borderBottom:"1px solid var(--c-line)"}}>
+                <th style={langThCell}>{t("admin.lang.key")}</th>
+                <th style={langThCell}>{t("admin.lang.reference")}</th>
+                {nonEn.map((l) => <th key={l.code} style={langThCell}>{l.native}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {ordered.map((key) => (
+                <tr key={key} style={{borderBottom:"1px solid var(--c-line-2)"}}>
+                  <td style={{padding:"8px 12px", fontFamily:"var(--font-mono)", fontSize: 10.5, color:"var(--c-dim)", verticalAlign:"top", whiteSpace:"nowrap"}}>
+                    {missingSet.has(key) && <span title={t("admin.lang.missing")} style={{color:"var(--pink-500)", marginRight: 4}}>●</span>}
+                    {key}
+                  </td>
+                  <td style={{padding:"8px 12px", color:"var(--c-ink)", verticalAlign:"top", maxWidth: 260, lineHeight: 1.4}}>{getSourceText(key)}</td>
+                  {nonEn.map((l) => (
+                    <td key={l.code} style={{padding:"6px 10px", verticalAlign:"top"}}>
+                      <div style={{display:"flex", gap: 6, alignItems:"center"}}>
+                        <input
+                          value={valueFor(l.code, key)}
+                          dir={l.code === "ar" ? "rtl" : "ltr"}
+                          placeholder="—"
+                          onChange={(e) => { const v = e.target.value; setDrafts((d) => ({ ...d, [dk(l.code, key)]: v })); }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          style={{flex: 1, minWidth: 120, padding:"5px 8px", border:"1px solid var(--c-line)", borderRadius: 6, background:"var(--c-bg)", color:"var(--c-ink)", fontSize: 12.5, outline:"none"}}
+                        />
+                        {dirty(l.code, key) && (
+                          <button className="btn btn--ghost btn--sm" disabled={saving === dk(l.code, key)} onClick={() => save(l.code, key)}>
+                            {saving === dk(l.code, key) ? "…" : t("admin.lang.save")}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 3 · Runtime gaps */}
+      <section style={{marginBottom: 32}}>
+        <h2 style={{margin:"0 0 6px", fontSize: 16, fontWeight: 600}}>{t("admin.lang.runtimeGaps")}</h2>
+        <p style={{margin:"0 0 12px", fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5, maxWidth: 640}}>{t("admin.lang.runtimeGapsDesc")}</p>
+        {runtimeGaps.length === 0 ? (
+          <div className="card" style={{padding:"18px 20px", color:"var(--c-faint)", fontSize: 13}}>{t("admin.lang.noGaps")}</div>
+        ) : (
+          <div className="card" style={{padding:"12px 16px", display:"flex", flexWrap:"wrap", gap: 6}}>
+            {runtimeGaps.map((k) => (
+              <code key={k} style={{fontSize: 11, padding:"3px 7px", background:"var(--c-bg)", border:"1px solid var(--c-line)", borderRadius: 6, color:"var(--c-dim)"}}>{k}</code>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 4 · Governance */}
+      <LanguageGovernance t={t} />
+    </div>
+  );
+}
+
+/* Per-workspace language policy — which locales are offered + the default.
+   en is always enabled and can't be turned off; the default is limited to the
+   enabled set. Reads/writes /api/i18n/policy. */
+function LanguageGovernance({ t }) {
+  const [policy, setPolicy] = useState(null);        // { enabled_locales, default_locale }
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const r = await apiFetch("/api/i18n/policy");
+        const d = await r.json();
+        if (r.ok && alive) setPolicy({
+          enabled_locales: Array.isArray(d.enabled_locales) && d.enabled_locales.length ? d.enabled_locales : ["en"],
+          default_locale: d.default_locale || "en",
+        });
+      } catch (e) {
+        if (alive) setPolicy({ enabled_locales: LOCALES.map((l) => l.code), default_locale: "en" });
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const toggle = (code) => {
+    if (code === "en") return;                        // en always enabled
+    setPolicy((p) => {
+      const on = p.enabled_locales.includes(code);
+      const enabled_locales = on ? p.enabled_locales.filter((c) => c !== code) : [...p.enabled_locales, code];
+      const default_locale = enabled_locales.includes(p.default_locale) ? p.default_locale : "en";
+      return { enabled_locales, default_locale };
+    });
+  };
+
+  const save = async () => {
+    if (!policy) return;
+    setSaving(true); setMsg(null);
+    try {
+      const r = await apiFetch("/api/i18n/admin/policy", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled_locales: policy.enabled_locales, default_locale: policy.default_locale }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error("policy save failed");
+      setPolicy({
+        enabled_locales: Array.isArray(d.enabled_locales) ? d.enabled_locales : policy.enabled_locales,
+        default_locale: d.default_locale || policy.default_locale,
+      });
+      setMsg(t("admin.lang.saved"));
+    } catch (e) { setMsg(t("admin.lang.saveError")); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <section>
+      <h2 style={{margin:"0 0 6px", fontSize: 16, fontWeight: 600}}>{t("admin.lang.governance")}</h2>
+      <p style={{margin:"0 0 12px", fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5, maxWidth: 640}}>{t("admin.lang.governanceDesc")}</p>
+      {!policy ? (
+        <div style={{color:"var(--c-faint)", fontSize: 13}}>…</div>
+      ) : (
+        <div className="card" style={{padding: 20, display:"flex", flexDirection:"column", gap: 20, maxWidth: 560}}>
+          <div>
+            <div style={{fontSize: 12, fontWeight: 600, marginBottom: 8}}>{t("admin.lang.enabledLocales")}</div>
+            <div style={{display:"flex", flexDirection:"column", gap: 8}}>
+              {LOCALES.map((l) => {
+                const on = l.code === "en" || policy.enabled_locales.includes(l.code);
+                return (
+                  <label key={l.code} style={{display:"flex", alignItems:"center", gap: 10, fontSize: 14, color:"var(--c-ink)"}}>
+                    <input type="checkbox" checked={on} disabled={l.code === "en"} onChange={() => toggle(l.code)} />
+                    {l.native} <span style={{color:"var(--c-faint)", fontFamily:"var(--font-mono)", fontSize: 11}}>{l.code}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize: 12, fontWeight: 600, marginBottom: 8}}>{t("admin.lang.defaultLocale")}</div>
+            <div style={{display:"flex", flexDirection:"column", gap: 8}}>
+              {LOCALES.filter((l) => l.code === "en" || policy.enabled_locales.includes(l.code)).map((l) => (
+                <label key={l.code} style={{display:"flex", alignItems:"center", gap: 10, fontSize: 14, color:"var(--c-ink)"}}>
+                  <input type="radio" name="lang-default-locale" checked={policy.default_locale === l.code} onChange={() => setPolicy((p) => ({ ...p, default_locale: l.code }))} />
+                  {l.native}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{display:"flex", alignItems:"center", gap: 12}}>
+            <button className="btn btn--primary" disabled={saving} onClick={save}>{saving ? t("admin.lang.saving") : t("admin.lang.saveGovernance")}</button>
+            {msg && <span style={{fontSize: 12.5, color:"var(--c-dim)"}}>{msg}</span>}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+Object.assign(window, { AdminSpecs, AdminBrandolphMemory, AdminLanguages });

@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from "./lib/supabase-browser.js";
+import { setLocale } from "./lib/i18n.js";
 
 const { Icon, BrandolphAvatar } = window;
 /* Real Supabase auth (P0-004) — replaces the prior localStorage mock.
@@ -61,10 +62,13 @@ async function resolveProfile(authUser) {
   if (!authUser) return null;
   const { data, error } = await supabase
     .from("users")
-    .select("id, workspace_id, email, role")
+    .select("id, workspace_id, email, role, locale")
     .eq("id", authUser.id)
     .maybeSingle();
   if (error) console.warn("[auth] users row lookup failed:", error.message);
+  // Apply the user's saved platform language across every surface. setLocale
+  // guards absent/invalid values, so a null column is a harmless no-op.
+  if (data?.locale) setLocale(data.locale);
   return {
     id: authUser.id,
     email: authUser.email,
