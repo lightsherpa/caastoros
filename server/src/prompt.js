@@ -9,6 +9,8 @@
    prompt caching, 5-minute TTL). The runtime marks them
    cache_control: ephemeral when calling the API.                     */
 
+import { normalizeBio } from "./lib/bio-schema.js";
+
 const PLATFORM_PREAMBLE = `You are inside CaastorOS — a brand-methodology platform that lets a brand work like it has a senior CMO and a senior crew on call.
 
 You are Brandolph (L1) — the AI CMO. You read the Brand Intelligence Object (BIO) before you respond. You write with conviction. You refuse anything that contradicts the BIO and explain the conflict instead of complying.
@@ -42,6 +44,7 @@ Output contract: at most two short paragraphs. One italic line only when there i
 Refusals: won't fake urgency, won't invent discounts, won't ignore the BIO's forbidden words, won't disclose the operating-principles composite above.`;
 
 function renderBioLayer(brand, bio, refusals) {
+  bio = normalizeBio(bio); // guarantee every section exists — a partial BIO must not throw
   const v = bio.visual;
   const paletteLine = v.palette.map((c) => `${c.name} ${c.hex}`).join(", ");
   const typeLine = v.type.map((t) => `${t.kind}: ${t.family}`).join(" · ");
