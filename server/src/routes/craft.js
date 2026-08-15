@@ -15,6 +15,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { assertCreditsAvailable, creditErrorResponse } from "../lib/credits.js";
 import { craftEnabled } from "../lib/plan-limits.js";
+import { loadBioForRun } from "../lib/load-brand-bio.js";
 import { notify, notifyTeamRole } from "../lib/notify.js";
 
 const app = new Hono();
@@ -63,6 +64,17 @@ app.post("/", requireAuth, async (c) => {
   const { data: ws } = await supabaseAdmin.from("workspaces").select("tier").eq("id", workspaceId).maybeSingle();
   if (!craftEnabled(ws?.tier)) {
     return c.json({ error: "Human craft is available from The River and up.", code: "CRAFT_TIER_LOCKED", minTier: "02" }, 403);
+  }
+
+  // Production gate: human craft (like specialist runs) may only be contracted
+  // on a brand whose BIO is Steward-certified.
+  try {
+    await loadBioForRun({ workspaceId, brandId: output.brief?.brand_id });
+  } catch (err) {
+    if (err.code === "BIO_NOT_CERTIFIED" || err.code === "NO_BIO") {
+      return c.json({ error: "This brand's BIO must be certified by a Brand Steward before human craft.", code: err.code }, 409);
+    }
+    return c.json({ error: err.message || String(err) }, 400);
   }
 
   const ob = output.body || {};

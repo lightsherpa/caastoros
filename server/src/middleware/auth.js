@@ -41,3 +41,13 @@ export async function requireAdmin(c, next) {
   }
   await next();
 }
+
+/* Review-hierarchy authority above admin: decertification, reviewer-of-
+   reviewers, cross-tenant ops. Powers are wired to routes in M2. */
+export async function requireSuperAdmin(c, next) {
+  const auth = c.get("auth");
+  if (!auth || auth.role !== "super_admin") {
+    return c.json({ error: "Super admin only" }, 403);
+  }
+  await next();
+}

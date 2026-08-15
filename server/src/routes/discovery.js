@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { inngest } from "../lib/inngest.js";
+import { assertPublicUrl } from "../lib/ingest-guards.js";
 
 const app = new Hono();
 
@@ -21,6 +22,12 @@ app.post("/start", requireAuth, async (c) => {
   const url = typeof body.url === "string" ? body.url.trim() : "";
   const instagram = typeof body.instagram === "string" ? body.instagram.trim() : undefined;
   if (!url) return c.json({ error: "url required" }, 400);
+
+  // SSRF guard — the URL is scraped server-side. Block non-public targets
+  // before it reaches the scrape pipeline.
+  const probeUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  try { assertPublicUrl(probeUrl); }
+  catch (e) { return c.json({ error: `Invalid or blocked URL (${e.code || "URL"})`, code: e.code || "BAD_URL" }, 400); }
 
   // Resolve brand — either the caller-supplied id (with workspace check)
   // or the workspace's default (first) brand.

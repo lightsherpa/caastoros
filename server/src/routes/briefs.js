@@ -8,7 +8,7 @@
 
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
-import { loadBrandBio } from "../lib/load-brand-bio.js";
+import { loadBioForBriefing } from "../lib/load-brand-bio.js";
 import { sharpenBrief } from "../lib/sharpener.js";
 import { loadBrandMemorySummary } from "../lib/brandolph-memory.js";
 
@@ -21,10 +21,19 @@ app.post("/sharpen", requireAuth, async (c) => {
   const { briefText, brandId } = body || {};
   if (!briefText || typeof briefText !== "string") return c.json({ error: "briefText required" }, 400);
 
+  /* BRIEFING gate — sharpening a brief requires the client to have
+     self-certified the BIO. loadBioForBriefing throws NOT_SELF_CERTIFIED
+     (or NO_BIO) otherwise. */
   let brandBio;
   try {
-    brandBio = await loadBrandBio({ workspaceId, brandId, requireCertified: false });
+    brandBio = await loadBioForBriefing({ workspaceId, brandId });
   } catch (err) {
+    if (err.code === "NOT_SELF_CERTIFIED") {
+      return c.json({ error: "Confirm your BIO (self-certify) before briefing.", code: err.code }, 409);
+    }
+    if (err.code === "NO_BIO") {
+      return c.json({ error: "This brand has no BIO yet — run Discovery first.", code: err.code }, 409);
+    }
     return c.json({ error: err.message || String(err) }, 400);
   }
 
