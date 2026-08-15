@@ -3,12 +3,31 @@ import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { assignSteward } from "../lib/assign-steward.js";
 import { scoreBio } from "../lib/score-bio.js";
-import { validateUpload } from "../lib/ingest-guards.js";
+import { validateUpload, assertPublicUrl, MAX_UPLOAD_BYTES } from "../lib/ingest-guards.js";
 import { computeFocus } from "../lib/bio-focus.js";
 import { selfCertifyBio } from "../lib/self-certify.js";
 import { diffBio } from "../lib/bio-diff.js";
+import { SCORED_PATHS } from "../lib/bio-schema.js";
 
 const app = new Hono();
+
+// SECURITY (P3 C-1): a client must NOT author the BIO's confidence/provenance
+// map — a fabricated {conf:100, source:"a".."e"} inflates avgConf + diversity,
+// drives the score to 100, and clears the self-cert floor. On a client edit we
+// discard any client-supplied confidence/missing/conflicts and stamp a uniform
+// "client-stated" provenance, so the score reflects coverage + one human-stated
+// source, never an attacker-chosen number.
+const nonEmptyVal = (v) => (Array.isArray(v) ? v.length > 0 : v != null && String(v).trim() !== "");
+function sanitizeClientPayload(payload) {
+  const p = { ...(payload || {}) };
+  delete p.confidence; delete p.missing; delete p.conflicts;
+  const confidence = {};
+  for (const [s, k] of SCORED_PATHS) {
+    if (nonEmptyVal(p?.[s]?.[k])) confidence[`${s}.${k}`] = { conf: 80, source: "client-stated" };
+  }
+  p.confidence = confidence;
+  return p;
+}
 
 /* POST /api/bios/:brandId/sources
    Body: { sources: [{ kind, bucket, src, signals? }, ...] }
@@ -36,6 +55,15 @@ app.post("/:brandId/sources", requireAuth, async (c) => {
   try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
   const sources = Array.isArray(body?.sources) ? body.sources : [];
   if (sources.length === 0) return c.json({ error: "sources[] required" }, 400);
+
+  // SECURITY (P3 H-2): a client-supplied raw_ref is later fetched by the
+  // compiler — validate any URL against the SSRF guard before storing it.
+  for (const s of sources) {
+    if (s?.raw_ref && /^https?:\/\//i.test(String(s.raw_ref))) {
+      try { assertPublicUrl(String(s.raw_ref)); }
+      catch (e) { return c.json({ error: `Blocked source URL (${e.code || "URL"})`, code: e.code || "BAD_URL" }, 400); }
+    }
+  }
 
   const rows = sources.map((s) => ({
     brand_id: brandId,
@@ -66,6 +94,13 @@ app.post("/:brandId/sources/upload", requireAuth, async (c) => {
   const { data: brand } = await supabaseAdmin
     .from("brands").select("id, workspace_id").eq("id", brandId).maybeSingle();
   if (!brand || brand.workspace_id !== workspaceId) return c.json({ error: "Brand not in workspace" }, 403);
+
+  // SECURITY (P3 M-1): reject an oversized upload by declared length BEFORE
+  // buffering the whole multipart body into memory.
+  const declaredLen = Number(c.req.header("content-length") || 0);
+  if (declaredLen && declaredLen > MAX_UPLOAD_BYTES + 8192) {
+    return c.json({ error: "File too large", code: "TOO_LARGE" }, 413);
+  }
 
   const form = await c.req.formData().catch(() => null);
   if (!form) return c.json({ error: "multipart/form-data required" }, 400);
@@ -140,6 +175,7 @@ app.patch("/:brandId", requireAuth, async (c) => {
 
   const body = await c.req.json().catch(() => ({}));
   if (!body.payload || typeof body.payload !== "object") return c.json({ error: "payload required" }, 400);
+  const cleanPayload = sanitizeClientPayload(body.payload); // strip client-authored confidence (P3 C-1)
 
   const { data: latest } = await supabaseAdmin
     .from("bios").select("version").eq("brand_id", brandId)
@@ -151,8 +187,8 @@ app.patch("/:brandId", requireAuth, async (c) => {
     .insert({
       brand_id: brandId,
       version: nextVersion,
-      payload: body.payload,
-      score: scoreBio(body.payload || {}),
+      payload: cleanPayload,
+      score: scoreBio(cleanPayload),
       certified: false,
       created_by: userId,
     })

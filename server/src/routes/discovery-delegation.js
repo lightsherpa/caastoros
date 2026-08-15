@@ -19,6 +19,10 @@ import { notify, brandOwnerUserId } from "../lib/notify.js";
 
 const app = new Hono();
 
+// SECURITY (P3 M3): a pending magic-link is a standing read/write credential —
+// give it a TTL so a leaked link doesn't live forever.
+const DELEGATION_TTL_MS = Number(process.env.DELEGATION_TTL_DAYS || 7) * 86400000;
+
 // The six BIO section names. A delegation is scoped to exactly one of these,
 // and it is also the key under discovery_sessions.draft_payload we touch.
 const SECTIONS = ["identity", "audience", "voice", "visual", "goals", "strategic"];
@@ -135,12 +139,16 @@ app.get("/delegation/:token", async (c) => {
 
   const { data: del, error: delErr } = await supabaseAdmin
     .from("discovery_delegations")
-    .select("id, brand_id, session_id, chapter, status")
+    .select("id, brand_id, session_id, chapter, status, created_at")
     .eq("token", token)
     .maybeSingle();
   if (delErr) return c.json({ error: delErr.message }, 500);
   if (!del) return c.json({ error: "Delegation not found" }, 404);
   if (del.status !== "pending") return c.json({ error: "Delegation is no longer active", status: del.status }, 410);
+  if (del.created_at && Date.now() - new Date(del.created_at).getTime() > DELEGATION_TTL_MS) {
+    await supabaseAdmin.from("discovery_delegations").update({ status: "expired" }).eq("id", del.id);
+    return c.json({ error: "This delegation link has expired", status: "expired" }, 410);
+  }
 
   // Defensive: only ever key into a known section.
   const chapter = SECTIONS.includes(del.chapter) ? del.chapter : null;
@@ -180,12 +188,16 @@ app.patch("/delegation/:token", async (c) => {
 
   const { data: del, error: delErr } = await supabaseAdmin
     .from("discovery_delegations")
-    .select("id, brand_id, session_id, chapter, status")
+    .select("id, brand_id, session_id, chapter, status, created_at")
     .eq("token", token)
     .maybeSingle();
   if (delErr) return c.json({ error: delErr.message }, 500);
   if (!del) return c.json({ error: "Delegation not found" }, 404);
   if (del.status !== "pending") return c.json({ error: "Delegation is no longer active", status: del.status }, 410);
+  if (del.created_at && Date.now() - new Date(del.created_at).getTime() > DELEGATION_TTL_MS) {
+    await supabaseAdmin.from("discovery_delegations").update({ status: "expired" }).eq("id", del.id);
+    return c.json({ error: "This delegation link has expired", status: "expired" }, 410);
+  }
 
   // Defensive: only ever write into a known section.
   const chapter = SECTIONS.includes(del.chapter) ? del.chapter : null;

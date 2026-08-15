@@ -64,10 +64,16 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
   // Resolve the gated BIO version.
   let bioQuery = supabaseAdmin
     .from("bios")
-    .select("id, version, payload, score, certified, certified_by, certified_at, cert_kind, self_certified, self_certified_at")
+    .select("id, version, payload, score, certified, certified_by, certified_at, cert_kind, cert_valid_until, self_certified, self_certified_at")
     .eq("brand_id", brandRow.id);
-  if (requireCertified) bioQuery = bioQuery.eq("certified", true);
-  else if (requireSelfCertified) bioQuery = bioQuery.eq("self_certified", true);
+  if (requireCertified) {
+    // Production gate also honors the cert TTL (P3 M1): an expired certification
+    // no longer serves. Null cert_valid_until = never-expires (legacy certs).
+    bioQuery = bioQuery.eq("certified", true)
+      .or(`cert_valid_until.is.null,cert_valid_until.gt.${new Date().toISOString()}`);
+  } else if (requireSelfCertified) {
+    bioQuery = bioQuery.eq("self_certified", true);
+  }
 
   const { data: bioRow, error: bioErr } = await bioQuery
     .order("version", { ascending: false })
@@ -106,6 +112,7 @@ export async function loadBrandBio({ workspaceId, brandId, requireCertified = fa
       certified_by:      bioRow.certified_by,
       certified_at:      bioRow.certified_at,
       cert_kind:         bioRow.cert_kind,
+      cert_valid_until:  bioRow.cert_valid_until,
       self_certified:    bioRow.self_certified,
       self_certified_at: bioRow.self_certified_at,
     }),

@@ -183,6 +183,14 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
   }
 
   /* ─── Steward submission (four decisions via the rubric engine) ──────── */
+  // Separation of duties (P3 H1): a reviewer may not review/certify a brand
+  // they own (the client who self-certifies). Hard gate at the decision point,
+  // independent of the assignment-time rotation rule.
+  const ownerUserId = await brandOwnerUserId(job.brand_id);
+  if (ownerUserId && ownerUserId === c.get("auth").userId) {
+    return c.json({ error: "Separation of duties: you can't review a brand you own.", code: "SOD_OWN_BRAND" }, 403);
+  }
+
   // Claim the job.
   if (!job.assigned_to) {
     await supabaseAdmin.from("steward_jobs").update({ assigned_to: steward.id, status: "in_review" }).eq("id", jobId);
