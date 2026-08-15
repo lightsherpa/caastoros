@@ -15,9 +15,24 @@ import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { computeFocus } from "../lib/bio-focus.js";
+import { scoreBio } from "../lib/score-bio.js";
 import { notify, brandOwnerUserId } from "../lib/notify.js";
 
 const app = new Hono();
+
+function mergeBioPayload(base, patch) {
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) return base;
+  const merged = { ...(base || {}) };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value && typeof value === "object" && !Array.isArray(value)
+      && merged[key] && typeof merged[key] === "object" && !Array.isArray(merged[key])) {
+      merged[key] = mergeBioPayload(merged[key], value);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
 
 /**
  * Resolve the caller's team_member row. Returns null if they're not
@@ -87,14 +102,31 @@ app.get("/jobs/:id", requireAuth, requireSteward, async (c) => {
   // Steward sees what the Compiler had to work with.
   const { data: sources } = await supabaseAdmin
     .from("bio_sources")
-    .select("id, kind, bucket, src, signals, created_at")
+    .select("id, kind, bucket, src, signals, raw_ref, created_at")
     .eq("brand_id", job.brand_id)
     .order("created_at", { ascending: false });
+
+  /* Keep private storage private while giving the assigned Steward a
+     short-lived, authenticated way to inspect the evidence. Never return
+     durable object paths to the browser. */
+  const reviewableSources = await Promise.all((sources || []).map(async ({ raw_ref, ...source }) => {
+    if (raw_ref) {
+      if (/^https?:\/\//i.test(raw_ref)) return { ...source, evidence_url: raw_ref };
+      const { data } = await supabaseAdmin.storage
+        .from("bio-sources")
+        .createSignedUrl(raw_ref, 60 * 60);
+      return { ...source, evidence_url: data?.signedUrl || null };
+    }
+    return {
+      ...source,
+      evidence_url: /^https?:\/\//i.test(source.src || "") ? source.src : null,
+    };
+  }));
 
   return c.json({
     job,
     focus: computeFocus(job?.bio?.payload || {}),
-    sources: sources || [],
+    sources: reviewableSources,
     you: { id: steward.id, name: steward.name, first_name: steward.first_name, roles: steward.roles },
   });
 });
@@ -129,52 +161,30 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
   if (typeof body.leadApprove === "boolean") {
     if (!isLead) return c.json({ error: "Lead Steward role required to approve calibration" }, 403);
     if (job.status !== "pending_lead_review") return c.json({ error: `Job is ${job.status}, not pending_lead_review` }, 409);
-
-    if (body.leadApprove === false) {
-      /* Send back for revision — clear the in-flight cert metadata on
-         the bios row (if it was tentatively set) and reopen the job. */
-      await supabaseAdmin
-        .from("bios")
-        .update({ certified: false, certified_by: null, certified_at: null, cert_kind: null })
-        .eq("id", job.bio_id);
-      await supabaseAdmin
-        .from("steward_jobs")
-        .update({
-          status: "in_review",
-          lead_reviewed_by: steward.id,
-          lead_reviewed_at: new Date().toISOString(),
-          override_reason: body.leadNotes ? `lead_reject: ${body.leadNotes}` : "lead_reject",
-        })
-        .eq("id", jobId);
-      return c.json({ ok: true, status: "in_review", action: "sent_back" });
-    }
-
-    /* Approve: finalize cert. The original certified_by stays as the
-       Steward who submitted; lead_reviewed_by tracks the Lead.        */
-    await supabaseAdmin
-      .from("steward_jobs")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        lead_reviewed_by: steward.id,
-        lead_reviewed_at: new Date().toISOString(),
-      })
-      .eq("id", jobId);
-    const { data: certified } = await supabaseAdmin
-      .from("bios").select("id, version").eq("id", job.bio_id).single();
-    await notify({
-      recipientUserId: await brandOwnerUserId(job.brand_id),
-      kind: "steward.certified",
-      title: "Your brand BIO is certified",
-      body: "A senior reviewer certified your Brand Intelligence Object.",
-      link: "#/home",
-      brandId: job.brand_id,
+    const { data: result, error: reviewErr } = await supabaseAdmin.rpc("review_steward_job_atomic", {
+      p_job_id: jobId,
+      p_lead_id: steward.id,
+      p_approve: body.leadApprove,
+      p_notes: body.leadNotes || null,
     });
+    if (reviewErr) return c.json({ error: reviewErr.message }, 409);
+    if (body.leadApprove) {
+      await notify({
+        recipientUserId: await brandOwnerUserId(job.brand_id),
+        kind: "steward.certified",
+        title: "Your brand BIO is certified",
+        body: "A senior reviewer certified your Brand Intelligence Object.",
+        link: "#/home",
+        brandId: job.brand_id,
+      });
+    }
     return c.json({
-      ok: true, status: "completed", action: "approved",
-      certifiedBioId: certified?.id,
-      certifiedVersion: certified?.version,
-      leadReviewedBy: { id: steward.id, name: steward.name },
+      ok: true,
+      status: result?.status,
+      action: result?.action,
+      certifiedBioId: result?.bio_id,
+      certifiedVersion: result?.version,
+      leadReviewedBy: body.leadApprove ? { id: steward.id, name: steward.name } : null,
     });
   }
 
@@ -184,77 +194,29 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
     return c.json({ error: "status must be 'completed' or 'cancelled'" }, 400);
   }
 
-  if (!job.assigned_to) {
-    await supabaseAdmin.from("steward_jobs").update({ assigned_to: steward.id, status: "in_review" }).eq("id", jobId);
-  } else if (job.assigned_to !== steward.id) {
+  if (job.assigned_to && job.assigned_to !== steward.id) {
     return c.json({ error: "Job assigned to another Steward" }, 403);
   }
-
-  if (status === "cancelled") {
-    await supabaseAdmin.from("steward_jobs").update({ status: "cancelled", completed_at: new Date().toISOString() }).eq("id", jobId);
-    return c.json({ ok: true, status: "cancelled" });
+  let candidatePayload = null;
+  if (body.bioPatch && typeof body.bioPatch === "object" && !Array.isArray(body.bioPatch)) {
+    const { data: sourceBio, error: bioErr } = await supabaseAdmin
+      .from("bios").select("payload").eq("id", job.bio_id).maybeSingle();
+    if (bioErr || !sourceBio) return c.json({ error: "Candidate BIO not found" }, 404);
+    candidatePayload = mergeBioPayload(sourceBio.payload, body.bioPatch);
   }
+  const { data: result, error: submitErr } = await supabaseAdmin.rpc("submit_steward_job_atomic", {
+    p_job_id: jobId,
+    p_steward_id: steward.id,
+    p_is_lead: isLead,
+    p_calibration: calibration,
+    p_status: status,
+    p_candidate_payload: candidatePayload,
+    p_candidate_score: candidatePayload ? scoreBio(candidatePayload) : null,
+    p_notes: body.notes || null,
+  });
+  if (submitErr) return c.json({ error: submitErr.message }, 409);
 
-  /* Decide final state: calibration on AND submitter is NOT a Lead →
-     stage as pending_lead_review; cert metadata is set OPTIMISTICALLY on
-     the bios row but the steward_jobs row stays pending. A Lead then
-     finalizes via the leadApprove path above. */
-  const needsLeadApproval = calibration && !isLead;
-  const finalCertified = !needsLeadApproval;
-
-  let certifiedBioId = job.bio_id;
-  let certifiedVersion = null;
-
-  if (body.bioPatch && typeof body.bioPatch === "object") {
-    const { data: bio } = await supabaseAdmin
-      .from("bios").select("payload, version, brand_id").eq("id", job.bio_id).single();
-    const merged = { ...bio.payload, ...body.bioPatch };
-    const { data: newRow, error: insertErr } = await supabaseAdmin
-      .from("bios")
-      .insert({
-        brand_id: bio.brand_id,
-        version: (bio.version || 0) + 1,
-        payload: merged,
-        score: 75,
-        certified: finalCertified,
-        certified_by: finalCertified ? steward.id : null,
-        certified_at: finalCertified ? new Date().toISOString() : null,
-        cert_kind: finalCertified ? job.kind : null,
-        steward_notes: body.notes || null,
-      })
-      .select("id, version")
-      .single();
-    if (insertErr) return c.json({ error: insertErr.message }, 500);
-    certifiedBioId = newRow.id;
-    certifiedVersion = newRow.version;
-  } else {
-    const { data: updated, error: updateErr } = await supabaseAdmin
-      .from("bios")
-      .update({
-        certified: finalCertified,
-        certified_by: finalCertified ? steward.id : null,
-        certified_at: finalCertified ? new Date().toISOString() : null,
-        cert_kind: finalCertified ? job.kind : null,
-        steward_notes: body.notes || null,
-      })
-      .eq("id", job.bio_id)
-      .select("version")
-      .single();
-    if (updateErr) return c.json({ error: updateErr.message }, 500);
-    certifiedVersion = updated.version;
-  }
-
-  const newJobStatus = needsLeadApproval ? "pending_lead_review" : "completed";
-  await supabaseAdmin
-    .from("steward_jobs")
-    .update({
-      status: newJobStatus,
-      completed_at: finalCertified ? new Date().toISOString() : null,
-      assigned_to: steward.id,
-    })
-    .eq("id", jobId);
-
-  if (finalCertified) {
+  if (result?.certified) {
     await notify({
       recipientUserId: await brandOwnerUserId(job.brand_id),
       kind: "steward.certified",
@@ -267,11 +229,11 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
 
   return c.json({
     ok: true,
-    status: newJobStatus,
-    certifiedBioId,
-    certifiedVersion,
-    certifiedBy: finalCertified ? { id: steward.id, name: steward.name } : null,
-    needsLeadApproval,
+    status: result?.status,
+    certifiedBioId: result?.bio_id,
+    certifiedVersion: result?.version,
+    certifiedBy: result?.certified ? { id: steward.id, name: steward.name } : null,
+    needsLeadApproval: !!result?.needs_lead_approval,
   });
 });
 

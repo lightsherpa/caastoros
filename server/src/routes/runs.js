@@ -18,16 +18,15 @@
 //   2. Inserts a `runs` row in `running` state (pins spec_version + bio_version).
 //   3. Calls the specialist via the router; streams tokens to the client.
 //   4. Runs a18 Voice QA on the full output text.
-//   5. Updates `runs` with completion stats + cost.
-//   6. Inserts `outputs` row + `qa_results` row + `ledger` debit row.
+//   5. Atomically finalizes `runs`, `outputs`, `qa_results`, and the reserved debit.
 // ─────────────────────────────────────────────────────────────────────
 
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
-import { loadBrandBio } from "../lib/load-brand-bio.js";
-import { streamCompletion } from "../lib/models/router.js";
+import { loadBioForRun } from "../lib/load-brand-bio.js";
+import { streamCompletion, isAllowedModelOverride, routeCreditMultiplier } from "../lib/models/router.js";
 import { composeSpecialistPrompt } from "../lib/compose-specialist-prompt.js";
 import { composeImagePrompt } from "../lib/compose-image-prompt.js";
 import { voiceQa } from "../lib/qa-voice.js";
@@ -35,7 +34,7 @@ import { visionQa } from "../lib/qa-vision.js";
 import { recordSignal } from "../lib/brandolph-memory.js";
 import { generate as generateImage, isImageRoute } from "../lib/models/fal-image.js";
 import { maxTokensForDeliverables, parseDeliverables, buildDeliverableContract, falSizeForPlatform } from "../lib/deliverables.js";
-import { assertCreditsAvailable, creditErrorResponse, estimateRunCredits } from "../lib/credits.js";
+import { assertCreditsAvailable, creditErrorResponse, estimateRunCredits, reserveCredits, failRunAndReleaseCredits } from "../lib/credits.js";
 
 const app = new Hono();
 
@@ -64,13 +63,10 @@ app.post("/stream", requireAuth, async (c) => {
     .maybeSingle();
   if (specErr || !spec) return c.json({ error: `Spec ${specialistId} not active or not found` }, 400);
 
-  /* Brand + BIO. requireCertified stays false during P3 first runs so
-     dev brands without Steward sign-off can still produce output. Flip
-     to true once production brands are all certified — that's the moat
-     contract per rev-2 §17 and rev-2 §5.5. */
+  /* Paid specialist work always reads the latest certified BIO. */
   let brandBio;
   try {
-    brandBio = await loadBrandBio({ workspaceId, brandId, requireCertified: false });
+    brandBio = await loadBioForRun({ workspaceId, brandId });
   } catch (err) {
     if (err.code === "BIO_NOT_CERTIFIED") {
       return c.json({ error: "BIO is awaiting Brand Steward certification.", code: err.code }, 409);
@@ -80,7 +76,10 @@ app.post("/stream", requireAuth, async (c) => {
 
   /* Effective route: caller override → spec default. The spec row in
      the DB is unchanged; the override applies to THIS run only. */
-  const route = (typeof modelOverride === "string" && modelOverride.includes("/"))
+  if (modelOverride != null && !isAllowedModelOverride(modelOverride)) {
+    return c.json({ error: "Model override is not permitted for client requests", code: "MODEL_OVERRIDE_NOT_ALLOWED" }, 400);
+  }
+  const route = modelOverride
     ? modelOverride
     : (spec.payload?.modelRouting?.primary || "");
   const isImage = isImageRoute(route);
@@ -90,7 +89,8 @@ app.post("/stream", requireAuth, async (c) => {
      the platform. No deliverableSpec → legacy single-output behavior. */
   const dlv = (deliverableSpec && typeof deliverableSpec === "object") ? deliverableSpec : null;
   const isDeliverableText = !isImage && !!dlv && Number(dlv.count) >= 1;
-  const creditsDebited = estimateRunCredits({ specPayload: spec.payload, deliverableSpec: dlv, isDeliverableText });
+  const baseCredits = estimateRunCredits({ specPayload: spec.payload, deliverableSpec: dlv, isDeliverableText });
+  const creditsDebited = Math.max(1, Math.ceil(baseCredits * routeCreditMultiplier(route)));
   const creditCheck = await assertCreditsAvailable(workspaceId, creditsDebited);
   if (!creditCheck.ok) return creditErrorResponse(c, creditCheck);
 
@@ -202,7 +202,7 @@ app.post("/stream", requireAuth, async (c) => {
     }
 
     /* 2. Runs row — pins spec_version + bio_version for reproducibility. */
-    const { data: runRow } = await supabaseAdmin
+    const { data: runRow, error: runErr } = await supabaseAdmin
       .from("runs")
       .insert({
         brief_id: briefId,
@@ -215,6 +215,43 @@ app.post("/stream", requireAuth, async (c) => {
       .select("id")
       .single();
     const runId = runRow?.id;
+    if (runErr || !runId) {
+      await stream.writeSSE({ event: "error", data: JSON.stringify({ message: `run insert failed: ${runErr?.message || "unknown"}` }) });
+      return;
+    }
+
+    const reservationKey = `run:${runId}:credits`;
+    const reservation = await reserveCredits({
+      workspaceId,
+      amount: creditsDebited,
+      key: reservationKey,
+      kind: "run_reserved",
+      runId,
+    });
+    if (!reservation.ok) {
+      await supabaseAdmin.from("runs").update({ status: "failed", ended_at: new Date().toISOString() }).eq("id", runId);
+      await stream.writeSSE({ event: "error", data: JSON.stringify({ message: reservation.message, code: reservation.code }) });
+      return;
+    }
+    let creditsSettled = false;
+    const failRun = async (message) => {
+      try {
+        if (creditsSettled) {
+          if (message) await stream.writeSSE({ event: "error", data: JSON.stringify({ message }) });
+          return;
+        }
+        await failRunAndReleaseCredits({
+          workspaceId,
+          runId,
+          reservationKey,
+          releaseKey: `${reservationKey}:refund`,
+          reason: "run_refund",
+        });
+      } catch (e) {
+        console.error("[runs] failed to release reserved credits", runId, e?.message || e);
+      }
+      if (message) await stream.writeSSE({ event: "error", data: JSON.stringify({ message }) });
+    };
 
     /* 3. Stream the specialist response.
           Branch: text specialists stream tokens (router → Anthropic / OR);
@@ -260,8 +297,7 @@ app.post("/stream", requireAuth, async (c) => {
             usage = { provider: "fal", model: ev.model, cost_usd: ev.cost_usd, prompt_tokens: 0, completion_tokens: 0, cached_tokens: 0 };
             modelUsed = ev.model;
           } else if (ev.type === "error") {
-            await stream.writeSSE({ event: "error", data: JSON.stringify({ message: ev.message }) });
-            await supabaseAdmin.from("runs").update({ status: "failed", ended_at: new Date().toISOString() }).eq("id", runId);
+            await failRun(ev.message);
             return;
           }
         }
@@ -282,11 +318,7 @@ app.post("/stream", requireAuth, async (c) => {
             usage = ev.usage;
             modelUsed = ev.usage?.model;
           } else if (ev.type === "error") {
-            await stream.writeSSE({ event: "error", data: JSON.stringify({ message: ev.message }) });
-            await supabaseAdmin.from("runs").update({
-              status: "failed",
-              ended_at: new Date().toISOString(),
-            }).eq("id", runId);
+            await failRun(ev.message);
             return;
           }
         }
@@ -327,25 +359,14 @@ app.post("/stream", requireAuth, async (c) => {
       }
       await stream.writeSSE({ event: "qa", data: JSON.stringify(qa) });
 
-      /* 5. Update runs with completion stats + cost. */
+      /* 5. Prepare completion stats. Persistence is committed atomically below. */
       const endedIso = new Date().toISOString();
       const latencyMs = Date.parse(endedIso) - Date.parse(startedIso);
       const baseCost = usage?.cost_usd ?? null;
       const qaCost = qa.usage?.cost_usd ?? null;
       const totalCost = baseCost != null || qaCost != null ? (baseCost || 0) + (qaCost || 0) : null;
 
-      await supabaseAdmin.from("runs").update({
-        status: "completed",
-        model_used: modelUsed,
-        prompt_tokens: usage?.prompt_tokens,
-        completion_tokens: usage?.completion_tokens,
-        cached_tokens: usage?.cached_tokens,
-        cost_usd: totalCost,
-        ended_at: endedIso,
-        latency_ms: latencyMs,
-      }).eq("id", runId);
-
-      /* 6a. Output row. Image runs carry asset_url + prompt_used in the
+      /* 6. Output payload. Image runs carry asset_url + prompt_used in the
             body; text runs carry text + rationale. */
       const outputKind = isImage
         ? (spec.payload?.code === "L2-19" ? "identity_drafts"
@@ -365,40 +386,31 @@ app.post("/stream", requireAuth, async (c) => {
         : isDeliverableText
         ? { kind: "deliverables", type: dlv.type, part: dlv.part, platform: dlv.platform || "generic", deliverables }
         : { text: output, rationale: null };
-      const { data: outputRow } = await supabaseAdmin
-        .from("outputs")
-        .insert({
-          run_id: runId,
-          brief_id: briefId,
-          kind: outputKind,
-          body: outputBody,
-          asset_url: isImage ? imageResult?.asset_url : null,
-          status: qa.passed ? "approved" : "flagged",
-          rationale: qa.violations?.join("; ") || null,
-        })
-        .select("id")
-        .single();
-
-      /* 6b. QA results row. */
-      if (outputRow?.id) {
-        await supabaseAdmin.from("qa_results").insert({
-          output_id: outputRow.id,
-          refusal_id: "voice_qa",
-          passed: qa.passed,
-          evidence: qa.violations?.length ? qa.violations.join("; ") : null,
-        });
-      }
-
-      /* 6c. Ledger debit — only for completed/approved runs. Flagged
-         runs still debit (work was done) but the ledger note carries
-         the flag for transparency. */
-      await supabaseAdmin.from("ledger").insert({
-        workspace_id: workspaceId,
-        run_id: runId,
-        credits: creditsDebited,
-        kind: qa.passed ? "run" : "run_flagged",
-        balance_after: creditCheck.balance - creditsDebited,
+      const qaEvidence = qa.violations?.length ? qa.violations.join("; ") : null;
+      const { data: finalized, error: finalizeErr } = await supabaseAdmin.rpc("finalize_run_atomic", {
+        p_workspace_id: workspaceId,
+        p_run_id: runId,
+        p_reservation_key: reservationKey,
+        p_model_used: modelUsed || route,
+        p_prompt_tokens: usage?.prompt_tokens ?? 0,
+        p_completion_tokens: usage?.completion_tokens ?? 0,
+        p_cached_tokens: usage?.cached_tokens ?? 0,
+        p_cost_usd: totalCost,
+        p_latency_ms: latencyMs,
+        p_output_kind: outputKind,
+        p_output_body: outputBody,
+        p_asset_url: isImage ? imageResult?.asset_url : null,
+        p_output_status: qa.passed ? "approved" : "flagged",
+        p_rationale: qaEvidence,
+        p_qa_passed: !!qa.passed,
+        p_qa_evidence: qaEvidence,
+        p_ledger_kind: qa.passed ? "run" : "run_flagged",
       });
+      if (finalizeErr || !finalized?.output_id) {
+        throw new Error(`run finalization failed: ${finalizeErr?.message || "output missing"}`);
+      }
+      const outputRow = { id: finalized.output_id };
+      creditsSettled = true;
 
       /* Brandolph memory · signal this run + any re-run/revision context. */
       const memoryKind = qa.passed ? "run.approved" : "run.flagged";
@@ -485,19 +497,17 @@ app.post("/stream", requireAuth, async (c) => {
         }),
       });
     } catch (err) {
-      await stream.writeSSE({ event: "error", data: JSON.stringify({ message: err?.message || String(err) }) });
-      await supabaseAdmin.from("runs").update({
-        status: "failed",
-        ended_at: new Date().toISOString(),
-      }).eq("id", runId);
-      recordSignal({
-        brandId:      brandBio.brand.id,
-        kind:         "run.failed",
-        specialistId: spec.specialist_id,
-        runId,
-        createdBy:    c.get("auth")?.userId,
-        payload:      { error: String(err?.message || err).slice(0, 240) },
-      });
+      await failRun(err?.message || String(err));
+      if (!creditsSettled) {
+        recordSignal({
+          brandId:      brandBio.brand.id,
+          kind:         "run.failed",
+          specialistId: spec.specialist_id,
+          runId,
+          createdBy:    c.get("auth")?.userId,
+          payload:      { error: String(err?.message || err).slice(0, 240) },
+        });
+      }
     }
   });
 });

@@ -6,6 +6,13 @@ import { scoreBio } from "../lib/score-bio.js";
 import { computeFocus } from "../lib/bio-focus.js";
 
 const app = new Hono();
+const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
+const ALLOWED_SOURCE_MIMES = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain", "text/markdown", "image/png", "image/jpeg", "image/webp",
+]);
 
 /* POST /api/bios/:brandId/sources
    Body: { sources: [{ kind, bucket, src, signals? }, ...] }
@@ -70,36 +77,43 @@ app.post("/:brandId/sources/upload", requireAuth, async (c) => {
   const bucket = String(form.get("bucket") || "").trim();
   if (!file || typeof file === "string") return c.json({ error: "file required" }, 400);
   if (!["foundations","visual","voice"].includes(bucket)) return c.json({ error: "bucket must be foundations|visual|voice" }, 400);
-
   const filename = file.name || "upload.bin";
-  const ext = filename.includes(".") ? filename.split(".").pop() : "bin";
+  const ext = filename.includes(".") ? filename.split(".").pop().toLowerCase() : "bin";
+  const inferredMime = ({ pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", txt: "text/plain", md: "text/markdown", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" })[ext];
+  const mime = file.type || inferredMime || "application/octet-stream";
+  if (file.size > MAX_SOURCE_BYTES) return c.json({ error: "File exceeds the 25 MiB source limit" }, 413);
+  if (!ALLOWED_SOURCE_MIMES.has(mime)) return c.json({ error: `Unsupported source type: ${mime}` }, 415);
+
   const safeName = filename.replace(/[^a-z0-9._-]+/gi, "_").slice(0, 80);
   const objectPath = `${workspaceId}/${brandId}/${crypto.randomUUID()}-${safeName}`;
 
   const buf = new Uint8Array(await file.arrayBuffer());
   const { data: uploadData, error: uploadErr } = await supabaseAdmin
     .storage.from("bio-sources")
-    .upload(objectPath, buf, { contentType: file.type || "application/octet-stream", upsert: false });
+    .upload(objectPath, buf, { contentType: mime, upsert: false });
   if (uploadErr) return c.json({ error: `Storage upload failed: ${uploadErr.message}` }, 500);
 
-  /* Sign a 1-year URL for retrieval. RLS on the storage.objects table
-     could replace this with per-request signing later. */
+  /* Store the durable object path, not an expiring signed URL. */
   const { data: signed } = await supabaseAdmin
     .storage.from("bio-sources")
-    .createSignedUrl(objectPath, 60 * 60 * 24 * 365);
+    .createSignedUrl(objectPath, 60 * 60);
 
-  const { data: uploadRow } = await supabaseAdmin
+  const { data: uploadRow, error: uploadRowErr } = await supabaseAdmin
     .from("uploads")
     .insert({
       workspace_id: workspaceId,
       user_id: userId,
       brand_id: brandId,
-      url: signed?.signedUrl || objectPath,
-      mime: file.type || null,
+      url: objectPath,
+      mime,
       bucket_hint: bucket,
     })
     .select("id, url")
     .single();
+  if (uploadRowErr) {
+    await supabaseAdmin.storage.from("bio-sources").remove([objectPath]);
+    return c.json({ error: `Upload metadata failed: ${uploadRowErr.message}` }, 500);
+  }
 
   const { data: sourceRow, error: sourceErr } = await supabaseAdmin
     .from("bio_sources")
@@ -108,14 +122,20 @@ app.post("/:brandId/sources/upload", requireAuth, async (c) => {
       kind: "file_upload",
       bucket,
       src: filename,
-      signals: { size: file.size, mime: file.type, upload_id: uploadRow?.id, ext },
-      raw_ref: uploadRow?.url,
+      signals: { size: file.size, mime, upload_id: uploadRow?.id, ext },
+      raw_ref: objectPath,
     })
     .select("id, bucket, src, signals, raw_ref")
     .single();
-  if (sourceErr) return c.json({ error: sourceErr.message }, 500);
+  if (sourceErr) {
+    await Promise.all([
+      supabaseAdmin.from("uploads").delete().eq("id", uploadRow.id),
+      supabaseAdmin.storage.from("bio-sources").remove([objectPath]),
+    ]);
+    return c.json({ error: sourceErr.message }, 500);
+  }
 
-  return c.json({ source: sourceRow, signedUrl: uploadRow?.url });
+  return c.json({ source: sourceRow, signedUrl: signed?.signedUrl || null });
 });
 
 /* PATCH /api/bios/:brandId
@@ -134,23 +154,13 @@ app.patch("/:brandId", requireAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   if (!body.payload || typeof body.payload !== "object") return c.json({ error: "payload required" }, 400);
 
-  const { data: latest } = await supabaseAdmin
-    .from("bios").select("version").eq("brand_id", brandId)
-    .order("version", { ascending: false }).limit(1).maybeSingle();
-  const nextVersion = (latest?.version || 0) + 1;
-
   const { data: newRow, error } = await supabaseAdmin
-    .from("bios")
-    .insert({
-      brand_id: brandId,
-      version: nextVersion,
-      payload: body.payload,
-      score: scoreBio(body.payload || {}),
-      certified: false,
-      created_by: userId,
-    })
-    .select("id, version, payload, score, certified, created_at")
-    .single();
+    .rpc("append_bio_version", {
+      p_brand_id: brandId,
+      p_payload: body.payload,
+      p_score: scoreBio(body.payload || {}),
+      p_created_by: userId,
+    });
   if (error) return c.json({ error: error.message }, 500);
 
   /* P1.5-005 — every BIO edit enqueues a drift_check Steward job so a
@@ -193,7 +203,7 @@ app.get("/:brandId", requireAuth, async (c) => {
 
   const { data: bio } = await supabaseAdmin
     .from("bios")
-    .select("id, version, payload, score, certified, certified_by, certified_at, cert_kind, steward_notes, created_at")
+    .select("id, version, payload, score, certified, certified_by, certified_at, cert_kind, steward_notes, discovery_id, created_at")
     .eq("brand_id", brandId)
     .order("version", { ascending: false })
     .limit(1)
@@ -252,7 +262,16 @@ app.post("/:brandId/request-review", requireAuth, async (c) => {
     .insert({ bio_id: bio.id, brand_id: brandId, kind: "drift_check", status: "queued" })
     .select("id")
     .single();
-  if (error) return c.json({ error: error.message }, 500);
+  if (error) {
+    if (error.code === "23505") {
+      const { data: raced } = await supabaseAdmin.from("steward_jobs")
+        .select("id, status").eq("bio_id", bio.id)
+        .in("status", ["queued", "in_review", "pending_lead_review"])
+        .limit(1).maybeSingle();
+      if (raced) return c.json({ ok: true, jobId: raced.id, status: raced.status, reused: true });
+    }
+    return c.json({ error: error.message }, 500);
+  }
 
   try { await assignSteward(job.id); } catch (e) { console.warn("[request-review] assignSteward failed:", e?.message || e); }
 

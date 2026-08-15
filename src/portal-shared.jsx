@@ -482,7 +482,12 @@ function splitSentences(text) {
 }
 
 function streamToHtml(s) {
-  return s
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
     .replace(/\*([^*]+)\*/g, '<em class="b-voice">$1</em>')
     .replace(/\n/g, "<br/>");
 }

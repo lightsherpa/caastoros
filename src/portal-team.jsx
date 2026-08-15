@@ -696,7 +696,7 @@ function TeamJob({ id, go }) {
                   {list.map(s => (
                     <div key={s.id} className="card card--inset" style={{padding:"8px 10px"}}>
                       <div style={{fontSize: 12, color:"var(--c-ink)", wordBreak:"break-all"}}>
-                        {s.raw_ref ? <a href={s.raw_ref} target="_blank" rel="noreferrer" style={{color:"var(--c-ink)"}}>{s.src}</a> : s.src}
+                        {s.evidence_url ? <a href={s.evidence_url} target="_blank" rel="noreferrer" style={{color:"var(--c-ink)"}}>{s.src} <span aria-hidden="true">↗</span></a> : s.src}
                       </div>
                       {s.signals?.title && <div style={{fontSize: 11, color:"var(--c-dim)", marginTop: 2}}>{s.signals.title}</div>}
                       {s.signals?.size && <div style={{fontSize: 10.5, color:"var(--c-faint)", marginTop: 2, fontFamily:"var(--font-mono)"}}>{Math.round(s.signals.size/1024).toLocaleString()} KB · {s.signals.mime || s.signals.ext}</div>}

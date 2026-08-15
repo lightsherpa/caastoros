@@ -13,8 +13,6 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
-import { assertCreditsAvailable, creditErrorResponse } from "../lib/credits.js";
-import { craftEnabled } from "../lib/plan-limits.js";
 import { notify, notifyTeamRole } from "../lib/notify.js";
 
 const app = new Hono();
@@ -59,48 +57,24 @@ app.post("/", requireAuth, async (c) => {
   if (error || !output) return c.json({ error: "Output not found" }, 404);
   if (output.brief?.brand?.workspace_id !== workspaceId) return c.json({ error: "Forbidden" }, 403);
 
-  // Tier gate: human craft is a paid entitlement that unlocks at The River ('02') and up.
-  const { data: ws } = await supabaseAdmin.from("workspaces").select("tier").eq("id", workspaceId).maybeSingle();
-  if (!craftEnabled(ws?.tier)) {
-    return c.json({ error: "Human craft is available from The River and up.", code: "CRAFT_TIER_LOCKED", minTier: "02" }, 403);
-  }
-
-  const ob = output.body || {};
-  const deliverables = Array.isArray(ob.deliverables) ? [...ob.deliverables] : null;
-  if (!deliverables || !deliverables[slot]) return c.json({ error: "Deliverable not found at slot" }, 404);
-  if (deliverables[slot]?.craft && deliverables[slot].craft.status !== "cancelled") {
-    return c.json({ error: "Deliverable is already in human craft", code: "CRAFT_ALREADY_REQUESTED" }, 409);
-  }
-
-  const creditCheck = await assertCreditsAvailable(workspaceId, POLISH_CR);
-  if (!creditCheck.ok) return creditErrorResponse(c, creditCheck);
-
-  const nowIso = new Date().toISOString();
-  deliverables[slot] = {
-    ...deliverables[slot],
-    craft: {
-      status: "queued",
-      notes: String(notes || "").slice(0, 2000),
-      credits: POLISH_CR,
-      requested_at: nowIso,
-      requested_by: userId,
-      delivered: null,
-    },
-  };
-
-  const { error: updErr } = await supabaseAdmin
-    .from("outputs").update({ body: { ...ob, deliverables } }).eq("id", outputId);
-  if (updErr) return c.json({ error: updErr.message }, 500);
-
-  const { error: ledgerErr } = await supabaseAdmin.from("ledger").insert({
-    workspace_id: workspaceId,
-    credits: POLISH_CR,
-    kind: "craft",
-    balance_after: creditCheck.balance - POLISH_CR,
+  const requestKey = `craft:${outputId}:${Number(slot)}`;
+  const { data: result, error: requestErr } = await supabaseAdmin.rpc("request_craft_atomic", {
+    p_workspace_id: workspaceId,
+    p_user_id: userId,
+    p_output_id: outputId,
+    p_slot: Number(slot),
+    p_notes: String(notes || ""),
+    p_credits: POLISH_CR,
+    p_idempotency_key: requestKey,
   });
-  if (ledgerErr) {
-    await supabaseAdmin.from("outputs").update({ body: ob }).eq("id", outputId);
-    return c.json({ error: ledgerErr.message }, 500);
+  if (requestErr) {
+    const message = requestErr.message || "Craft request failed";
+    if (message.includes("CRAFT_TIER_LOCKED")) return c.json({ error: "Human craft is available from The River and up.", code: "CRAFT_TIER_LOCKED", minTier: "02" }, 403);
+    if (message.includes("CRAFT_ALREADY_REQUESTED")) return c.json({ error: "Deliverable is already in human craft", code: "CRAFT_ALREADY_REQUESTED" }, 409);
+    if (message.includes("OUT_OF_CREDITS")) return c.json({ error: "Out of credits. Top up before requesting craft.", code: "OUT_OF_CREDITS" }, 402);
+    if (message.includes("MONTHLY_CREDIT_CAP")) return c.json({ error: "This workspace has reached its monthly credit cap.", code: "MONTHLY_CREDIT_CAP" }, 429);
+    if (message.includes("DELIVERABLE_NOT_FOUND")) return c.json({ error: "Deliverable not found at slot" }, 404);
+    return c.json({ error: message }, 500);
   }
 
   await notifyTeamRole("craft", {
@@ -111,7 +85,7 @@ app.post("/", requireAuth, async (c) => {
     brandId: output.brief?.brand?.id || null,
   });
 
-  return c.json({ ok: true, status: "queued", credits: POLISH_CR, craft: deliverables[slot].craft });
+  return c.json({ ok: true, status: "queued", credits: POLISH_CR, craft: result?.craft });
 });
 
 /* GET /api/craft/queue — pending craft jobs in the caller's workspace, flattened

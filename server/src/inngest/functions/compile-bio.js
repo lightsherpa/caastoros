@@ -108,7 +108,7 @@ export const compileBio = inngest.createFunction(
     triggers: [{ event: "discovery/start" }],
   },
   async ({ event, step, logger }) => {
-    const { brandId, url, workspaceId, instagram } = event.data || {};
+    const { brandId, url, workspaceId, instagram, discoveryId } = event.data || {};
     if (!brandId || !url) throw new Error("Event missing brandId or url");
     logger.info("BIO compile starting", { brandId, url, v2: V2 });
 
@@ -164,21 +164,18 @@ export const compileBio = inngest.createFunction(
       };
     });
 
-    // ── Step 1b · Uploaded sources + instagram (V2 only) ─────────
+    // ── Step 1b · Uploaded sources + instagram ───────────────────
     // Read brand-uploaded files + the instagram handle and fold them into the
     // synthesis input. Text files (pdf/docx/pptx/txt/md) are fetched via their
     // signed raw_ref and run through Firecrawl→markdown; images are skipped
     // (the visual bucket is handled by the visual step). Built as labeled
     // blocks so the model can cite which source a fact came from.
     //
-    // ponytail: this relies on uploads having committed to bio_sources during
-    // the ~10–30s crawl window above (uploads currently fire just before
-    // discovery/start). If logs ever show a race (uploads arriving after this
-    // read), the upgrade path is a POST /api/discovery/resolve-brand endpoint
-    // that returns brandId so the UI can attach files before firing discovery.
+    // The SPA commits uploads before discovery/start, so this step reads a
+    // stable source set. It is intentionally independent of DISCOVERY_V2;
+    // uploads must never be accepted by the UI and then silently ignored.
     const TEXT_EXTS = new Set(["pdf", "docx", "pptx", "txt", "md"]);
-    const extraSources = V2
-      ? await step.run("gather-upload-sources", async () => {
+    const extraSources = await step.run("gather-upload-sources", async () => {
           const blocks = [];
 
           const { data: rows } = await supabaseAdmin
@@ -192,7 +189,14 @@ export const compileBio = inngest.createFunction(
             if (!TEXT_EXTS.has(ext)) continue;          // skip images / non-text
             if (!row.raw_ref) continue;
             try {
-              const result = await scrape(row.raw_ref, { formats: ["markdown"] });
+              let sourceUrl = row.raw_ref;
+              if (!/^https?:\/\//i.test(sourceUrl)) {
+                const { data: signed, error: signErr } = await supabaseAdmin.storage
+                  .from("bio-sources").createSignedUrl(sourceUrl, 60 * 60);
+                if (signErr || !signed?.signedUrl) continue;
+                sourceUrl = signed.signedUrl;
+              }
+              const result = await scrape(sourceUrl, { formats: ["markdown"] });
               const text = (result?.markdown || "").slice(0, 12000); // cap ~12k each
               if (text.trim()) {
                 blocks.push(`## UPLOADED FILE: ${row.src || "(file)"}\n\n${text}`);
@@ -208,8 +212,7 @@ export const compileBio = inngest.createFunction(
           }
 
           return blocks;
-        })
-      : [];
+        });
 
     // ── Step 2 · Synthesize ──────────────────────────────────────
     const bioPayload = await step.run("synthesize-bio", async () => {
@@ -298,27 +301,14 @@ export const compileBio = inngest.createFunction(
 
     // ── Step 3 · Write bios row (uncertified) ────────────────────
     const bioRow = await step.run("write-bio-row", async () => {
-      // Find current max version for this brand → +1
-      const { data: latest } = await supabaseAdmin
-        .from("bios")
-        .select("version")
-        .eq("brand_id", brandId)
-        .order("version", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const nextVersion = (latest?.version || 0) + 1;
-
       const { data, error } = await supabaseAdmin
-        .from("bios")
-        .insert({
-          brand_id: brandId,
-          version: nextVersion,
-          payload: bioPayload,
-          score: scoreBio(bioPayload), // deterministic score from coverage/conf/diversity
-          certified: false,                // Steward cert (P1.5) flips this later
-        })
-        .select("id, version")
-        .single();
+        .rpc("append_bio_version", {
+          p_brand_id: brandId,
+          p_payload: bioPayload,
+          p_score: scoreBio(bioPayload),
+          p_created_by: null,
+          p_discovery_id: discoveryId || null,
+        });
       if (error) throw new Error(`bios insert failed: ${error.message}`);
       logger.info("BIO compiled", { brandId, version: data.version, bioId: data.id });
       return data;

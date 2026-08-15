@@ -8,7 +8,7 @@ const { useState: useDState, useEffect: useDEffect } = React;
 /* useLiveBio — fetches the user's first brand + latest BIO + cert state.
    Polls every `pollMs` while `pendingCert` is true (BIO not yet certified
    by Steward, or no BIO at all yet). Returns { brandId, bio, cert, refresh }. */
-function useLiveBio({ pollMs = 6000 } = {}) {
+function useLiveBio({ pollMs = 6000, brandId: fixedBrandId = null } = {}) {
   const [state, setState] = useDState({ brandId: null, brandName: null, brandUrl: null, bio: null, cert: null, reviewPending: false, focusCount: 0, error: null, loading: true });
 
   const tick = React.useCallback(async () => {
@@ -16,11 +16,15 @@ function useLiveBio({ pollMs = 6000 } = {}) {
       /* Resolve current user's brand. Prefers the workspace switcher's
          selection (from localStorage); falls back to the first brand. RLS
          scopes results to the user's workspaces. */
-      const wantedId = window.getCurrentBrandId?.();
+      const wantedId = fixedBrandId || window.getCurrentBrandId?.();
       let brand = null;
       if (wantedId) {
         const { data } = await supabase.from("brands").select("id, name, url").eq("id", wantedId).maybeSingle();
         brand = data;
+      }
+      if (fixedBrandId && !brand) {
+        setState((s) => ({ ...s, brandId: fixedBrandId, bio: null, cert: null, loading: false, error: "Brand is not available in this workspace" }));
+        return;
       }
       if (!brand) {
         const { data: brands, error: bErr } = await supabase
@@ -49,7 +53,7 @@ function useLiveBio({ pollMs = 6000 } = {}) {
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e?.message || String(e) }));
     }
-  }, []);
+  }, [fixedBrandId]);
 
   useDEffect(() => {
     let alive = true;
@@ -115,7 +119,7 @@ function DiscoveryStepper({ step }) {
    plus bio_sources/uploads rows with the selected bucket. */
 const BUCKETS = [
   { key:"foundations", label:"Brand foundations", help:"Brand book, decks, manifestos, “about us” docs",       readBy:"All specialists" },
-  { key:"visual",      label:"Visual references", help:"Moodboards, examples of work you admire",                       readBy:"Design dept" },
+  { key:"visual",      label:"Visual references", help:"Moodboards and image references are stored for your Steward; automated visual extraction currently reads the website only", readBy:"Steward review" },
   { key:"voice",       label:"Voice references",  help:"Emails, posts, talks where you sound like yourself",            readBy:"Copy dept" },
 ];
 
@@ -179,11 +183,13 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
      /api/discovery/start; the SPA can then poll bios for the result. */
   const [uploadsByBucket, setUploadsByBucket] = useDState({ foundations: [], visual: [], voice: [] });
   const [brandName, setBrandName] = useDState("");
-  const [url, setUrl] = useDState("vinilo.coffee");
+  const [url, setUrl] = useDState("");
   const [instagram, setInstagram] = useDState("");
   const [busy, setBusy] = useDState(false);
   const [error, setError] = useDState(null);
   const [uploading, setUploading] = useDState(false);
+  const [createdBrandId, setCreatedBrandId] = useDState(null);
+  const uploadedFilesRef = React.useRef(new Set());
   const addToBucket = (key) => (newFiles) =>
     setUploadsByBucket(prev => ({ ...prev, [key]: [...prev[key], ...newFiles] }));
   const removeFromBucket = (key) => (idx) =>
@@ -197,8 +203,8 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
       /* New-brand mode: create the brand first, then run the same
          discovery flow targeting it. Existing onboarding (newBrand=false)
          skips this block entirely and behaves exactly as before. */
-      let newBrandId = null;
-      if (newBrand) {
+      let newBrandId = createdBrandId;
+      if (newBrand && !newBrandId) {
         const created = await apiFetch("/api/brands", {
           method: "POST",
           body: JSON.stringify({ name: brandName.trim() }),
@@ -214,23 +220,34 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
         }
         const { brand } = await created.json();
         newBrandId = brand.id;
+        setCreatedBrandId(brand.id);
         window.setCurrentBrandId?.(brand.id);
       }
-      const res = await apiFetch("/api/discovery/start", {
-        method: "POST",
-        body: JSON.stringify({ url: targetUrl, instagram, ...(newBrandId ? { brandId: newBrandId } : {}) }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        throw new Error(err.error || `HTTP ${res.status}`);
+      let brandId = newBrandId || window.getCurrentBrandId?.();
+      if (!brandId) {
+        const { data: brands, error: brandErr } = await supabase.from("brands")
+          .select("id").order("created_at", { ascending: true }).limit(1);
+        if (brandErr) throw brandErr;
+        brandId = brands?.[0]?.id;
       }
-      const { eventId, brandId } = await res.json();
+      if (!brandId) throw new Error("No brand is available for Discovery.");
+
+      /* Capture the baseline before enqueueing, then commit every source.
+         The worker receives an immutable source set instead of racing uploads. */
+      let baselineVersion = 0;
+      const baselineRes = await apiFetch(`/api/bios/${brandId}`);
+      if (baselineRes.ok) {
+        const baseline = await baselineRes.json();
+        baselineVersion = Number(baseline.bio?.version) || 0;
+      }
       const filesToUpload = BUCKETS.flatMap((bucket) =>
         uploadsByBucket[bucket.key].map((file) => ({ bucket: bucket.key, file }))
       );
       if (brandId && filesToUpload.length) {
         setUploading(true);
         for (const item of filesToUpload) {
+          const uploadKey = `${item.bucket}:${item.file.name}:${item.file.size}:${item.file.lastModified}`;
+          if (uploadedFilesRef.current.has(uploadKey)) continue;
           const form = new FormData();
           form.set("bucket", item.bucket);
           form.set("file", item.file);
@@ -242,10 +259,22 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
             const err = await up.json().catch(() => ({ error: `HTTP ${up.status}` }));
             throw new Error(`Upload failed for ${item.file.name}: ${err.error || `HTTP ${up.status}`}`);
           }
+          uploadedFilesRef.current.add(uploadKey);
         }
       }
-      console.log("[Discovery] fired", { eventId, brandId, url: targetUrl });
-      onNext();
+      const res = await apiFetch("/api/discovery/start", {
+        method: "POST",
+        body: JSON.stringify({ url: targetUrl, instagram, brandId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const { discoveryId, eventId } = await res.json();
+      const runId = discoveryId || eventId;
+      if (!runId) throw new Error("Discovery started without a correlation id. Please retry.");
+      console.log("[Discovery] fired", { discoveryId: runId, brandId, url: targetUrl });
+      onNext({ discoveryId: runId, eventId, brandId, baselineVersion });
     } catch (err) {
       setError(err?.message || String(err));
     } finally {
@@ -281,7 +310,8 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
                 <label style={{display:"block", fontSize:12, fontWeight:500, color:"var(--c-ink)", marginBottom: 8}}>
                   Brand name <span style={{color:"var(--pink-500)"}}>·</span>
                 </label>
-                <input className="input" value={brandName} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. Vinilo Coffee" />
+                <input className="input" value={brandName} disabled={!!createdBrandId} onChange={(e) => setBrandName(e.target.value)} placeholder="e.g. North Star Studio" />
+                {createdBrandId && <div style={{fontSize:11.5, color:"var(--c-faint)", marginTop:6}}>Brand created. Retrying will reuse this brand and any sources already uploaded.</div>}
               </div>
             )}
             <div>
@@ -346,7 +376,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
   );
 }
 
-function DiscoveryStep2Running({ onDone }) {
+function DiscoveryStep2Running({ onDone, onExit, runContext }) {
   /* Real BIO-compile polling. Captures the current latest BIO version
      on mount; polls /api/bios/:brandId every 3s until a new (higher)
      version appears — that's the Inngest compile-bio function finishing.
@@ -354,6 +384,8 @@ function DiscoveryStep2Running({ onDone }) {
      UI doesn't hang forever. */
   const [stage, setStage] = useDState("scrape");                /* scrape → vision → compile → done */
   const [elapsed, setElapsed] = useDState(0);
+  const [error, setError] = useDState(null);
+  const [retryNonce, setRetryNonce] = useDState(0);
 
   const lines = [
     { state: stage === "scrape" ? "running" : "ok", text: "Brandolph is reading every page of your site" },
@@ -364,8 +396,11 @@ function DiscoveryStep2Running({ onDone }) {
 
   useDEffect(() => {
     let alive = true;
-    let baselineVersion = null;
+    const discoveryId = runContext?.discoveryId;
     const startedAt = Date.now();
+    setError(null);
+    setElapsed(0);
+    setStage("scrape");
 
     const tick = async () => {
       if (!alive) return;
@@ -379,21 +414,15 @@ function DiscoveryStep2Running({ onDone }) {
       else setStage("compile");
 
       try {
-        const wantedId = window.getCurrentBrandId?.();
-        let brandId = wantedId;
-        if (!brandId) {
-          const { data: brands } = await supabase.from("brands").select("id").order("created_at", { ascending: true }).limit(1);
-          brandId = brands?.[0]?.id;
-        }
+        const brandId = runContext?.brandId;
         if (!brandId) return;
         const res = await apiFetch(`/api/bios/${brandId}`);
         if (!res.ok) return;
         const { bio } = await res.json();
-        const v = bio?.version ?? null;
-        if (baselineVersion === null) {
-          /* First poll just records what version (if any) exists right now. */
-          baselineVersion = v ?? 0;
-        } else if ((v ?? 0) > baselineVersion) {
+        /* A newer version is not enough: another tab or user action can
+           compile the same brand concurrently. Only this run's correlation
+           id is allowed to advance the flow. */
+        if (discoveryId && bio?.discovery_id === discoveryId) {
           setStage("done");
           alive = false;                 /* stop further polling */
           clearTimeout(fallback);        /* the 90s safety net is no longer needed */
@@ -409,10 +438,16 @@ function DiscoveryStep2Running({ onDone }) {
 
     tick();
     const id = setInterval(tick, 3000);
-    /* Safety fallback: if we hit 90s without a new BIO, advance anyway. */
-    const fallback = setTimeout(() => { if (alive) { alive = false; onDone(); } }, 90000);
+    /* A timeout is an error, never a successful extraction. */
+    const fallback = setTimeout(() => {
+      if (alive) {
+        alive = false;
+        clearInterval(id);
+        setError("We haven't confirmed this extraction yet. It may still finish in the background; check again or open the BIO without activating this run.");
+      }
+    }, 90000);
     return () => { alive = false; clearInterval(id); clearTimeout(fallback); };
-  }, [onDone]);
+  }, [onDone, retryNonce, runContext?.brandId, runContext?.discoveryId]);
 
   const pct = Math.min(95, Math.round(elapsed * 4));            /* visual progress only */
   return (
@@ -421,6 +456,13 @@ function DiscoveryStep2Running({ onDone }) {
         <BrandolphDot state={stage === "done" ? "ok" : "thinking"} size={12} />
         <h2 style={{margin: 0, fontSize: 20}}>{stage === "done" ? "Brandolph compiled your BIO" : "Brandolph is reading your brand"}</h2>
       </div>
+      {error && <div className="card" style={{padding:14, marginBottom:14, borderColor:"var(--pink-500)"}}>
+        <div style={{color:"var(--pink-600)", marginBottom:10}}>{error}</div>
+        <div style={{display:"flex", gap:8}}>
+          <button className="btn btn--ghost btn--sm" onClick={() => setRetryNonce(n => n + 1)}>Check again</button>
+          <button className="btn btn--link" onClick={onExit}>Open current BIO</button>
+        </div>
+      </div>}
       <div className="card" style={{padding: 0, overflow:"hidden"}}>
         <div style={{padding:"16px 20px", borderBottom:"1px solid var(--c-line)", background:"var(--c-bg)"}}>
           <div style={{display:"flex", justifyContent:"space-between", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)", letterSpacing:"0.06em"}}>
@@ -445,12 +487,54 @@ function DiscoveryStep2Running({ onDone }) {
   );
 }
 
-function DiscoveryStep2Results({ onConfirm }) {
-  const d = window.CI_DISCOVERY;
+function DiscoveryStep2Results({ onConfirm, onLater, runContext }) {
   const [tab, setTab] = useDState("identity");
   /* Pull live BIO + cert state so the Steward chip flips in real time
      if a certification lands while the user is on this screen. */
-  const live = useLiveBio({ pollMs: 5000 });
+  const live = useLiveBio({ pollMs: 5000, brandId: runContext?.brandId });
+  const p = live.bio?.payload || {};
+  const confidence = p.confidence || {};
+  const fieldConfidence = (path, fallback = 0) => Number(confidence[path]?.conf) || fallback;
+  const normalizedPalette = (p.visual?.palette || []).map((item, i) => typeof item === "string"
+    ? { hex: item, name: `Brand colour ${i + 1}`, conf: fieldConfidence("visual.palette"), wcag: "—" }
+    : { hex: item.hex || "#888888", name: item.name || `Brand colour ${i + 1}`, conf: item.conf || fieldConfidence("visual.palette"), wcag: item.wcag || "—" });
+  const normalizedType = (p.visual?.type || []).map((item, i) => typeof item === "string"
+    ? { kind: i === 0 ? "Display" : "Body", family: item, size: "—", license: "unknown", suggest: "system fallback" }
+    : { kind: item.kind || (i === 0 ? "Display" : "Body"), family: item.family || "Unknown", size: item.size || "—", license: item.license || "unknown", suggest: item.suggest || "system fallback" });
+  const d = {
+    brand: live.brandName || "Your brand",
+    url: live.brandUrl || "",
+    confidence: Number(live.bio?.score) || 0,
+    signals: Object.keys(confidence).length,
+    flags: Array.isArray(p.missing) ? p.missing.length : 0,
+    identity: [
+      ["Positioning", p.identity?.positioning, "identity.positioning"],
+      ["Category", p.identity?.category, "identity.category"],
+      ["Founded", p.identity?.founded, "identity.founded"],
+      ["Pillars", (p.identity?.pillars || []).join(" · "), "identity.pillars"],
+    ].filter(([, value]) => value).map(([key, val, path]) => ({ key, val, conf: fieldConfidence(path) })),
+    palette: normalizedPalette,
+    type: normalizedType,
+    voice: [
+      { dim: "Register", val: fieldConfidence("voice.register") / 100, sample: p.voice?.register || "Not established" },
+      { dim: "Rhythm", val: fieldConfidence("voice.rhythm") / 100, sample: p.voice?.rhythm || "Not established" },
+      { dim: "Signatures", val: fieldConfidence("voice.signatures") / 100, sample: (p.voice?.signatures || []).join(" · ") || "Not established" },
+    ],
+    imagery: p.visual?.imagery || [],
+    avoid: p.visual?.avoid || [],
+    audience: {
+      segments: [p.audience?.primary, p.audience?.secondary, p.audience?.tertiary].filter(Boolean),
+      jobs: p.audience?.jtbd || [],
+    },
+  };
+  const tabs = [
+    ["identity", "Identity", d.identity.length],
+    ["palette", "Palette", d.palette.length],
+    ["type", "Typography", d.type.length],
+    ["voice", "Voice", d.voice.filter(v => v.sample !== "Not established").length],
+    ["imagery", "Imagery", d.imagery.length + d.avoid.length],
+    ["audience", "Audience", d.audience.segments.length + d.audience.jobs.length],
+  ];
   return (
     <div style={{maxWidth: 1080, margin:"24px auto 0"}}>
       {/* Brand Steward notice — the moat-defining trust signal per rev-2 §17 */}
@@ -491,15 +575,14 @@ function DiscoveryStep2Results({ onConfirm }) {
         }}>
           <div>
             <div style={{display:"flex", alignItems:"center", gap:12, marginBottom: 6}}>
-              <span style={{width:36, height: 36, borderRadius: 8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize: 18}}>V</span>
+              <span style={{width:36, height: 36, borderRadius: 8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize: 18}}>{d.brand.slice(0,1).toUpperCase()}</span>
               <h2 style={{margin:0, fontSize: 22, letterSpacing:"-0.01em"}}>{d.brand}</h2>
             </div>
-            <p style={{margin: 0, color:"var(--c-dim)", fontSize: 14}}>Specialty coffee for slow Tuesdays. · <a href={"https://" + d.url} style={{color:"var(--purple-500)"}}>{d.url}</a></p>
+            <p style={{margin: 0, color:"var(--c-dim)", fontSize: 14}}>{p.identity?.positioning || "Positioning awaiting review"}{d.url ? <> · <a href={d.url} style={{color:"var(--purple-500)"}}>{d.url.replace(/^https?:\/\//, "")}</a></> : null}</p>
             <div style={{marginTop: 12, display:"flex", gap: 14, alignItems:"center", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)", letterSpacing:"0.06em"}}>
               <span><span className="dot-state dot-state--ok" /> EXTRACTION COMPLETE</span>
-              <span>· {d.duration}</span>
               <span>· {d.signals} signals</span>
-              <span style={{color:"var(--orange-600)"}}>· {d.flags} flag</span>
+              <span style={{color:d.flags ? "var(--orange-600)" : "var(--green-600)"}}>· {d.flags} {d.flags === 1 ? "gap" : "gaps"}</span>
             </div>
           </div>
           <div style={{textAlign:"right"}}>
@@ -512,8 +595,8 @@ function DiscoveryStep2Results({ onConfirm }) {
         </div>
       </Reveal>
 
-      {/* Flag banner */}
-      <Reveal>
+      {/* Evidence gaps surfaced by the compiler */}
+      {d.flags > 0 && <Reveal>
         <div style={{
           marginBottom: 14,
           background:"var(--yellow-50)", border:"1px solid var(--yellow-200)", borderRadius: 10,
@@ -523,27 +606,16 @@ function DiscoveryStep2Results({ onConfirm }) {
           <div style={{display:"flex", alignItems:"center", gap: 10}}>
             <Icon name="flag" size={14} />
             <span style={{fontSize: 13, color:"var(--c-ink)"}}>
-              <strong style={{fontWeight: 600}}>1 flag to resolve.</strong> Display typeface (Söhne Breit) requires a paid license. Suggested substitute: Söhne.
+              <strong style={{fontWeight: 600}}>{d.flags} {d.flags === 1 ? "gap" : "gaps"} to resolve.</strong> {p.missing?.[0]?.why || "Your Brand Steward will resolve unsupported fields."}
             </span>
           </div>
-          <div style={{display:"flex", gap: 8}}>
-            <button className="btn btn--ghost btn--sm">Upload license</button>
-            <button className="btn btn--primary btn--sm">Accept substitute</button>
-          </div>
         </div>
-      </Reveal>
+      </Reveal>}
 
       <Reveal>
         <div className="card" style={{padding: 0, overflow:"hidden"}}>
           <div className="tabs">
-            {[
-              ["identity","Identity", 4],
-              ["palette","Palette", 5],
-              ["type","Typography", 2],
-              ["voice","Voice", 4],
-              ["imagery","Imagery", 4],
-              ["audience","Audience", 3],
-            ].map(([k, l, count]) => (
+            {tabs.map(([k, l, count]) => (
               <button key={k} className={"tab" + (tab === k ? " tab--active" : "")} onClick={() => setTab(k)}>
                 {l} <span className="tab__count">{count}</span>
               </button>
@@ -554,7 +626,7 @@ function DiscoveryStep2Results({ onConfirm }) {
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 28}}>
                 <div>
                   <div className="eyebrow" style={{marginBottom: 12}}>Facts captured</div>
-                  <table style={{width:"100%", borderCollapse:"collapse", fontSize: 14}}>
+                  {d.identity.length === 0 ? <p style={{fontSize:13, color:"var(--c-faint)"}}>No supported identity facts were extracted.</p> : <table style={{width:"100%", borderCollapse:"collapse", fontSize: 14}}>
                     <tbody>
                       {d.identity.map((r, i) => (
                         <tr key={i} style={{borderBottom: i < d.identity.length - 1 ? "1px solid var(--c-line)" : "none"}}>
@@ -564,21 +636,15 @@ function DiscoveryStep2Results({ onConfirm }) {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </table>}
                 </div>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Logo lockups captured · 3</div>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 10}}>
-                    {["#1F1A14", "#F4ECDD", "#C97B3F"].map((bg, i) => (
-                      <div key={i} style={{
-                        aspectRatio: "1.3 / 1", background: bg,
-                        borderRadius: 10, display:"flex", alignItems:"center", justifyContent:"center",
-                        color: bg === "#F4ECDD" ? "#1F1A14" : "#F4ECDD",
-                        fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 24, letterSpacing:"-0.02em",
-                        border:"1px solid var(--c-line)",
-                      }}>vinilo</div>
-                    ))}
-                  </div>
+                <div className="card card--inset" style={{padding:18, alignSelf:"start"}}>
+                  <div className="eyebrow" style={{marginBottom:8}}>Evidence state</div>
+                  <p style={{margin:0, fontSize:13, color:"var(--c-dim)", lineHeight:1.55}}>
+                    {d.identity.length
+                      ? `${d.identity.length} identity ${d.identity.length === 1 ? "field is" : "fields are"} backed by the current BIO evidence map.`
+                      : "Identity evidence is still awaiting extraction or Steward review."}
+                  </p>
                 </div>
               </div>
             )}
@@ -599,14 +665,7 @@ function DiscoveryStep2Results({ onConfirm }) {
                     </div>
                   ))}
                 </div>
-                <div style={{marginTop: 18}}>
-                  <div className="eyebrow" style={{marginBottom: 8}}>Distribution across 47 scraped pages</div>
-                  <div style={{display:"flex", height: 18, borderRadius: 4, overflow:"hidden", border:"1px solid var(--c-line)"}}>
-                    {d.palette.map((c, i) => (
-                      <div key={i} style={{flex: [38, 22, 28, 8, 4][i], background: c.hex}} title={`${c.name} ${[38,22,28,8,4][i]}%`} />
-                    ))}
-                  </div>
-                </div>
+                {d.palette.length === 0 && <p style={{fontSize:13, color:"var(--c-faint)"}}>No palette evidence was extracted.</p>}
               </div>
             )}
             {tab === "type" && (
@@ -622,7 +681,7 @@ function DiscoveryStep2Results({ onConfirm }) {
                       fontWeight: 700, fontSize: t.kind === "Display" ? 38 : 22,
                       letterSpacing: "-0.01em", marginBottom: 6, color:"var(--c-ink)",
                     }}>
-                      {t.kind === "Display" ? "Slow Tuesdays." : "Cup-by-cup, named after the person who grew it."}
+                      Aa Bb Cc
                     </div>
                     <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginBottom: 14}}>
                       {t.family} · {t.size}
@@ -653,7 +712,7 @@ function DiscoveryStep2Results({ onConfirm }) {
                   </div>
                 </div>
                 <div>
-                  <div className="eyebrow" style={{marginBottom: 14}}>Sampled from the site</div>
+                  <div className="eyebrow" style={{marginBottom: 14}}>Extracted voice fields</div>
                   <div style={{display:"flex", flexDirection:"column", gap: 12}}>
                     {d.voice.map((v, i) => (
                       <div key={i} style={{
@@ -671,30 +730,17 @@ function DiscoveryStep2Results({ onConfirm }) {
             {tab === "imagery" && (
               <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 28}}>
                 <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Style categories</div>
+                  <div className="eyebrow" style={{marginBottom: 12}}>Imagery direction</div>
                   <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 10}}>
-                    {[1,2,4,5].map((n, i) => (
-                      <div key={n} style={{
-                        aspectRatio:"1/1", borderRadius: 10, overflow:"hidden",
-                        position:"relative", border:"1px solid var(--c-line)",
-                      }}>
-                        <img src={`caastor/assets/profile-${n}.jpg`} alt="" style={{width:"100%", height:"100%", objectFit:"cover", filter:"sepia(0.05) saturate(0.9)"}} />
-                        <div style={{position:"absolute", bottom:8, left:8, right:8, background:"rgba(0,0,0,0.66)", color:"#fff", padding:"4px 8px", borderRadius: 4, fontSize: 10, fontFamily:"var(--font-mono)", letterSpacing:"0.06em", textTransform:"uppercase"}}>
-                          {d.imagery[i]}
-                        </div>
+                    {d.imagery.map((direction, i) => (
+                      <div key={i} className="card card--inset" style={{minHeight:90, padding:14, display:"flex", alignItems:"flex-end", fontSize:12.5, color:"var(--c-ink)"}}>
+                        {direction}
                       </div>
                     ))}
                   </div>
+                  {d.imagery.length === 0 && <p style={{fontSize:13, color:"var(--c-faint)"}}>No imagery direction was established.</p>}
                 </div>
                 <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Style qualities</div>
-                  <ul style={{margin:0, padding: 0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8, marginBottom: 22}}>
-                    {["Warm, slightly sunny color cast","Editorial framing — never staged","Hands + craft tools","Low light café interiors","Producer portraits with name"].map((q, i) => (
-                      <li key={i} style={{display:"flex", gap: 8, fontSize: 13, color:"var(--c-ink)"}}>
-                        <span style={{color:"var(--green-600)"}}>✓</span> {q}
-                      </li>
-                    ))}
-                  </ul>
                   <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>Avoid</div>
                   <ul style={{margin:0, padding: 0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
                     {d.avoid.map((q, i) => (
@@ -703,15 +749,15 @@ function DiscoveryStep2Results({ onConfirm }) {
                       </li>
                     ))}
                   </ul>
+                  {d.avoid.length === 0 && <p style={{fontSize:13, color:"var(--c-faint)"}}>No avoid list was established.</p>}
                 </div>
               </div>
             )}
             {tab === "audience" && (
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 22}}>
+              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 22}}>
                 {[
                   ["Segments", d.audience.segments],
-                  ["Channels", d.audience.channels],
-                  ["Languages", d.audience.languages],
+                  ["Jobs to be done", d.audience.jobs],
                 ].map(([title, items], i) => (
                   <div key={i}>
                     <div className="eyebrow" style={{marginBottom: 12}}>{title}</div>
@@ -720,11 +766,12 @@ function DiscoveryStep2Results({ onConfirm }) {
                         <div key={j} style={{
                           padding:"10px 14px", border:"1px solid var(--c-line)",
                           borderRadius: 8, fontSize: 13, color:"var(--c-ink)",
-                          display:"flex", justifyContent:"space-between", alignItems:"center",
+                          display:"flex", alignItems:"center",
                         }}>
-                          {it} <Confidence value={[88, 75, 92][j] || 80} />
+                          {it}
                         </div>
                       ))}
+                      {items.length === 0 && <div style={{fontSize:13, color:"var(--c-faint)"}}>Not established.</div>}
                     </div>
                   </div>
                 ))}
@@ -746,7 +793,7 @@ function DiscoveryStep2Results({ onConfirm }) {
           <span style={{fontSize: 14, color:"var(--c-ink)"}}>Looks right? Confirm to activate your Brand Space.</span>
         </div>
         <div style={{display:"flex", gap: 10}}>
-          <button className="btn btn--ghost">Save & review later</button>
+          <button className="btn btn--ghost" onClick={onLater}>Save & review later</button>
           <button className="btn btn--primary btn--lg" onClick={onConfirm}>
             Activate brand space <Icon name="arrow" size={14} />
           </button>
@@ -756,7 +803,10 @@ function DiscoveryStep2Results({ onConfirm }) {
   );
 }
 
-function DiscoveryStep3({ go }) {
+function DiscoveryStep3({ go, runContext }) {
+  const live = useLiveBio({ pollMs: 10000, brandId: runContext?.brandId });
+  const positioning = live.bio?.payload?.identity?.positioning || "the clearest supported version of your positioning";
+  const gapCount = Array.isArray(live.bio?.payload?.missing) ? live.bio.payload.missing.length : 0;
   return (
     <div style={{maxWidth: 580, margin:"80px auto 0", textAlign:"center"}}>
       <div style={{display:"flex", justifyContent:"center", marginBottom: 22}}>
@@ -764,8 +814,8 @@ function DiscoveryStep3({ go }) {
       </div>
       <h1 style={{fontSize: 28, letterSpacing:"-0.01em", marginBottom: 14}}>Brand Space is live.</h1>
       <div className="stream" style={{display:"flex", flexDirection:"column", gap: 12, marginBottom: 28, textAlign:"left"}}>
-        <BrandolphLine html="*I've read the site, the IG, and three competitors.* You sell coffee. You also sell a decision to slow down on purpose. Most people in the category sell the first; almost none sell the second. That's your unfair advantage." />
-        <BrandolphLine html="*Two things to know before we go further.* One — the BIO is editable. If I got something wrong, fix it. Two — I don't pretend to know what I don't know. I left three fields flagged amber. I'd rather ask you than guess." />
+        <BrandolphLine html={`*I've read the sources for ${live.brandName || "your brand"}.* The BIO now anchors on: ${positioning}`} />
+        <BrandolphLine html={`*Two things to know before we go further.* One — the BIO is editable. If I got something wrong, fix it. Two — I don't pretend to know what I don't know. I left ${gapCount} ${gapCount === 1 ? "field" : "fields"} flagged for evidence or Steward review.`} />
         <BrandolphLine html="*The first brief is on you.* When you have something to ship, brief me on the change you want — not the deliverable. I'll do the deliverable part." />
       </div>
       <button className="btn btn--primary btn--lg" onClick={() => go("home")}>
@@ -778,80 +828,20 @@ function DiscoveryStep3({ go }) {
 function Discovery({ go, newBrand = false }) {
   const [step, setStep] = useDState(1);
   const [phase, setPhase] = useDState("form"); // form | running | results
+  const [runContext, setRunContext] = useDState(null);
   return (
     <div style={{padding:"24px 36px 60px", maxWidth: 1180, margin:"0 auto"}}>
       <DiscoveryStepper step={step} />
-      {step === 1 && <DiscoveryStep1 newBrand={newBrand} onNext={() => { setStep(2); setPhase("running"); }} />}
-      {step === 2 && phase === "running"  && <DiscoveryStep2Running onDone={() => setPhase("results")} />}
-      {step === 2 && phase === "results"  && <DiscoveryStep2Results onConfirm={() => setStep(3)} />}
-      {step === 3 && <DiscoveryStep3 go={go} />}
+      {step === 1 && <DiscoveryStep1 newBrand={newBrand} onNext={(context) => { setRunContext(context); setStep(2); setPhase("running"); }} />}
+      {step === 2 && phase === "running"  && <DiscoveryStep2Running runContext={runContext} onDone={() => setPhase("results")} onExit={() => go("bio")} />}
+      {step === 2 && phase === "results"  && <DiscoveryStep2Results runContext={runContext} onConfirm={() => setStep(3)} onLater={() => go("bio")} />}
+      {step === 3 && <DiscoveryStep3 go={go} runContext={runContext} />}
     </div>
   );
 }
 
 /* ════════════════════════════════════════════════════════════════ */
 /* BIO VIEWER                                                        */
-
-const BIO_SEED_SOURCES = [
-  { src: "vinilo.coffee · homepage", date: "scraped 14 May 09:31", n: 18 },
-  { src: "vinilo.coffee · about", date: "scraped 14 May 09:31", n: 12 },
-  { src: "vinilo.coffee · pricing", date: "scraped 14 May 09:31", n: 7 },
-  { src: "Instagram · @vinilo.coffee · 90 posts", date: "scraped 14 May 09:34", n: 22 },
-  { src: "Founder intake answers", date: "14 May 09:42", n: 14 },
-  { src: "Brand book v1.pdf · uploaded", date: "14 May 09:42", n: 9 },
-  { src: "Competitor map · 9 in-category", date: "Brandolph 14 May 09:50", n: 12 },
-];
-
-const BIO_IDENTITY = [
-  { label:"Name",        value:"Vinilo Coffee",                       conf:99, source:"intake answer" },
-  { label:"Positioning", value:"Specialty coffee for slow Tuesdays.", conf:88, source:"extracted from homepage hero + about page", italic:true },
-  { label:"Category",    value:"Specialty coffee · subscription + café", conf:94, source:"scrape + competitor map" },
-  { label:"Founded",     value:"2021 · Barcelona",                    conf:96, source:"about page" },
-  { label:"Ownership",   value:"Founder-led · 2 co-founders · 8 FTEs", conf:72, source:"intake answer + LinkedIn" },
-  { label:"Pillars",     multi:true, value:["Provenance","Routine","Patience","Café-as-rest"], conf:84, source:"Brandolph synthesis from 47 scraped pages" },
-];
-const BIO_AUDIENCE = [
-  { label:"Primary",   value:"Subscribers, 28–48, urban, recurring purchase behaviour. Value routine over discovery.", conf:86, source:"IG + Klaviyo intake" },
-  { label:"Secondary", value:"Café-warm locals. Walks-in within 2.5km. Tuesday afternoon over Saturday morning.", conf:78, source:"café footfall + observation" },
-  { label:"Tertiary",  value:"Wholesale buyers. Specialty hotels + co-working spaces.", conf:62, source:"intake answer" },
-  { label:"JTBD",      multi:true, value:["The decision to slow down","The ritual that holds the week together","A weekly bag arriving on time"], conf:80, source:"Brandolph synthesis" },
-];
-const BIO_COMPETITIVE = [
-  { label:"Direct",   multi:true, value:["Café Granell","Nomad Coffee","Three Marks","Caravelle"], conf:92, source:"competitor map · 9 in-category" },
-  { label:"Adjacent", multi:true, value:["The Slow Café (UK)","Onyx (US)","La Marzocco Home"], conf:78, source:"competitor map" },
-  { label:"The table you sit at", value:"Specialty roasters who lead with provenance + ritual. NOT the 'limited drop' microlot table.", conf:84, source:"Brandolph diagnosis" },
-  { label:"Where you don't fit",  value:"High-energy 'third wave' branding. Aesthetic-led without infrastructure.", conf:80, source:"Brandolph diagnosis" },
-];
-const BIO_VOICE = [
-  { label:"Register",        value:"Editorial, low-urgency, second person. Funny only when it's earned.", conf:88, source:"50 paragraphs sampled from site + IG" },
-  { label:"Forbidden",       multi:true, value:["unlock","limited time","FOMO","drop","exclusive","kit","journey"], conf:94, source:"rules + Brandolph QA" },
-  { label:"Sentence rhythm", value:"Short. Then longer, with a slight ramp. Periods over commas. No dashes-for-pace.", conf:82, source:"rhythm analysis (Opus)" },
-  { label:"Signature moves", multi:true, value:["The phrase 'on purpose'","'It isn't X — it's Y'","First-person plural only in brand voice"], conf:86, source:"Brandolph synthesis" },
-];
-const BIO_GOALS = [
-  { label:"2026 north star", value:"Be the coffee that earns the Tuesday back, for 10,000 households.", conf:70, source:"intake" },
-  { label:"Q2 priority",     value:"Pricing relaunch + summer Tuesdays campaign.", conf:90, source:"founder calendar" },
-  { label:"Q3 priority",     value:"Honduras + Aug microlot. Brand book v2.", conf:62, source:"intake" },
-];
-const BIO_STRATEGIC = {
-  watchouts: [
-    "The \"slow Tuesday\" line is doing a lot of work. If you outgrow it without retiring it cleanly, the brand reads contradictory.",
-    "The café revenue is half the business. The site reads like it's only the subscription. There's a tension to resolve, not hide.",
-    "Wholesale audience is on the BIO but invisible everywhere else. Decide if it stays.",
-  ],
-  gaps: [
-    "No documented behaviour around producer relationships. Critical for the microlot cadence.",
-    "No declared price ceiling. The annual conversation needs one.",
-  ],
-  notList: [
-    "A discount-led subscription.",
-    "A \"drop\" culture roaster.",
-    "An aesthetic-led brand. The taste is the brand.",
-    "A coffee-cult evangelism brand. Quiet conviction over loud taste.",
-  ],
-  diagnosis: "Vinilo's writing is consistently better than its visual system. The site reads with conviction; the system around it doesn't earn that conviction yet. The Q3 priority should be the book — not new campaigns. The summer campaign is fine, but a brand book is the unlock you've been compounding the cost of for two years.",
-};
-const BIO_GRADE = "Warm, slightly sunny. Editorial framing. Hands + craft + low-light interiors.";
 
 /* ─── API payload ↔ BioFieldList shape mappers ─────────────────────
    The BIO viewer's tabs render flat arrays of `{ label, value, multi? }`.
@@ -865,34 +855,51 @@ function payloadToFields(payload) {
      Old BIOs have no map → cf() returns {} → conf/source stay undefined and the
      downstream Confidence/EditableField components render exactly as before. */
   const cmap = p.confidence || {};
+  const fieldMeta = p.fieldMeta || {};
   const cf = (section, key) => cmap[`${section}.${key}`] || {};
   const field = (section, key, label, extra = {}) => {
     const { conf, source } = cf(section, key);
-    return { label, conf, source, ...extra };
+    const meta = fieldMeta?.[section]?.[key] || {};
+    return { key, label: meta.label || label, conf, source, ...extra, ...(typeof meta.multi === "boolean" ? { multi: meta.multi } : {}) };
   };
+  const humanize = (key) => String(key)
+    .replace(/^custom_/, "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/^./, (c) => c.toUpperCase());
+  const customFields = (section, known) => Object.entries(p[section] || {})
+    .filter(([key]) => !known.includes(key))
+    .map(([key, value]) => ({
+      ...field(section, key, humanize(key), { multi: Array.isArray(value) }),
+      value,
+    }));
   return {
     identity: [
       { ...field("identity", "positioning", "Positioning", { italic: true }), value: p.identity?.positioning || "" },
       { ...field("identity", "category", "Category"), value: p.identity?.category || "" },
       { ...field("identity", "founded", "Founded"),   value: p.identity?.founded || "" },
       { ...field("identity", "pillars", "Pillars", { multi: true }), value: p.identity?.pillars || [] },
+      ...customFields("identity", ["positioning", "category", "founded", "pillars"]),
     ],
     audience: [
       { ...field("audience", "primary", "Primary"),     value: p.audience?.primary || "" },
       { ...field("audience", "secondary", "Secondary"), value: p.audience?.secondary || "" },
       { ...field("audience", "tertiary", "Tertiary"),   value: p.audience?.tertiary || "" },
       { ...field("audience", "jtbd", "Jobs to be done", { multi: true }), value: p.audience?.jtbd || [] },
+      ...customFields("audience", ["primary", "secondary", "tertiary", "jtbd"]),
     ],
     voice: [
       { ...field("voice", "register", "Register"),    value: p.voice?.register || "" },
       { ...field("voice", "forbidden", "Forbidden", { multi: true }), value: p.voice?.forbidden || [] },
       { ...field("voice", "rhythm", "Rhythm"),        value: p.voice?.rhythm || "" },
       { ...field("voice", "signatures", "Signatures", { multi: true }), value: p.voice?.signatures || [] },
+      ...customFields("voice", ["register", "forbidden", "rhythm", "signatures"]),
     ],
     goals: [
       { ...field("goals", "northStar", "North star"), value: p.goals?.northStar || "" },
       { ...field("goals", "q2", "This quarter"),      value: p.goals?.q2 || "" },
       { ...field("goals", "q3", "Next quarter"),      value: p.goals?.q3 || "" },
+      ...customFields("goals", ["northStar", "q2", "q3"]),
     ],
     strategic: {
       watchouts: p.strategic?.watchouts || [],
@@ -904,59 +911,60 @@ function payloadToFields(payload) {
       gaps:      (p.missing || []).map(m =>
                    typeof m === "string" ? m
                    : [m?.field, m?.why].filter(Boolean).join(" — ")),
-      diagnosis: "",
+      diagnosis: p.strategic?.diagnosis || "",
     },
     /* Visual tab consumes these arrays directly. */
     palette: p.visual?.palette || [],
     type:    p.visual?.type || [],
     imagery: p.visual?.imagery || [],
     avoid:   p.visual?.avoid || [],
-    grade:   "",
+    grade:   p.visual?.grade || "",
   };
 }
 
 function fieldsToPayload(bio, prevPayload) {
-  const getStr = (fields, label) => fields.find(f => f.label === label)?.value || "";
-  const getArr = (fields, label) => fields.find(f => f.label === label)?.value || [];
-  /* Confidence + missing are Brandolph/Steward-side metadata, not user-editable
-     here. Carry them through on save so a user edit never clobbers them. */
-  const carry = {};
-  if (prevPayload?.confidence) carry.confidence = prevPayload.confidence;
-  if (prevPayload?.missing) carry.missing = prevPayload.missing;
+  const toSection = (fields) => Object.fromEntries((fields || []).map((f) => [f.key, f.value]));
+  const confidence = { ...(prevPayload?.confidence || {}) };
+  const fieldMeta = { ...(prevPayload?.fieldMeta || {}) };
+  for (const [section, fields] of [["identity", bio.identity], ["audience", bio.audience], ["voice", bio.voice], ["goals", bio.goals]]) {
+    for (const key of Object.keys(confidence)) {
+      if (key.startsWith(`${section}.`)) delete confidence[key];
+    }
+    fieldMeta[section] = {};
+    for (const f of fields || []) {
+      const parsedConfidence = Number(f.conf);
+      if (Number.isFinite(parsedConfidence)) {
+        confidence[`${section}.${f.key}`] = { conf: parsedConfidence, source: f.source || "manual entry" };
+      }
+      fieldMeta[section][f.key] = { label: f.label || f.key, multi: !!f.multi };
+    }
+  }
+  const missing = (bio.strategic?.gaps || []).filter(Boolean).map((entry) => {
+    const [field, ...why] = String(entry).split(" — ");
+    return { field: why.length ? field : "manual", why: why.length ? why.join(" — ") : field };
+  });
   return {
-    ...carry,
-    identity: {
-      positioning: getStr(bio.identity, "Positioning"),
-      category:    getStr(bio.identity, "Category"),
-      founded:     getStr(bio.identity, "Founded"),
-      pillars:     getArr(bio.identity, "Pillars"),
-    },
-    audience: {
-      primary:   getStr(bio.audience, "Primary"),
-      secondary: getStr(bio.audience, "Secondary"),
-      tertiary:  getStr(bio.audience, "Tertiary"),
-      jtbd:      getArr(bio.audience, "Jobs to be done"),
-    },
-    voice: {
-      register:   getStr(bio.voice, "Register"),
-      forbidden:  getArr(bio.voice, "Forbidden"),
-      rhythm:     getStr(bio.voice, "Rhythm"),
-      signatures: getArr(bio.voice, "Signatures"),
-    },
-    goals: {
-      northStar: getStr(bio.goals, "North star"),
-      q2:        getStr(bio.goals, "This quarter"),
-      q3:        getStr(bio.goals, "Next quarter"),
-    },
+    ...(prevPayload || {}),
+    confidence,
+    fieldMeta,
+    missing,
+    identity: toSection(bio.identity),
+    audience: toSection(bio.audience),
+    voice: toSection(bio.voice),
+    goals: toSection(bio.goals),
     strategic: {
+      ...(prevPayload?.strategic || {}),
       watchouts: bio.strategic?.watchouts || [],
       notList:   bio.strategic?.notList || [],
+      diagnosis: bio.strategic?.diagnosis || "",
     },
     visual: {
+      ...(prevPayload?.visual || {}),
       palette: bio.palette || [],
       type:    bio.type || [],
       imagery: bio.imagery || [],
       avoid:   bio.avoid || [],
+      grade:   bio.grade || "",
     },
   };
 }
@@ -1135,7 +1143,7 @@ function BioViewer({ go, bioScore = 91 }) {
       {/* Hero */}
       <div style={{display:"grid", gridTemplateColumns:"1fr 320px", gap: 28, marginBottom: 28, alignItems:"end"}}>
         <div>
-          <div className="eyebrow" style={{marginBottom: 6}}>Brand Intelligence Object · {live.brandName || "Vinilo Coffee"}</div>
+          <div className="eyebrow" style={{marginBottom: 6}}>Brand Intelligence Object · {live.brandName || "Your brand"}</div>
           <div style={{display:"flex", alignItems:"baseline", gap: 14}}>
             <span style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 88, lineHeight: 1, color: tone.color, fontWeight: 500}}>
               <Counter to={conf} />
@@ -1347,10 +1355,10 @@ function EditableField({ f, editing, onChange, onRemove }) {
 function BioFieldList({ items, editing, onChange }) {
   const upd = (i, p) => onChange(items.map((x, j) => j === i ? { ...x, ...p } : x));
   const rm = (i) => onChange(items.filter((_, j) => j !== i));
-  const add = (multi) => onChange([...items, { label: "New field", value: multi ? [] : "", conf: 50, source: "manual entry", multi }]);
+  const add = (multi) => onChange([...items, { key: `custom_${Date.now().toString(36)}`, label: "New field", value: multi ? [] : "", conf: 50, source: "manual entry", multi }]);
   return (
     <div>
-      {items.map((f, i) => <EditableField key={i} f={f} editing={editing} onChange={(p) => upd(i, p)} onRemove={() => rm(i)} />)}
+      {items.map((f, i) => <EditableField key={f.key || i} f={f} editing={editing} onChange={(p) => upd(i, p)} onRemove={() => rm(i)} />)}
       {editing && (
         <div style={{display:"flex", gap:8, marginTop:14}}>
           <button className="btn btn--ghost btn--sm" onClick={() => add(false)}><Icon name="plus" size={13} /> Add field</button>
@@ -1383,7 +1391,7 @@ function BioVisual({ bio, patch, editing }) {
     <div style={{display:"flex", flexDirection:"column", gap:30}}>
       {/* PALETTE */}
       <section>
-        <BioSectionHead label="Colour palette" source="extracted from 47 pages + logo" conf={94} />
+        <BioSectionHead label="Colour palette" source="visual extraction" />
         <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))", gap:12}}>
           {bio.palette.map((c, i) => (
             <div key={i} className="card" style={{padding:0, overflow:"hidden"}}>
@@ -1439,7 +1447,7 @@ function BioVisual({ bio, patch, editing }) {
                     : <span className="pill" style={{height:18, padding:"0 8px", fontSize:9.5}}>{t.license}</span>}
                 </div>
                 <div style={{fontFamily:ff, fontSize:52, lineHeight:1, color:"var(--c-ink)", fontWeight:600, letterSpacing:"-0.02em"}}>Aa Gg</div>
-                <div style={{fontFamily:ff, fontSize:15, color:"var(--c-dim)", marginTop:8, lineHeight:1.4}}>The decision to slow down, on purpose.</div>
+                <div style={{fontFamily:ff, fontSize:15, color:"var(--c-dim)", marginTop:8, lineHeight:1.4}}>ABCDEFGHIJKLMNOPQRSTUVWXYZ · 0123456789</div>
                 <div style={{marginTop:14, paddingTop:12, borderTop:"1px dashed var(--c-line-2)"}}>
                   {editing
                     ? <div style={{display:"flex", flexDirection:"column", gap:6}}>
@@ -1472,7 +1480,7 @@ function BioVisual({ bio, patch, editing }) {
 
       {/* IMAGERY */}
       <section>
-        <BioSectionHead label="Imagery" source="image analysis · 90 posts" conf={84} />
+        <BioSectionHead label="Imagery" source="visual evidence" />
         <div className="card card--inset" style={{padding:"14px 16px", marginBottom:12}}>
           <div className="eyebrow" style={{marginBottom:6}}>Grade</div>
           {editing
@@ -1522,7 +1530,7 @@ function BioStrategic({ strat, patchStrategic, editing }) {
             </ul>}
       </div>
       <div className="card" style={{padding: 18, borderLeft:"3px solid var(--pink-500)", gridColumn: "1 / -1"}}>
-        <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>What Vinilo is NOT</div>
+        <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>What the brand is NOT</div>
         {editing
           ? <StringListEditor items={strat.notList} onChange={(v) => patchStrategic("notList", v)} marker="✕" color="var(--pink-500)" />
           : <ul style={{margin: 0, paddingLeft: 0, listStyle:"none", display:"grid", gridTemplateColumns: "1fr 1fr", gap: 10}}>
@@ -1566,9 +1574,7 @@ function BioSources({ sources, setSources, feed, setFeed, reading, addReference,
           </button>
         </div>
         <div style={{display:"flex", gap:8, marginTop:12, flexWrap:"wrap"}}>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Document upload · brand-deck.pdf", "doc")}><Icon name="files" size={13} /> Upload document</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Instagram · @vinilo.coffee · latest 30 posts")}><Icon name="refresh" size={13} /> Re-pull social</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Competitor · blue-bottle.com")}><Icon name="plus" size={13} /> Add competitor</button>
+          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => go("discovery")}><Icon name="files" size={13} /> Upload files in Discovery</button>
         </div>
       </div>
 
