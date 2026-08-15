@@ -1,0 +1,112 @@
+{
+  "nav": {
+    "create": "Create",
+    "briefs": "Briefs",
+    "bio": "BIO",
+    "library": "Library",
+    "specialists": "Specialists",
+    "humans": "Humans",
+    "credits": "Credits",
+    "account": "Account"
+  },
+  "section": {
+    "createBriefs": "Create / Briefs",
+    "bioLibrary": "BIO / Library",
+    "specialistsHumans": "Specialists / Humans",
+    "creditsAccount": "Credits / Account",
+    "team": "Team",
+    "teamPortal": "Team portal",
+    "admin": "Admin"
+  },
+  "team": {
+    "jobQueue": "Job queue",
+    "craftPolish": "Craft polish",
+    "capacity": "Capacity",
+    "clients": "Clients",
+    "myEarnings": "My earnings"
+  },
+  "admin": {
+    "specs": "Specs",
+    "brandolphMemory": "Brandolph memory"
+  },
+  "common": {
+    "brandolph": "Brandolph",
+    "logOut": "Log out"
+  },
+  "a11y": {
+    "switchBrand": "Switch brand",
+    "language": "Language",
+    "navigation": "Navigation",
+    "backToDashboard": "Back to dashboard"
+  },
+  "ws": {
+    "workspace": "Workspace",
+    "addBrand": "Add brand"
+  },
+  "sidebar": {
+    "bioScore": "BIO {score}%",
+    "seniorDesigner": "Senior designer",
+    "active": "Active",
+    "brandolphReading": "Reading your BIO. Watching the pricing relaunch through review.",
+    "viewLedger": "View ledger →",
+    "thisWeek": "This week",
+    "jobsDelivered": "Jobs delivered",
+    "creditsEarned": "Credits earned"
+  },
+  "notif": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "empty": "You're all caught up.",
+    "ariaUnread": { "plural": { "one": "Notifications, {count} unread", "other": "Notifications, {count} unread" } },
+    "ago": {
+      "seconds": "{count}s ago",
+      "minutes": "{count}m ago",
+      "hours": "{count}h ago",
+      "days": "{count}d ago"
+    }
+  },
+  "title": {
+    "discovery": "Discovery",
+    "brief": "Brief",
+    "specialistsOnShift": "Specialists · {count} on shift",
+    "specialistNew": "New specialist",
+    "canvas": "Canvas",
+    "plans": "Plans",
+    "activeJob": "Active job",
+    "capacitySla": "Capacity & SLA",
+    "clientRoster": "Client roster"
+  },
+  "topbar": {
+    "startBrief": "Start a brief",
+    "brandolphReading": "Brandolph is reading"
+  },
+  "plans": {
+    "eyebrow": "Plans",
+    "headline": "Grow your studio.",
+    "intro": "Every plan ships the full Brandolph crew and a senior-certified BIO. Choose the brand allowance that fits the work in front of you.",
+    "success": "Payment received — your plan is updating. This can take a few seconds.",
+    "cancel": "No changes made. Pick a plan whenever you're ready.",
+    "currentPlan": "Current plan",
+    "tierLabel": "Tier {id}",
+    "allowanceUnlimited": "Unlimited brands",
+    "allowance": { "plural": { "one": "{count} brand", "other": "{count} brands" } },
+    "yourPlan": "Your plan",
+    "managedByAdmin": "Plan changes are managed by your workspace admin.",
+    "talkToUs": "Talk to us",
+    "starting": "Starting…",
+    "upgrade": "Upgrade",
+    "note03": "Reach your Caastor team to set up The Colony 🐜.",
+    "noteFail": "Couldn't start the upgrade just now — please try again or contact your Caastor team.",
+    "included": "Included",
+    "backToCreate": "← Back to Create",
+    "blurb": {
+      "00": "One brand, the full Brandolph crew, and your certified BIO.",
+      "01": "Run two brands side by side with shared specialist memory.",
+      "02": "Three brands plus priority human craft polish.",
+      "03": "Unlimited brands for studios running the whole roster."
+    }
+  },
+  "locale": {
+    "name": "English"
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "_notes": {
+    "proper_nouns": "BIO, Brandolph, Caastor, CaastorOS and 'The Colony' are kept in Latin script as product/proper nouns.",
+    "plurals": "Plural keys (notif.ariaUnread, plans.allowance) supply all 6 Arabic CLDR categories (zero/one/two/few/many/other); selection is by Intl.PluralRules('ar'), never a ternary.",
+    "digits": "Numeric values are formatted via Intl.NumberFormat('ar') at call sites, so counts render as Arabic-Indic numerals.",
+    "direction": "Arrow glyphs are pre-mirrored for RTL reading order; the RTL/font pass may refine further."
+  },
+  "nav": {
+    "create": "إنشاء",
+    "briefs": "الموجزات",
+    "bio": "BIO",
+    "library": "المكتبة",
+    "specialists": "المتخصصون",
+    "humans": "البشر",
+    "credits": "الرصيد",
+    "account": "الحساب"
+  },
+  "section": {
+    "createBriefs": "الإنشاء / الموجزات",
+    "bioLibrary": "BIO / المكتبة",
+    "specialistsHumans": "المتخصصون / البشر",
+    "creditsAccount": "الرصيد / الحساب",
+    "team": "الفريق",
+    "teamPortal": "بوابة الفريق",
+    "admin": "الإدارة"
+  },
+  "team": {
+    "jobQueue": "قائمة المهام",
+    "craftPolish": "الصقل اليدوي",
+    "capacity": "السعة",
+    "clients": "العملاء",
+    "myEarnings": "أرباحي"
+  },
+  "admin": {
+    "specs": "المواصفات",
+    "brandolphMemory": "ذاكرة Brandolph"
+  },
+  "common": {
+    "brandolph": "Brandolph",
+    "logOut": "تسجيل الخروج"
+  },
+  "a11y": {
+    "switchBrand": "تبديل العلامة",
+    "language": "اللغة",
+    "navigation": "التنقّل",
+    "backToDashboard": "العودة إلى لوحة التحكم"
+  },
+  "ws": {
+    "workspace": "مساحة العمل",
+    "addBrand": "إضافة علامة"
+  },
+  "sidebar": {
+    "bioScore": "BIO {score}٪",
+    "seniorDesigner": "مصمِّمة أولى",
+    "active": "نشط",
+    "brandolphReading": "يقرأ BIO الخاص بك، ويتابع إعادة إطلاق التسعير خلال المراجعة.",
+    "viewLedger": "عرض السجل ←",
+    "thisWeek": "هذا الأسبوع",
+    "jobsDelivered": "المهام المُسلَّمة",
+    "creditsEarned": "الرصيد المكتسب"
+  },
+  "notif": {
+    "title": "الإشعارات",
+    "markAllRead": "تحديد الكل كمقروء",
+    "empty": "لقد اطّلعت على كل شيء.",
+    "ariaUnread": {
+      "plural": {
+        "zero": "الإشعارات، لا جديد",
+        "one": "الإشعارات، {count} غير مقروء",
+        "two": "الإشعارات، {count} غير مقروءين",
+        "few": "الإشعارات، {count} غير مقروءة",
+        "many": "الإشعارات، {count} غير مقروءة",
+        "other": "الإشعارات، {count} غير مقروءة"
+      }
+    },
+    "ago": {
+      "seconds": "قبل {count} ث",
+      "minutes": "قبل {count} د",
+      "hours": "قبل {count} س",
+      "days": "قبل {count} ي"
+    }
+  },
+  "title": {
+    "discovery": "الاكتشاف",
+    "brief": "موجز",
+    "specialistsOnShift": "المتخصصون · {count} في الوردية",
+    "specialistNew": "متخصص جديد",
+    "canvas": "اللوحة",
+    "plans": "الخطط",
+    "activeJob": "المهمة النشطة",
+    "capacitySla": "السعة واتفاقية مستوى الخدمة",
+    "clientRoster": "قائمة العملاء"
+  },
+  "topbar": {
+    "startBrief": "ابدأ موجزًا",
+    "brandolphReading": "Brandolph يقرأ الآن"
+  },
+  "plans": {
+    "eyebrow": "الخطط",
+    "headline": "طوّر استوديوك.",
+    "intro": "تشمل كل خطة فريق Brandolph الكامل وBIO معتمدًا من خبير أول. اختر عدد العلامات الذي يناسب العمل الذي أمامك.",
+    "success": "تم استلام الدفع — يجري تحديث خطتك. قد يستغرق ذلك بضع ثوانٍ.",
+    "cancel": "لم تُجرَ أي تغييرات. اختر خطة متى شئت.",
+    "currentPlan": "الخطة الحالية",
+    "tierLabel": "المستوى {id}",
+    "allowanceUnlimited": "علامات غير محدودة",
+    "allowance": {
+      "plural": {
+        "zero": "لا توجد علامات",
+        "one": "علامة واحدة",
+        "two": "علامتان",
+        "few": "{count} علامات",
+        "many": "{count} علامة",
+        "other": "{count} علامة"
+      }
+    },
+    "yourPlan": "خطتك",
+    "managedByAdmin": "تُدار تغييرات الخطة من قِبل مسؤول مساحة عملك.",
+    "talkToUs": "تواصل معنا",
+    "starting": "جارٍ البدء…",
+    "upgrade": "ترقية",
+    "note03": "تواصل مع فريق Caastor لإعداد The Colony 🐜.",
+    "noteFail": "تعذّر بدء الترقية الآن — يُرجى المحاولة مجددًا أو التواصل مع فريق Caastor.",
+    "included": "مُضمَّن",
+    "backToCreate": "→ العودة إلى الإنشاء",
+    "blurb": {
+      "00": "علامة واحدة، وفريق Brandolph الكامل، وBIO المعتمد الخاص بك.",
+      "01": "شغّل علامتين جنبًا إلى جنب مع ذاكرة متخصصين مشتركة.",
+      "02": "ثلاث علامات إضافةً إلى صقل يدوي بشري ذي أولوية.",
+      "03": "علامات غير محدودة للاستوديوهات التي تدير الطاقم بالكامل."
+    }
+  },
+  "locale": {
+    "name": "العربية"
+  }
+}

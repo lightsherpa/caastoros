@@ -1,0 +1,117 @@
+{
+  "_notes": {
+    "proper_nouns": "BIO, Brandolph, Caastor, CaastorOS, SLA and 'The Colony' are kept untranslated as product/proper nouns.",
+    "nav.briefs": "'Briefs' is retained as the industry loanword commonly used by Spanish-speaking creative studios.",
+    "nav.credits": "'Créditos' = the in-product spend currency (never raw API cost)."
+  },
+  "nav": {
+    "create": "Crear",
+    "briefs": "Briefs",
+    "bio": "BIO",
+    "library": "Biblioteca",
+    "specialists": "Especialistas",
+    "humans": "Humanos",
+    "credits": "Créditos",
+    "account": "Cuenta"
+  },
+  "section": {
+    "createBriefs": "Crear / Briefs",
+    "bioLibrary": "BIO / Biblioteca",
+    "specialistsHumans": "Especialistas / Humanos",
+    "creditsAccount": "Créditos / Cuenta",
+    "team": "Equipo",
+    "teamPortal": "Portal del equipo",
+    "admin": "Administración"
+  },
+  "team": {
+    "jobQueue": "Cola de trabajos",
+    "craftPolish": "Pulido artesanal",
+    "capacity": "Capacidad",
+    "clients": "Clientes",
+    "myEarnings": "Mis ingresos"
+  },
+  "admin": {
+    "specs": "Especificaciones",
+    "brandolphMemory": "Memoria de Brandolph"
+  },
+  "common": {
+    "brandolph": "Brandolph",
+    "logOut": "Cerrar sesión"
+  },
+  "a11y": {
+    "switchBrand": "Cambiar de marca",
+    "language": "Idioma",
+    "navigation": "Navegación",
+    "backToDashboard": "Volver al panel"
+  },
+  "ws": {
+    "workspace": "Espacio de trabajo",
+    "addBrand": "Añadir marca"
+  },
+  "sidebar": {
+    "bioScore": "BIO {score}%",
+    "seniorDesigner": "Diseñadora sénior",
+    "active": "Activo",
+    "brandolphReading": "Leyendo tu BIO. Siguiendo el relanzamiento de precios durante la revisión.",
+    "viewLedger": "Ver el registro →",
+    "thisWeek": "Esta semana",
+    "jobsDelivered": "Trabajos entregados",
+    "creditsEarned": "Créditos ganados"
+  },
+  "notif": {
+    "title": "Notificaciones",
+    "markAllRead": "Marcar todo como leído",
+    "empty": "Estás al día.",
+    "ariaUnread": { "plural": { "one": "Notificaciones, {count} sin leer", "other": "Notificaciones, {count} sin leer" } },
+    "ago": {
+      "seconds": "hace {count} s",
+      "minutes": "hace {count} min",
+      "hours": "hace {count} h",
+      "days": "hace {count} d"
+    }
+  },
+  "title": {
+    "discovery": "Descubrimiento",
+    "brief": "Brief",
+    "specialistsOnShift": "Especialistas · {count} en turno",
+    "specialistNew": "Nuevo especialista",
+    "canvas": "Lienzo",
+    "plans": "Planes",
+    "activeJob": "Trabajo activo",
+    "capacitySla": "Capacidad y SLA",
+    "clientRoster": "Lista de clientes"
+  },
+  "topbar": {
+    "startBrief": "Iniciar un brief",
+    "brandolphReading": "Brandolph está leyendo"
+  },
+  "plans": {
+    "eyebrow": "Planes",
+    "headline": "Haz crecer tu estudio.",
+    "intro": "Cada plan incluye el equipo completo de Brandolph y un BIO certificado por un sénior. Elige el número de marcas que se ajuste al trabajo que tienes por delante.",
+    "success": "Pago recibido: tu plan se está actualizando. Esto puede tardar unos segundos.",
+    "cancel": "No se hicieron cambios. Elige un plan cuando quieras.",
+    "currentPlan": "Plan actual",
+    "tierLabel": "Nivel {id}",
+    "allowanceUnlimited": "Marcas ilimitadas",
+    "allowance": { "plural": { "one": "{count} marca", "other": "{count} marcas" } },
+    "yourPlan": "Tu plan",
+    "managedByAdmin": "Los cambios de plan los gestiona el administrador de tu espacio de trabajo.",
+    "talkToUs": "Habla con nosotros",
+    "starting": "Iniciando…",
+    "upgrade": "Mejorar plan",
+    "note03": "Contacta con tu equipo de Caastor para configurar The Colony 🐜.",
+    "noteFail": "No se pudo iniciar la mejora ahora mismo: inténtalo de nuevo o contacta con tu equipo de Caastor.",
+    "included": "Incluido",
+    "backToCreate": "← Volver a Crear",
+    "blurb": {
+      "00": "Una marca, el equipo completo de Brandolph y tu BIO certificado.",
+      "01": "Gestiona dos marcas en paralelo con memoria de especialistas compartida.",
+      "02": "Tres marcas más pulido artesanal humano prioritario.",
+      "03": "Marcas ilimitadas para estudios que gestionan toda la plantilla."
+    }
+  },
+  "locale": {
+    "name": "Español"
+  }
+}

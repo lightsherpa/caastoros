@@ -10,16 +10,71 @@
 
 @import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Geist:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap");
 
+/* ─────────────────────────────────────────────────────────────────
+   ARABIC TYPOGRAPHY — IBM Plex Sans Arabic (SIL OFL, self-hosted)
+   The Latin faces above (Inter Tight / Geist / IBM Plex Sans
+   Condensed) carry NO Arabic glyphs. These @font-face rules add an
+   Arabic-capable face, self-hosted as Arabic-subset woff2 (~34KB/wt)
+   under assets/fonts/ so it never touches the Latin loading path.
+
+   KEY: unicode-range is scoped to the Arabic blocks only. That turns
+   the family into a drop-in *fallback* — when "IBM Plex Sans Arabic"
+   sits anywhere in a font stack the browser routes ONLY Arabic
+   codepoints to it and lets every other codepoint fall through to the
+   Latin face ahead of it. This is what makes one stack render mixed
+   bidi correctly: Latin → Inter Tight, Arabic → Plex Arabic.
+   font-display:swap keeps text visible while the subset loads. */
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("assets/fonts/ibm-plex-sans-arabic-400.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("assets/fonts/ibm-plex-sans-arabic-500.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("assets/fonts/ibm-plex-sans-arabic-600.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("assets/fonts/ibm-plex-sans-arabic-700.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+/* Self-hosted, Arabic-subset only (Latin/numerals handled by Inter et al.
+   above). Full-range files are not needed here; keep the subset lean.
+   TODO(optional): regenerate the subset from the upstream OFL TTFs with
+   fonttools/glyphhanger if additional glyph coverage is ever required. */
+
 /* =================================================================
    ROOT — fonts, scale, motion, radii (palette-agnostic)
    ================================================================= */
 :root {
-  /* Fonts */
-  --font-sans:    "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-display: "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-body:    "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-mono:    "Geist Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --font-serif:   "Instrument Serif", "Times New Roman", serif;
+  /* Fonts — "IBM Plex Sans Arabic" is appended as the last real family
+     before the generic. Its @font-face is unicode-range-scoped to Arabic,
+     so it is a no-op for Latin text (Latin → Inter Tight) and only ever
+     supplies Arabic glyphs. This is the mixed-bidi cascade: one stack,
+     Latin → Inter, Arabic → Plex Arabic — no lang switch required. */
+  --font-sans:    "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, "IBM Plex Sans Arabic", sans-serif;
+  --font-display: "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, "IBM Plex Sans Arabic", sans-serif;
+  --font-body:    "Inter Tight", -apple-system, BlinkMacSystemFont, system-ui, "IBM Plex Sans Arabic", sans-serif;
+  --font-mono:    "Geist Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, "IBM Plex Sans Arabic", monospace;
+  --font-serif:   "Instrument Serif", "Times New Roman", "IBM Plex Sans Arabic", serif;
 
   /* Type scale — slightly tighter, Apple-feel */
   --text-display-lg: 72px;  --lh-display-lg: 76px;
@@ -280,11 +335,47 @@ body {
 h1, h2, h3, h4, h5, h6 { margin: 0; font-family: var(--font-sans); color: var(--text-primary); }
 p { margin: 0; font-family: var(--font-body); }
 
-/* Font preset overrides (Tweaks-driven) */
-[data-font="inter"] { --font-sans: "Inter Tight", system-ui, sans-serif; --font-display: "Inter Tight", system-ui, sans-serif; --font-body: "Inter Tight", system-ui, sans-serif; }
-[data-font="geist"] { --font-sans: "Geist", system-ui, sans-serif; --font-display: "Geist", system-ui, sans-serif; --font-body: "Geist", system-ui, sans-serif; }
-[data-font="plex"]  { --font-sans: "IBM Plex Sans Condensed", system-ui, sans-serif; --font-display: "IBM Plex Sans Condensed", system-ui, sans-serif; --font-body: "IBM Plex Sans Condensed", system-ui, sans-serif; }
-[data-font="serif-mix"] { --font-display: "Instrument Serif", serif; --font-sans: "Inter Tight", system-ui, sans-serif; --font-body: "Inter Tight", system-ui, sans-serif; }
+/* Font preset overrides (Tweaks-driven). "IBM Plex Sans Arabic" is kept as
+   the trailing family in every preset so Arabic codepoints always land on
+   it (via its unicode-range) regardless of which Latin face is selected. */
+[data-font="inter"] { --font-sans: "Inter Tight", system-ui, "IBM Plex Sans Arabic", sans-serif; --font-display: "Inter Tight", system-ui, "IBM Plex Sans Arabic", sans-serif; --font-body: "Inter Tight", system-ui, "IBM Plex Sans Arabic", sans-serif; }
+[data-font="geist"] { --font-sans: "Geist", system-ui, "IBM Plex Sans Arabic", sans-serif; --font-display: "Geist", system-ui, "IBM Plex Sans Arabic", sans-serif; --font-body: "Geist", system-ui, "IBM Plex Sans Arabic", sans-serif; }
+[data-font="plex"]  { --font-sans: "IBM Plex Sans Condensed", system-ui, "IBM Plex Sans Arabic", sans-serif; --font-display: "IBM Plex Sans Condensed", system-ui, "IBM Plex Sans Arabic", sans-serif; --font-body: "IBM Plex Sans Condensed", system-ui, "IBM Plex Sans Arabic", sans-serif; }
+[data-font="serif-mix"] { --font-display: "Instrument Serif", "IBM Plex Sans Arabic", serif; --font-sans: "Inter Tight", system-ui, "IBM Plex Sans Arabic", sans-serif; --font-body: "Inter Tight", system-ui, "IBM Plex Sans Arabic", sans-serif; }
+
+/* =================================================================
+   ARABIC / RTL TYPOGRAPHY TOKENS
+   Activated when the i18n layer sets `lang="ar"` and/or `dir="rtl"`
+   on <html>. Placed AFTER the [data-font] presets so, at equal
+   specificity, source order lets this win in Arabic mode regardless
+   of the selected Latin preset.
+   - Swaps the sans/display/body stacks to an Arabic-first cascade.
+     "IBM Plex Sans Arabic" leads (Arabic glyphs); Readex Pro / Noto
+     Naskh Arabic are graceful system fallbacks if the subset is slow.
+   - Bumps line-height: Arabic needs more leading for ascenders and
+     stacked diacritics that Latin-tuned 1.0–1.3 leadings would clip.
+   ================================================================= */
+[lang="ar"], [dir="rtl"] {
+  --font-sans:    "IBM Plex Sans Arabic", "Readex Pro", "Noto Naskh Arabic", sans-serif;
+  --font-display: "IBM Plex Sans Arabic", "Readex Pro", "Noto Naskh Arabic", sans-serif;
+  --font-body:    "IBM Plex Sans Arabic", "Readex Pro", "Noto Naskh Arabic", sans-serif;
+  line-height: 1.7;
+}
+
+/* Zero the negative letter-spacing baked into the display/heading
+   utilities. Negative (or any) tracking is invalid for connected
+   Arabic script — it severs the joins between letters. Also relax the
+   very tight px line-heights those utilities carry so diacritics on
+   large Arabic display type are not clipped. */
+[lang="ar"] .t-display-lg, [dir="rtl"] .t-display-lg,
+[lang="ar"] .t-display-md, [dir="rtl"] .t-display-md,
+[lang="ar"] .t-display-sm, [dir="rtl"] .t-display-sm,
+[lang="ar"] .t-h1, [dir="rtl"] .t-h1,
+[lang="ar"] .t-h2, [dir="rtl"] .t-h2,
+[lang="ar"] .t-h3, [dir="rtl"] .t-h3 {
+  letter-spacing: 0;
+  line-height: 1.35;
+}
 
 /* Density */
 [data-density="comfortable"] { --row-h: 56px; --control-h: 40px; --pad-card: 24px; }
