@@ -1,0 +1,46 @@
+services:
+  - type: web
+    runtime: node
+    name: caastoros-app
+    plan: free
+    branch: feature/image-quality-overhaul
+    buildCommand: npm ci --include=dev && npm run build && cd server && npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    domains:
+      - app.getcaastor.co
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_URL
+        value: https://app.getcaastor.co
+      - key: ALLOWED_ORIGINS
+        value: https://app.getcaastor.co
+      - key: DISCOVERY_V2
+        value: "1"
+      - key: EMAIL_FROM
+        value: CaastorOS <notifications@caastoros.com>
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: FAL_API_KEY
+        sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false
+      - key: INNGEST_EVENT_KEY
+        sync: false
+      - key: INNGEST_SIGNING_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
