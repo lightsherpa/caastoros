@@ -871,7 +871,7 @@
       "titlePointRest": "Brandolph leerá el resto.",
       "lead": "Con una URL basta. Si tienes guías, compártelas. Y si no las tienes, trabajaremos con lo que ya es público y te diremos qué no pudimos encontrar.",
       "brandNameLabel": "Nombre de la marca",
-      "brandNamePlaceholder": "p. ej. Vinilo Coffee",
+      "brandNamePlaceholder": "p. ej. Your brand",
       "urlLabel": "URL del sitio web principal",
       "urlPlaceholder": "marca.com",
       "igLabel": "Usuario de Instagram",
@@ -1245,7 +1245,7 @@
     "strategic": {
       "watchouts": "Puntos de atención estratégicos",
       "gaps": "Vacíos",
-      "whatNot": "Lo que Vinilo NO es",
+      "whatNot": "Lo que Your brand NO es",
       "diagnosis": "Diagnóstico de Brandolph · esta semana"
     },
     "sources": {

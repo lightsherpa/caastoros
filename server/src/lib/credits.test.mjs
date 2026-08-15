@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { creditBalanceFromRows, creditCheck, estimateRunCredits, monthStartIso } from "./credits.js";
+import { creditBalanceFromRows, creditCheck, estimateRunCredits, monthStartIso, monthlyDebitedFromRows } from "./credits.js";
 
 test("creditBalanceFromRows treats positive ledger rows as debits and negative rows as grants", () => {
   assert.equal(creditBalanceFromRows([
@@ -45,4 +45,15 @@ test("estimateRunCredits keeps legacy/image runs flat and scales multi-item text
 
 test("monthStartIso returns the UTC month boundary", () => {
   assert.equal(monthStartIso(new Date("2026-06-15T12:34:00Z")), "2026-06-01T00:00:00.000Z");
+});
+
+test("monthlyDebitedFromRows excludes reservations that were refunded", () => {
+  const now = new Date("2026-08-15T12:00:00Z");
+  const rows = [
+    { credits: 40, kind: "run_reserved", run_id: "failed", created_at: "2026-08-10T00:00:00Z" },
+    { credits: -40, kind: "run_refund", run_id: "failed", created_at: "2026-08-10T00:01:00Z" },
+    { credits: 25, kind: "run", run_id: "ok", created_at: "2026-08-11T00:00:00Z" },
+    { credits: 10, kind: "craft", run_id: null, created_at: "2026-08-12T00:00:00Z" },
+  ];
+  assert.equal(monthlyDebitedFromRows(rows, now), 35);
 });

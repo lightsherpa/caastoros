@@ -37,5 +37,3 @@ http://localhost:5173, and walk it in this order. Tick as you go.
 
 ## Theme
 - [ ] Toggle light/dark and switch palette. Canvas cards, footers and chips stay legible in both. *Wrong: faint grey provenance text vanishing on the dark background.*
-
-

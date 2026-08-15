@@ -184,7 +184,7 @@ function AgentCard({ agentId, compact = false, onClick, showCaps = false }) {
 /* Output card — used in /briefs/[id] and canvas drawers.
    Footer renders the rev-2 §5.5 / §9 attribution. Two render modes:
    - Client (default, public): leads with the Steward chip; NO model name.
-     This is the moat-defining trust signal — `certified by Marina` is
+     This is the moat-defining trust signal — `certified by Your steward` is
      impossible to fake without the real Steward operation.
    - Team / debug: adds `routed via {model}` and `run {short_id}` for
      ops debugging. Surfaces by default on team portal; hover-reveal on
@@ -488,7 +488,12 @@ function splitSentences(text) {
 }
 
 function streamToHtml(s) {
-  return s
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
     .replace(/\*([^*]+)\*/g, '<em class="b-voice">$1</em>')
     .replace(/\n/g, "<br/>");
 }
@@ -533,6 +538,35 @@ function StreamedText({ html, stream = true, startDelay = 600, lineStep = 420, c
   );
 }
 
+/* Shared Brandolph message row used by conversational completion screens. */
+export function BrandolphLine({ html, who = "brandolph" }) {
+  const isBrandolph = who === "brandolph";
+  const user = window.CI_USER || {};
+  return (
+    <div style={{display:"flex", gap: 12, alignItems:"flex-start"}}>
+      {isBrandolph ? <BrandolphAvatar /> : (
+        <img
+          src={user.avatar}
+          alt=""
+          style={{width: 36, height: 36, borderRadius: "50%", objectFit:"cover"}}
+        />
+      )}
+      <div style={{flex: 1, minWidth: 0}}>
+        <div style={{display:"flex", alignItems:"center", gap:8, marginBottom: 4}}>
+          <span style={{fontWeight:500, fontSize:13, color:"var(--c-ink)"}}>
+            {isBrandolph ? "Brandolph" : (user.name || "You")}
+          </span>
+          {isBrandolph && <LayerTag layer="L1" />}
+          <span className="eyebrow" style={{marginLeft:"auto"}}>now</span>
+        </div>
+        <div className="b-voice" style={{fontSize: 14.5, lineHeight: 1.6, color:"var(--c-ink)"}}>
+          <StreamedText html={html} stream={isBrandolph} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* Pins — re-render on change; toggle favorite outputs / specialists. */
 function usePins() {
   const [, force] = useState(0);
@@ -564,5 +598,5 @@ function PinButton({ kind, id, size = 15, style }) {
 Object.assign(window, {
   BrandolphDot, BrandolphAvatar, LayerTag, ModelChip, Credit, Confidence,
   AgentCard, OutputCard, StatusPill, Reveal, Drawer, Counter, SlaHeat,
-  PageHeader, Icon, useIsTeam, StreamedText, usePins, PinButton,
+  PageHeader, Icon, useIsTeam, StreamedText, BrandolphLine, usePins, PinButton,
 });

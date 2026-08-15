@@ -866,7 +866,7 @@
       "titlePointRest": "Brandolph will read the rest.",
       "lead": "A URL is enough. If you have guidelines, hand them over. If you don't — we'll work from what's already public, and tell you what we couldn't find.",
       "brandNameLabel": "Brand name",
-      "brandNamePlaceholder": "e.g. Vinilo Coffee",
+      "brandNamePlaceholder": "e.g. Your brand",
       "urlLabel": "Primary website URL",
       "urlPlaceholder": "brand.com",
       "igLabel": "Instagram handle",
@@ -1240,7 +1240,7 @@
     "strategic": {
       "watchouts": "Strategic watchouts",
       "gaps": "Gaps",
-      "whatNot": "What Vinilo is NOT",
+      "whatNot": "What Your brand is NOT",
       "diagnosis": "Brandolph's diagnosis · this week"
     },
     "sources": {

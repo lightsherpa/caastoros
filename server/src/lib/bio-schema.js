@@ -3,7 +3,7 @@
 // projection (projectBio). Pure — no DB, no network.
 //
 // Why this exists: the BIO payload shape was defined by example in 5+
-// disagreeing places (vinilo seed, compiler schema, score-bio, bio-focus,
+// disagreeing places (legacy fixtures, compiler schema, score-bio, bio-focus,
 // two renderers). This module makes the shape ONE thing. Every read and
 // write should pass through normalizeBio so no consumer ever touches a
 // raw payload — which is also what fixes the renderBioLayer null-crash.

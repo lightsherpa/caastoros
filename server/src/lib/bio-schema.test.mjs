@@ -10,7 +10,37 @@ import {
   SCHEMA_VERSION,
 } from "./bio-schema.js";
 import { buildBrandolphSystem } from "../prompt.js";
-import { VINILO_BIO, VINILO_BRAND, VINILO_REFUSALS } from "../data/vinilo.js";
+
+const TEST_BRAND = { id: "test-brand", name: "Test Brand", url: "test.example" };
+const TEST_REFUSALS = ["Never invent a discount."];
+const TEST_BIO = {
+  identity: {
+    positioning: "A considered product for deliberate routines.",
+    category: "Consumer goods",
+    founded: "2024",
+    pillars: ["Provenance", "Routine", "Patience", "Craft"],
+  },
+  audience: {
+    primary: "People who value deliberate choices.",
+    secondary: "Returning customers.",
+    tertiary: "Trade partners.",
+    jtbd: ["Make a considered choice"],
+  },
+  voice: {
+    register: "Editorial and restrained.",
+    forbidden: ["unlock", "exclusive"],
+    rhythm: "Short, direct sentences.",
+    signatures: ["On purpose"],
+  },
+  visual: {
+    palette: [{ hex: "#1F1A14", name: "Espresso" }],
+    type: [{ kind: "Display", family: "Sans" }],
+    imagery: ["Craft details"],
+    avoid: ["Generic stock photography"],
+  },
+  goals: { northStar: "Grow deliberately.", q2: "Launch pricing.", q3: "Launch the seasonal collection." },
+  strategic: { watchouts: ["Protect positioning."], notList: ["Discount-led growth."] },
+};
 
 // The historical scored-path list, before it was derived from the registry.
 // If this drifts from SCORED_PATHS, scoreBio's coverage surface changed —
@@ -53,15 +83,15 @@ test("normalizeBio fills gaps without overwriting present values or extras", () 
 });
 
 test("normalizeBio preserves a full payload's values", () => {
-  const n = normalizeBio(VINILO_BIO);
-  assert.equal(n.identity.positioning, VINILO_BIO.identity.positioning);
-  assert.deepEqual(n.voice.forbidden, VINILO_BIO.voice.forbidden);
+  const n = normalizeBio(TEST_BIO);
+  assert.equal(n.identity.positioning, TEST_BIO.identity.positioning);
+  assert.deepEqual(n.voice.forbidden, TEST_BIO.voice.forbidden);
   assert.equal(n.visual.palette[0].name, "Espresso");
-  assert.equal(n.audience.tertiary, VINILO_BIO.audience.tertiary);
+  assert.equal(n.audience.tertiary, TEST_BIO.audience.tertiary);
 });
 
 test("normalizeBio is idempotent", () => {
-  const once = normalizeBio(VINILO_BIO);
+  const once = normalizeBio(TEST_BIO);
   const twice = normalizeBio(once);
   assert.deepEqual(twice, once);
   const emptyOnce = normalizeBio({});
@@ -89,16 +119,16 @@ test("buildBrandolphSystem does not throw on a partial BIO", () => {
 });
 
 test("buildBrandolphSystem renders a full BIO intact (no regression)", () => {
-  const bio = normalizeBio({ ...VINILO_BIO, version: 1, score: 91 });
+  const bio = normalizeBio({ ...TEST_BIO, version: 1, score: 91 });
   const blocks = buildBrandolphSystem({
-    brand: VINILO_BRAND, bio, refusals: VINILO_REFUSALS, routeId: "home",
+    brand: TEST_BRAND, bio, refusals: TEST_REFUSALS, routeId: "home",
   });
   // Content is spread across the tiered BIO blocks now — assert on the union.
   const text = blocks.map((b) => b.text).join("\n");
-  assert.match(text, /Specialty coffee for slow Tuesdays\./);        // positioning (core)
-  assert.match(text, /Provenance, Routine, Patience, Café-as-rest/); // pillars joined (core)
+  assert.match(text, /A considered product for deliberate routines\./); // positioning (core)
+  assert.match(text, /Provenance, Routine, Patience, Craft/);         // pillars joined (core)
   assert.match(text, /Espresso #1F1A14/);                            // palette rendered (detail)
-  assert.match(text, /Honduras/);                                    // goals.q3 rendered (detail)
+  assert.match(text, /seasonal collection/);                         // goals.q3 rendered (detail)
 });
 
 // ── projectBio (event-sourced projection) ───────────────────────────

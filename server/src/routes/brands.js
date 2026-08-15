@@ -4,7 +4,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
-import { canAddBrand, brandLimit } from "../lib/plan-limits.js";
+import { brandLimit } from "../lib/plan-limits.js";
 
 const app = new Hono();
 
@@ -20,22 +20,24 @@ app.post("/", requireAuth, async (c) => {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return c.json({ error: "name required" }, 400);
 
-  // Resolve the workspace tier (default to most restrictive if missing).
+  // Resolve tier for the structured limit response. The actual count + insert
+  // happens atomically in Postgres under a workspace row lock.
   const { data: workspace } = await supabaseAdmin
     .from("workspaces").select("tier").eq("id", workspaceId).maybeSingle();
   const tier = workspace?.tier || "00";
 
-  // Count existing brands in this workspace.
-  const { count } = await supabaseAdmin
-    .from("brands").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
-
-  if (!canAddBrand(tier, count)) {
-    return c.json({ error: "BRAND_LIMIT", tier, limit: brandLimit(tier), count }, 402);
+  const { data, error } = await supabaseAdmin.rpc("create_brand_with_limit", {
+    p_workspace_id: workspaceId,
+    p_name: name,
+  });
+  if (error) {
+    if ((error.message || "").includes("BRAND_LIMIT")) {
+      const { count } = await supabaseAdmin.from("brands")
+        .select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
+      return c.json({ error: "BRAND_LIMIT", tier, limit: brandLimit(tier), count }, 402);
+    }
+    return c.json({ error: error.message }, 500);
   }
-
-  const { data, error } = await supabaseAdmin
-    .from("brands").insert({ workspace_id: workspaceId, name }).select("id, name, created_at").single();
-  if (error) return c.json({ error }, 500);
 
   return c.json({ brand: data });
 });

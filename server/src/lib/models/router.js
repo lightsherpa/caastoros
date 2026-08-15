@@ -22,6 +22,32 @@
 import * as anthropic from "./anthropic.js";
 import * as openrouter from "./openrouter.js";
 
+/* Browser-requested overrides are deliberately finite. Specs may still use
+   other routes as their server-authored primary, but clients cannot turn the
+   platform key into an arbitrary OpenRouter proxy. */
+export const ALLOWED_MODEL_OVERRIDES = new Set([
+  "anthropic/claude-opus-4-7",
+  "anthropic/claude-sonnet-4-6",
+  "anthropic/claude-haiku-4-5-20251001",
+  "openrouter/google/gemini-2.5-pro",
+  "openrouter/google/gemini-2.5-flash",
+  "vendor/fal/flux-1.1-pro",
+  "vendor/fal/flux-schnell",
+  "vendor/fal/recraft-v3",
+]);
+
+export function isAllowedModelOverride(route) {
+  return typeof route === "string" && ALLOWED_MODEL_OVERRIDES.has(route);
+}
+
+/* Credit multipliers reflect relative provider cost classes. They are kept
+   server-side and applied to the specialist's base credit estimate. */
+export function routeCreditMultiplier(route) {
+  if (/opus|gemini-2\.5-pro|flux-1\.1-pro|recraft-v3/i.test(route || "")) return 2;
+  if (/haiku|gemini-2\.5-flash|flux-schnell/i.test(route || "")) return 0.75;
+  return 1;
+}
+
 /**
  * Stream a text completion through the right vendor.
  *

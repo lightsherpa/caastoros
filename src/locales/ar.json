@@ -940,7 +940,7 @@
       "titlePointRest": "سيقرأ Brandolph الباقي.",
       "lead": "رابط واحد يكفي. إن كانت لديك إرشادات فسلّمها لنا. وإن لم تكن لديك، فسنعمل مما هو متاح للعموم ونخبرك بما لم نستطع إيجاده.",
       "brandNameLabel": "اسم العلامة",
-      "brandNamePlaceholder": "مثال: Vinilo Coffee",
+      "brandNamePlaceholder": "مثال: Your brand",
       "urlLabel": "رابط الموقع الرئيسي",
       "urlPlaceholder": "brand.com",
       "igLabel": "معرّف إنستغرام",
@@ -1330,7 +1330,7 @@
     "strategic": {
       "watchouts": "نقاط انتباه استراتيجية",
       "gaps": "فجوات",
-      "whatNot": "ما ليست عليه Vinilo",
+      "whatNot": "ما ليست عليه Your brand",
       "diagnosis": "تشخيص Brandolph · هذا الأسبوع"
     },
     "sources": {

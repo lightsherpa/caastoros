@@ -8,14 +8,19 @@ const app = new Hono();
    (Realtime pushes new rows live; this is the initial load + backfill.) */
 app.get("/", requireAuth, async (c) => {
   const { userId } = c.get("auth");
-  const { data } = await supabaseAdmin
-    .from("notifications")
-    .select("id, kind, title, body, link, brand_id, read_at, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const [itemsResult, countResult] = await Promise.all([
+    supabaseAdmin.from("notifications")
+      .select("id, kind, title, body, link, brand_id, read_at, created_at")
+      .eq("user_id", userId).order("created_at", { ascending: false }).limit(50),
+    supabaseAdmin.from("notifications")
+      .select("id", { count: "exact", head: true }).eq("user_id", userId).is("read_at", null),
+  ]);
+  if (itemsResult.error || countResult.error) {
+    return c.json({ error: itemsResult.error?.message || countResult.error?.message }, 500);
+  }
+  const { data } = itemsResult;
   const items = data || [];
-  return c.json({ items, unread: items.filter((n) => !n.read_at).length });
+  return c.json({ items, unread: countResult.count || 0 });
 });
 
 /* GET /api/notifications/prefs — per-channel toggles (default on). */
@@ -33,7 +38,8 @@ app.patch("/prefs", requireAuth, async (c) => {
   const row = { user_id: userId, updated_at: new Date().toISOString() };
   if (typeof body.in_app === "boolean") row.in_app = body.in_app;
   if (typeof body.email === "boolean") row.email = body.email;
-  await supabaseAdmin.from("notification_prefs").upsert(row, { onConflict: "user_id" });
+  const { error } = await supabaseAdmin.from("notification_prefs").upsert(row, { onConflict: "user_id" });
+  if (error) return c.json({ error: error.message }, 500);
   return c.json({ ok: true });
 });
 

@@ -101,9 +101,9 @@ function BrandolphDiagnosis({ onAnswer, onProceed }) {
               minWidth: 22,
             }}>01</span>
             <div>
-              <div style={{fontWeight: 500, fontSize: 14, color:"var(--c-ink)"}}>Annual at 11.4× monthly, or 10×?</div>
+              <div style={{fontWeight: 500, fontSize: 14, color:"var(--c-ink)"}}>Annual as one month free, or a flat discount?</div>
               <div style={{fontSize: 12.5, color:"var(--c-dim)", marginTop: 4}}>
-                Because — at 10× you're competing with your own monthly. At 11.4× you're offering 1-in-12 free, which reads as a decision, not a discount.
+                Because a flat discount competes with your monthly plan. One month free reads as a decision, not a markdown.
               </div>
             </div>
           </div>
@@ -240,7 +240,7 @@ function BioChip({ bioScore }) {
   return (
     <div className="card" style={{padding: "14px 16px", marginBottom: 14}}>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom: 6}}>
-        <span className="eyebrow">BIO · Vinilo</span>
+        <span className="eyebrow">BIO · Your brand</span>
         <span style={{fontFamily:"var(--font-mono)", fontWeight: 600, fontSize:14, color:"var(--c-ink)"}}>{bioScore}%</span>
       </div>
       <div style={{height:6, background:"var(--neutral-50)", borderRadius: 999, overflow:"hidden", marginBottom: 10}}>
@@ -405,7 +405,7 @@ function HomeConsole({ tweaks }) {
           {tweaks.brandolphMood === "fresh" && (
             <>
               <NotDoing items={[
-                "Don't ask me to make a logo before we agree what 'Vinilo' is for in 2026.",
+                "Don't ask me to make a logo before we agree what 'Your brand' is for in 2026.",
                 "Don't ask me to write you content for a content calendar that doesn't exist yet.",
               ]} />
               <QuickPrompts onPrompt={(p) => setInput(p)} />
@@ -437,7 +437,7 @@ function HomeCards({ tweaks }) {
           <div style={{flex:1, paddingTop: 8}}>
             <div className="eyebrow eyebrow--yellow" style={{marginBottom: 4}}>Brandolph · L1</div>
             <h1 style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 30, lineHeight: 1.25, letterSpacing:"-0.01em", margin: 0, color:"var(--c-ink)"}}>
-              Good morning, Marina. The pricing relaunch is two cards short of ready, and the summer campaign is sitting in your head — not on a brief. <em style={{fontStyle:"normal", background:"var(--yellow-200)", padding:"0 4px"}}>Where do you want to spend the next 20 minutes?</em>
+              Good morning, Your steward. The pricing relaunch is two cards short of ready, and the summer campaign is sitting in your head — not on a brief. <em style={{fontStyle:"normal", background:"var(--yellow-200)", padding:"0 4px"}}>Where do you want to spend the next 20 minutes?</em>
             </h1>
           </div>
         </div>
@@ -473,7 +473,7 @@ function HomeCards({ tweaks }) {
         <Reveal delay={250}>
           <div className="card" style={{padding: 22, display:"flex", flexDirection:"column", height:"100%", borderLeft: "3px solid var(--mint-500)"}}>
             <div className="eyebrow" style={{color:"#1d6b4b", marginBottom: 8}}>Hand to the human team</div>
-            <h3 style={{fontSize: 18, letterSpacing:"-0.01em", margin: 0, marginBottom: 8}}>Honduras essay needs finishing</h3>
+            <h3 style={{fontSize: 18, letterSpacing:"-0.01em", margin: 0, marginBottom: 8}}>Collection essay needs finishing</h3>
             <p style={{fontSize: 13, color:"var(--c-dim)", lineHeight: 1.5, margin: 0, flex: 1}}>
               Opus wrote 1,840 words. <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>The opening is exactly right. The middle drifts.</em> Lia could finish this in 2h. 120 cr.
             </p>
@@ -532,7 +532,7 @@ function HomeDesk({ tweaks }) {
           <div>
             <div className="eyebrow eyebrow--yellow" style={{marginBottom: 6}}>Brandolph · this morning</div>
             <p style={{fontSize:17, lineHeight:1.5, margin: 0, color:"var(--c-ink)"}}>
-              <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>You shipped two things last week.</em> The annual page is converting at 6.2% — better than baseline, not yet what we agreed. The Honduras essay is in human craft. <strong>Today the work is the summer campaign brief.</strong> I have two questions before we assemble.
+              <em className="b-voice" style={{background:"none", fontStyle:"italic"}}>You shipped two things last week.</em> The annual page is converting at 6.2% — better than baseline, not yet what we agreed. The Collection essay is in human craft. <strong>Today the work is the summer campaign brief.</strong> I have two questions before we assemble.
             </p>
           </div>
           <div style={{display:"flex", flexDirection:"column", gap: 8}}>
@@ -554,8 +554,8 @@ function HomeDesk({ tweaks }) {
                   <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"var(--yellow-700)"}}>● live</span>
                 </a>
               ))}
-              <a href="#/board/b-honduras-microlot" style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius: 8, border:"1px solid var(--c-line)", textDecoration:"none", color:"inherit"}}>
-                <span style={{fontSize:13, fontWeight: 500}}>Honduras single-origin</span>
+              <a href="#/board/b-collection-microlot" style={{display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", borderRadius: 8, border:"1px solid var(--c-line)", textDecoration:"none", color:"inherit"}}>
+                <span style={{fontSize:13, fontWeight: 500}}>New collection</span>
                 <span style={{fontFamily:"var(--font-mono)", fontSize: 10, color:"#1d6b4b"}}>● in craft</span>
               </a>
             </div>
@@ -570,7 +570,7 @@ function HomeDesk({ tweaks }) {
                 <div style={{fontSize:12, color:"var(--c-dim)"}}>3 directions ready. Brandolph recommends "Slow June".</div>
               </div>
               <div style={{padding: 10, borderRadius: 8, borderLeft:"3px solid var(--purple-500)", background:"var(--purple-50)"}}>
-                <div style={{fontSize:13, color:"var(--c-ink)", marginBottom: 4}}>Decide: annual 10× or 11.4×</div>
+                <div style={{fontSize:13, color:"var(--c-ink)", marginBottom: 4}}>Decide: annual discount or one month free</div>
                 <div style={{fontSize:12, color:"var(--c-dim)"}}>Affects 5 outputs in flight.</div>
               </div>
             </div>
@@ -582,7 +582,7 @@ function HomeDesk({ tweaks }) {
             <div style={{display:"flex", flexDirection:"column", gap: 10}}>
               <div style={{padding: 10, borderRadius: 8, border:"1px dashed var(--c-line-2)"}}>
                 <div style={{fontSize:13, color:"var(--c-ink)"}}>Run a producer-named microlot in Aug.</div>
-                <div style={{fontSize:11.5, color:"var(--c-faint)", marginTop: 4}}><em>Because Honduras worked — repeat the pattern with a different country.</em></div>
+                <div style={{fontSize:11.5, color:"var(--c-faint)", marginTop: 4}}><em>Because the last collection worked — repeat the pattern with a new story.</em></div>
               </div>
               <div style={{padding: 10, borderRadius: 8, border:"1px dashed var(--c-line-2)"}}>
                 <div style={{fontSize:13, color:"var(--c-ink)"}}>Kill the brewing-kit page.</div>
@@ -636,7 +636,7 @@ function HomeDesk({ tweaks }) {
 /* Workspace switcher — multi-brand is a Suite-plan feature. */
 function WorkspaceBar() {
   const [open, setOpen] = useBState(false);
-  const [active, setActive] = useBState("vinilo");
+  const [active, setActive] = useBState("demo-brand");
   const ws = window.CI_WORKSPACES || [];
   const cur = ws.find(w => w.id === active) || ws[0];
   if (!cur) return null;
@@ -762,6 +762,7 @@ function HomeDashboard({ go }) {
 }
 
 function HomeCreate({ tweaks, go }) {
+  const activeBrandId = window.useCurrentBrandId ? window.useCurrentBrandId() : null;
   const { t } = useLocale();
   const [scope, setScope] = useBState("all");
   const [mode, setMode]   = useBState("flow");
@@ -839,7 +840,7 @@ function HomeCreate({ tweaks, go }) {
     try {
       const res = await apiFetch("/api/briefs/sharpen", {
         method: "POST",
-        body: JSON.stringify({ briefText: input.trim() }),
+        body: JSON.stringify({ briefText: input.trim(), brandId: activeBrandId }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
@@ -868,6 +869,7 @@ function HomeCreate({ tweaks, go }) {
       answers,
       refusals:      sharp.data?.refusals || [],
       specialistIds: realAssembly.agents.map((a) => a.id),
+      brandId:       activeBrandId,
       deliveryPlan:  sharp.data?.deliveryPlan || null,
       totalCr:       realAssembly.totalCr,
       ts:            Date.now(),
@@ -931,6 +933,7 @@ function HomeCreate({ tweaks, go }) {
 
     const composedBrief = composeBriefText();
     let sharedBriefId = null;
+    const briefBrandId = activeBrandId;
 
     for (const agent of realAssembly.agents) {
       setAgentStates((prev) => ({ ...prev, [agent.id]: "running" }));
@@ -941,6 +944,7 @@ function HomeCreate({ tweaks, go }) {
       await streamSpecialistRun({
         specialistId: agent.id,
         briefText:    composedBrief,
+        brandId:      briefBrandId || activeBrandId,
         briefId:      sharedBriefId,
         onToken: ({ text: t }) => {
           text += t;
@@ -1012,7 +1016,7 @@ function HomeCreate({ tweaks, go }) {
             <div style={{display:"flex", alignItems:"center", justifyContent:"center", gap: 8, marginTop: 28, flexWrap:"wrap"}}>
               <span className="eyebrow" style={{marginRight: 4}}>{t("brandolph.scope")}</span>
               {[
-                {k:"all",          l:"All Vinilo"},
+                {k:"all",          l:"All Your brand"},
                 {k:"subscription", l:"Subscription"},
                 {k:"cafe",         l:"Café"},
                 {k:"wholesale",    l:"Wholesale"},
