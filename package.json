@@ -22,6 +22,7 @@
     "test:run": "node --env-file=server/.env scripts/test-run.mjs",
     "test:gate": "node scripts/test-gate.mjs",
     "test:cert-flow": "node scripts/test-cert-flow.mjs",
+    "test:discovery-flow": "node scripts/test-discovery-flow.mjs",
     "test:plan": "node --env-file=server/.env scripts/test-delivery-plan.mjs",
     "test:units": "node --test server/src/lib/platforms.test.mjs server/src/lib/taxonomy.test.mjs server/src/lib/delivery-plan.test.mjs server/src/lib/deliverables.test.mjs server/src/lib/credits.test.mjs server/src/lib/compose-specialist-prompt.test.mjs server/src/lib/compose-image-prompt.test.mjs server/src/lib/models/fal-image.test.mjs server/src/lib/score-bio.test.mjs server/src/lib/bio-schema.test.mjs server/src/lib/ingest-guards.test.mjs server/src/lib/evaluate-certification.test.mjs server/src/lib/bio-hash.test.mjs server/src/lib/bio-focus.test.mjs server/src/lib/extract-visual-deterministic.test.mjs server/src/lib/plan-limits.test.mjs",
     "test:deliverables": "node --env-file=server/.env scripts/test-deliverables.mjs",

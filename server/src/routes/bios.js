@@ -5,8 +5,7 @@ import { assignSteward } from "../lib/assign-steward.js";
 import { scoreBio } from "../lib/score-bio.js";
 import { validateUpload } from "../lib/ingest-guards.js";
 import { computeFocus } from "../lib/bio-focus.js";
-import { payloadHash } from "../lib/bio-hash.js";
-import { DEFAULT_RUBRIC } from "../lib/evaluate-certification.js";
+import { selfCertifyBio } from "../lib/self-certify.js";
 
 const app = new Hono();
 
@@ -244,46 +243,21 @@ app.post("/:brandId/self-certify", requireAuth, async (c) => {
   if (!brand || brand.workspace_id !== workspaceId) return c.json({ error: "Brand not in workspace" }, 403);
 
   const body = await c.req.json().catch(() => ({}));
-  const fieldMarks = (body.fieldMarks && typeof body.fieldMarks === "object") ? body.fieldMarks : {};
-  const statements = body.statements || {};
-  const statementVersion = String(body.statementVersion || "1");
-
-  if (!(statements.authority && statements.reflects && statements.aspirationalMarked)) {
-    return c.json({ error: "All three attestation statements must be confirmed", code: "STATEMENTS_REQUIRED" }, 400);
-  }
-  for (const [k, v] of Object.entries(fieldMarks)) {
-    if (v !== "accurate" && v !== "aspirational") return c.json({ error: `Invalid mark for ${k}`, code: "BAD_MARK" }, 400);
-  }
 
   const { data: bio } = await supabaseAdmin
     .from("bios").select("id, version, payload").eq("brand_id", brandId)
     .order("version", { ascending: false }).limit(1).maybeSingle();
   if (!bio) return c.json({ error: "No BIO to certify yet", code: "NO_BIO" }, 400);
 
-  const payload = bio.payload || {};
-  const highGaps = computeFocus(payload).filter((f) => f.status === "missing" && f.importance >= 1.0);
-  if (highGaps.length) {
-    return c.json({ error: "Fill the high-importance fields before self-certifying", code: "HIGH_IMPORTANCE_GAPS", fields: highGaps.map((f) => f.field) }, 400);
-  }
-
-  const { data: rubric } = await supabaseAdmin
-    .from("cert_rubric_versions").select("config").eq("active", true).maybeSingle();
-  const minScore = rubric?.config?.selfCertMinScore ?? DEFAULT_RUBRIC.selfCertMinScore;
-  const score = scoreBio(payload);
-  if (score < minScore) {
-    return c.json({ error: `BIO score ${score} is below the ${minScore} needed to self-certify`, code: "BELOW_MIN_SCORE", score, minScore }, 400);
-  }
-
-  await supabaseAdmin.from("bio_attestations").insert({
-    bio_id: bio.id, brand_id: brandId, attested_by: userId,
-    payload_hash: payloadHash(payload), statement_version: statementVersion,
-    field_marks: fieldMarks, self_score: score,
+  // Shared gate: statements + field marks + high-importance gaps + min score,
+  // then the attestation write + self_certified flip (see lib/self-certify.js).
+  const result = await selfCertifyBio({
+    brandId, bioId: bio.id, payload: bio.payload || {}, userId,
+    statements: body.statements, fieldMarks: body.fieldMarks, statementVersion: body.statementVersion,
   });
-  await supabaseAdmin.from("bios")
-    .update({ self_certified: true, self_certified_at: new Date().toISOString() })
-    .eq("id", bio.id);
+  if (!result.ok) { const { ok, ...err } = result; return c.json(err, 400); }
 
-  return c.json({ ok: true, self_certified: true, version: bio.version, score });
+  return c.json({ ok: true, self_certified: true, version: bio.version, score: result.score });
 });
 
 /* POST /api/bios/:brandId/request-review

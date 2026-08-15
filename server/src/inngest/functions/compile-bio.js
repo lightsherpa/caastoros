@@ -22,11 +22,13 @@ import { scoreBio } from "../../lib/score-bio.js";
 import { extractPalette, extractFonts } from "../../lib/extract-visual-deterministic.js";
 import { extractImageryAvoid } from "../../lib/extract-visual-vision.js";
 
-// DISCOVERY_V2 master flag (default OFF). When unset the pipeline runs exactly
-// as before — single homepage scrape, empty visual{}, no upload/instagram read.
+// DISCOVERY_V2 master flag (default ON). The full pipeline — multi-page crawl,
+// upload/instagram source-gathering, and deterministic+vision visual extraction
+// — runs by default. Escape hatch: set DISCOVERY_V2=0 to fall back to the legacy
+// path (single homepage scrape, empty visual{}, no upload/instagram read).
 // The cheap/additive improvements (confidence/missing/refusals/scoreBio) are
 // flagless and always on; only the expensive crawl + visual passes are gated.
-const V2 = process.env.DISCOVERY_V2 === "1";
+const V2 = process.env.DISCOVERY_V2 !== "0";
 
 /* BIO Compiler model — Gemini 2.5 Pro via OpenRouter.
    Per cost analysis 2026-05-26: ~$0.08 / BIO vs ~$0.78 with Opus 4.7
@@ -376,6 +378,38 @@ export const compileBio = inngest.createFunction(
         override: assignment.override || null,
       });
       return { id: job.id, ...assignment };
+    });
+
+    // ── Step 5 · Seed discovery draft session (best-effort) ──────
+    // Upsert one resumable draft per brand (brand_id is UNIQUE) so the rebuilt
+    // discovery UI can reopen the compiled BIO as an editable draft. Non-fatal
+    // by contract: a seed failure here must never fail the compile, so we catch
+    // inside the step, log, and return rather than throw.
+    await step.run("seed-discovery-session", async () => {
+      try {
+        const { error } = await supabaseAdmin
+          .from("discovery_sessions")
+          .upsert(
+            {
+              brand_id: brandId,
+              workspace_id: workspaceId,
+              draft_payload: bioPayload,
+              cursor: { chapter: "identity" },
+              chapter_status: null,
+              attested: {},
+              status: "active",
+            },
+            { onConflict: "brand_id" },
+          );
+        if (error) throw error;
+        return { seeded: true };
+      } catch (err) {
+        logger.warn("discovery_sessions seed failed (non-fatal)", {
+          brandId,
+          error: err?.message || String(err),
+        });
+        return { seeded: false, reason: err?.message || String(err) };
+      }
     });
 
     return { bioId: bioRow.id, version: bioRow.version, brandId, stewardJobId: stewardJob.id };

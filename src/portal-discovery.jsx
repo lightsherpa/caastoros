@@ -445,313 +445,653 @@ function DiscoveryStep2Running({ onDone }) {
   );
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   S3 DRAFT HUB + CHAPTERED REVIEW  (M3 discovery rebuild)
+   Replaces the old hardcoded window.CI_DISCOVERY "Confirm" screen with
+   the live discovery-session draft flow:
+     GET   /api/discovery/session/:brandId          → seed on mount (create-on-read)
+     PATCH /api/discovery/session/:brandId          → debounced autosave (~800ms)
+     POST  /api/discovery/session/:brandId/attest   → promote draft → BIO + self-cert
+     POST  /api/discovery/delegation                → hand a chapter to a teammate
+   No invented brand data: a field with no value renders empty + flagged,
+   never a guess.
+   ─────────────────────────────────────────────────────────────────── */
+
+/* Chapter map — one entry per BIO section, each with the 3–5 fields the
+   user reviews. `multi` = string[] (chips); `list` = object[] (palette/type). */
+const DISCO_CHAPTERS = [
+  { key:"identity", label:"Identity", blurb:"Who you are and what you stand for.", fields:[
+    { key:"positioning", label:"Positioning", area:true, italic:true },
+    { key:"category",    label:"Category" },
+    { key:"founded",     label:"Founded" },
+    { key:"pillars",     label:"Pillars", multi:true },
+  ]},
+  { key:"audience", label:"Audience", blurb:"Who you're for.", fields:[
+    { key:"primary",   label:"Primary audience", area:true },
+    { key:"secondary", label:"Secondary audience", area:true },
+    { key:"tertiary",  label:"Tertiary audience", area:true },
+    { key:"jtbd",      label:"Jobs to be done", multi:true },
+  ]},
+  { key:"voice", label:"Voice", blurb:"How you sound.", fields:[
+    { key:"register",   label:"Register", area:true },
+    { key:"rhythm",     label:"Sentence rhythm", area:true },
+    { key:"forbidden",  label:"Forbidden words", multi:true },
+    { key:"signatures", label:"Signature moves", multi:true },
+  ]},
+  { key:"visual", label:"Visual", blurb:"How you look.", fields:[
+    { key:"palette", label:"Palette", list:"palette" },
+    { key:"type",    label:"Typography", list:"type" },
+    { key:"imagery", label:"Shoot this", multi:true },
+    { key:"avoid",   label:"Never this", multi:true },
+  ]},
+  { key:"goals", label:"Goals", blurb:"Where you're headed.", fields:[
+    { key:"northStar", label:"North star", area:true },
+    { key:"q2",        label:"This quarter", area:true },
+    { key:"q3",        label:"Next quarter", area:true },
+  ]},
+  { key:"strategic", label:"Strategic", blurb:"Tensions and no-gos.", fields:[
+    { key:"watchouts", label:"Watchouts", multi:true },
+    { key:"notList",   label:"What you're NOT", multi:true },
+  ]},
+];
+
+function discoBlank(v) {
+  if (v == null) return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === "string") return v.trim() === "";
+  return false;
+}
+
+/* Per-field status → drives the chip + colour. A blank field is always
+   "missing" (never surfaces a guessed value), regardless of any source. */
+function discoFieldStatus({ value, meta, mark }) {
+  if (discoBlank(value))       return { kind:"missing",      word:"we couldn't find this",          color:"var(--pink-500)" };
+  if (mark === "accurate")     return { kind:"accurate",     word:"confirmed accurate",             color:"var(--green-600)" };
+  if (mark === "aspirational") return { kind:"aspirational", word:"aspirational",                   color:"var(--purple-500)" };
+  if (meta && meta.source)     return { kind:"inferred",     word:"confirm — inferred, not stated", color:"var(--orange-600)" };
+  return { kind:"stated", word:"your words", color:"var(--green-600)" };
+}
+
+/* Section roll-up for the Draft Hub cards + attest summary. */
+function discoAnalyzeSection(chapter, draft, confMap, attested) {
+  const sec = draft?.[chapter.key] || {};
+  let confirmed = 0, toConfirm = 0, gaps = 0;
+  for (const f of chapter.fields) {
+    const st = discoFieldStatus({
+      value: sec[f.key],
+      meta: confMap[`${chapter.key}.${f.key}`],
+      mark: attested[`${chapter.key}.${f.key}`],
+    });
+    if (st.kind === "missing") gaps++;
+    else if (st.kind === "inferred") toConfirm++;
+    else confirmed++;
+  }
+  const total = chapter.fields.length;
+  let status;
+  if (gaps >= Math.ceil(total / 2)) status = { key:"needs",   word:"needs sources", color:"var(--pink-500)",   bg:"var(--pink-50, rgba(244,143,177,0.12))" };
+  else if (gaps > 0 || toConfirm > 0) status = { key:"filling", word:"filling in",    color:"var(--orange-600)", bg:"var(--yellow-50, rgba(252,211,77,0.12))" };
+  else status = { key:"well", word:"well sourced", color:"var(--green-600)", bg:"var(--green-50, rgba(127,163,122,0.12))" };
+  return { confirmed, toConfirm, gaps, total, status };
+}
+
+/* Friendly copy for the attest endpoint's 400 codes. */
+function discoAttestError(j) {
+  switch (j && j.code) {
+    case "STATEMENTS_REQUIRED":
+      return "Confirm all three statements to attest.";
+    case "HIGH_IMPORTANCE_GAPS":
+      return `A few important fields still need answers${j.fields && j.fields.length ? `: ${j.fields.join(", ")}` : ""}. Fill or mark them, then attest.`;
+    case "BELOW_MIN_SCORE":
+      return `Your BIO is at ${j.score ?? "—"}/100${j.minScore ? `, below the ${j.minScore} needed` : ""}. Confirm more fields or add sources to raise it.`;
+    default:
+      return (j && j.error) || "Couldn't attest just yet — try again.";
+  }
+}
+
+/* Compact read/edit views for the object-array visual fields. */
+function DiscoPaletteView({ items }) {
+  return (
+    <div style={{display:"flex", flexWrap:"wrap", gap:8}}>
+      {items.map((c, i) => (
+        <span key={i} style={{display:"inline-flex", alignItems:"center", gap:6, border:"1px solid var(--c-line)", borderRadius:8, padding:"3px 8px 3px 4px"}}>
+          <span style={{width:18, height:18, borderRadius:4, background:c.hex || "#ccc", border:"1px solid var(--c-line)"}} />
+          <span style={{fontSize:12.5, color:"var(--c-ink)"}}>{c.name || c.hex}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+function DiscoPaletteEdit({ items, onChange }) {
+  const upd = (i, p) => onChange(items.map((x, j) => j === i ? { ...x, ...p } : x));
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap:8}}>
+      {items.map((c, i) => (
+        <div key={i} style={{display:"flex", gap:8, alignItems:"center"}}>
+          <input type="color" value={c.hex || "#888888"} onChange={(e) => upd(i, { hex: e.target.value })} style={{width:34, height:30, border:"none", background:"transparent", cursor:"pointer", padding:0}} />
+          <div style={{flex:1}}><EditInput value={c.name || ""} onChange={(v) => upd(i, { name: v })} placeholder="Colour name" /></div>
+          <button onClick={() => onChange(items.filter((_, j) => j !== i))} style={CHIP_X} title="Remove">×</button>
+        </div>
+      ))}
+      <button className="btn btn--ghost btn--sm" onClick={() => onChange([...items, { hex:"#888888", name:"" }])}><Icon name="plus" size={12} /> Add colour</button>
+    </div>
+  );
+}
+function DiscoTypeView({ items }) {
+  return (
+    <div style={{display:"flex", flexWrap:"wrap", gap:8}}>
+      {items.map((t, i) => (
+        <span key={i} className="pill" style={{fontSize:12.5}}>{t.kind ? `${t.kind}: ` : ""}{t.family || "—"}</span>
+      ))}
+    </div>
+  );
+}
+function DiscoTypeEdit({ items, onChange }) {
+  const upd = (i, p) => onChange(items.map((x, j) => j === i ? { ...x, ...p } : x));
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap:8}}>
+      {items.map((t, i) => (
+        <div key={i} style={{display:"flex", gap:8, alignItems:"center"}}>
+          <div style={{width:120}}><EditInput value={t.kind || ""} onChange={(v) => upd(i, { kind: v })} placeholder="Role" /></div>
+          <div style={{flex:1}}><EditInput value={t.family || ""} onChange={(v) => upd(i, { family: v })} placeholder="Family" /></div>
+          <button onClick={() => onChange(items.filter((_, j) => j !== i))} style={CHIP_X} title="Remove">×</button>
+        </div>
+      ))}
+      <button className="btn btn--ghost btn--sm" onClick={() => onChange([...items, { kind:"", family:"" }])}><Icon name="plus" size={12} /> Add typeface</button>
+    </div>
+  );
+}
+
+/* One reviewable field: status chip, value (or "we couldn't find this"),
+   and the per-field controls (mark accurate/aspirational, edit, leave blank). */
+function DiscoFieldRow({ field, value, meta, mark, onChange, onMark, onLeaveBlank }) {
+  const [editing, setEditing] = useDState(false);
+  const st = discoFieldStatus({ value, meta, mark });
+  const blank = st.kind === "missing";
+
+  const renderValue = () => {
+    if (field.list === "palette") return <DiscoPaletteView items={value || []} />;
+    if (field.list === "type") return <DiscoTypeView items={value || []} />;
+    if (field.multi) return <div style={{display:"flex", flexWrap:"wrap", gap:6}}>{(value || []).map((v, i) => <span key={i} className="pill">{v}</span>)}</div>;
+    return field.italic ? <em style={{fontStyle:"italic"}}>{value}</em> : <span>{value}</span>;
+  };
+
+  const renderEditor = () => {
+    if (field.list === "palette") return <DiscoPaletteEdit items={value || []} onChange={onChange} />;
+    if (field.list === "type") return <DiscoTypeEdit items={value || []} onChange={onChange} />;
+    if (field.multi) return <ChipEditor items={value || []} onChange={onChange} />;
+    return <EditInput area={field.area} value={value || ""} onChange={onChange} placeholder="Type what's true — leave blank if you're not sure" />;
+  };
+
+  return (
+    <div style={{padding:"16px 0", borderBottom:"1px solid var(--c-line)"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:12, marginBottom:8}}>
+        <div>
+          <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)", letterSpacing:"0.06em", textTransform:"uppercase"}}>{field.label}</span>
+          {meta && meta.source && <span style={{fontSize:11, color:"var(--c-faint)", fontStyle:"italic", marginLeft:10}}>from {meta.source}</span>}
+        </div>
+        <span className="pill" style={{background:"transparent", border:`1px solid ${st.color}`, color:st.color, fontSize:10.5, whiteSpace:"nowrap"}}>{st.word}</span>
+      </div>
+
+      {/* Value / editor / empty-state — NEVER a guessed value */}
+      <div style={{
+        borderLeft: `3px solid ${st.kind === "inferred" ? "var(--orange-600)" : st.kind === "missing" ? "var(--pink-500)" : "var(--c-line-2)"}`,
+        background: st.kind === "inferred" ? "var(--yellow-50, rgba(252,211,77,0.08))" : st.kind === "missing" ? "var(--pink-50, rgba(244,143,177,0.06))" : "transparent",
+        borderRadius:"0 8px 8px 0", padding:"10px 14px", fontSize:14, color:"var(--c-ink)", lineHeight:1.55,
+      }}>
+        {editing
+          ? renderEditor()
+          : blank
+            ? <span style={{color:"var(--c-faint)", fontStyle:"italic"}}>Empty — we couldn't find this. Add it if you know it, or leave it blank.</span>
+            : renderValue()}
+      </div>
+
+      {/* Per-field controls */}
+      <div style={{display:"flex", gap:10, marginTop:10, flexWrap:"wrap", alignItems:"center"}}>
+        {!blank && (mark ? (
+          <button className="btn btn--link" style={{fontSize:12}} onClick={() => onMark(null)}>
+            <Icon name="check" size={12} /> Marked {mark} · undo
+          </button>
+        ) : (
+          <>
+            <button className="btn btn--ghost btn--sm" onClick={() => onMark("accurate")}>Mark accurate</button>
+            <button className="btn btn--ghost btn--sm" onClick={() => onMark("aspirational")}>Mark aspirational</button>
+          </>
+        ))}
+        <button className="btn btn--link" style={{fontSize:12}} onClick={() => setEditing(e => !e)}>
+          <Icon name="edit" size={12} /> {editing ? "Done editing" : blank ? "Add it" : "Edit"}
+        </button>
+        {!blank && (
+          <button className="btn btn--link" style={{fontSize:12, color:"var(--c-faint)"}} onClick={() => { onLeaveBlank(); setEditing(false); }}>Leave blank</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* Hand a single chapter to a teammate — POST /discovery/delegation. */
+function DiscoDelegatePanel({ brandId, chapter }) {
+  const [email, setEmail] = useDState("");
+  const [note, setNote] = useDState("");
+  const [busy, setBusy] = useDState(false);
+  const [link, setLink] = useDState(null);
+  const [err, setErr] = useDState(null);
+  const [copied, setCopied] = useDState(false);
+
+  const send = async () => {
+    if (!email.trim() || busy || !brandId) return;
+    setBusy(true); setErr(null); setLink(null);
+    try {
+      const res = await apiFetch(`/api/discovery/delegation`, {
+        method: "POST",
+        body: JSON.stringify({ brandId, chapter: chapter.key, invitee_email: email.trim(), note: note.trim() || undefined }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      setLink(j.link || null);
+    } catch (e) { setErr(e?.message || String(e)); }
+    finally { setBusy(false); }
+  };
+  const copy = () => { if (link && navigator.clipboard) { navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1600); } };
+
+  return (
+    <div className="card card--inset" style={{padding:16, marginTop:18}}>
+      <div style={{fontSize:13.5, fontWeight:600, color:"var(--c-ink)", marginBottom:4}}>Delegate this chapter</div>
+      <div style={{fontSize:12, color:"var(--c-faint)", marginBottom:12}}>Hand {chapter.label} to a teammate who knows it best. They get a link to fill just this section.</div>
+      <div style={{display:"flex", gap:8, flexWrap:"wrap"}}>
+        <input className="input" style={{flex:"1 1 200px"}} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="teammate@brand.com" />
+        <input className="input" style={{flex:"1 1 200px"}} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" />
+        <button className="btn btn--primary btn--sm" disabled={busy || !email.trim()} onClick={send}>
+          <Icon name="mail" size={13} /> {busy ? "Sending…" : "Send invite"}
+        </button>
+      </div>
+      {err && <div style={{fontSize:12, color:"var(--pink-500)", marginTop:8}}>{err}</div>}
+      {link && (
+        <div style={{marginTop:10, display:"flex", gap:8, alignItems:"center", fontSize:12}}>
+          <span style={{color:"var(--green-600)", whiteSpace:"nowrap"}}>Invite ready.</span>
+          <code style={{flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)", background:"var(--neutral-50)", padding:"4px 8px", borderRadius:6}}>{link}</code>
+          <button className="btn btn--ghost btn--sm" onClick={copy}>{copied ? "Copied" : "Copy link"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DiscoveryStep2Results({ onConfirm }) {
-  const d = window.CI_DISCOVERY;
-  const [tab, setTab] = useDState("identity");
-  /* Pull live BIO + cert state so the Steward chip flips in real time
-     if a certification lands while the user is on this screen. */
-  const live = useLiveBio({ pollMs: 5000 });
+  /* Live brand + cert + score — drives the Steward chip (flips in real
+     time if certification lands) and the completion meter. */
+  const live = useLiveBio({ pollMs: 6000 });
+  const brandId = live.brandId;
+
+  /* Discovery-session state, hydrated from GET /session on mount. */
+  const [draft, setDraft] = useDState({});
+  const [attested, setAttested] = useDState({});
+  const [chapterStatus, setChapterStatus] = useDState({});
+  const [cursor, setCursor] = useDState("hub");
+  const [view, setView] = useDState("hub");                // hub | chapter | attest
+  const [activeChapter, setActiveChapter] = useDState(null);
+  const [loading, setLoading] = useDState(true);
+  const [saveState, setSaveState] = useDState("idle");     // idle | saving | saved | error
+  const [rev, setRev] = useDState(0);                      // bumps on every user edit → debounced save
+  const [toast, setToast] = useDState(null);
+
+  /* Attest UI */
+  const [statements, setStatements] = useDState({ authority:false, reflects:false, aspirationalMarked:false });
+  const [attestBusy, setAttestBusy] = useDState(false);
+  const [attestErr, setAttestErr] = useDState(null);
+
+  /* Refs mirror state so the debounced saver + attest flush always send
+     the freshest snapshot without re-subscribing. */
+  const draftRef = React.useRef(draft);
+  const attestedRef = React.useRef(attested);
+  const chapterStatusRef = React.useRef(chapterStatus);
+  const cursorRef = React.useRef(cursor);
+  const hydratedRef = React.useRef(false);
+  useDEffect(() => { draftRef.current = draft; }, [draft]);
+  useDEffect(() => { attestedRef.current = attested; }, [attested]);
+  useDEffect(() => { chapterStatusRef.current = chapterStatus; }, [chapterStatus]);
+  useDEffect(() => { cursorRef.current = cursor; }, [cursor]);
+
+  const confMap = draft?.confidence || {};
+  const bump = () => setRev(r => r + 1);
+  const flash = (m) => { setToast(m); clearTimeout(window.__discoT); window.__discoT = setTimeout(() => setToast(null), 2600); };
+
+  /* ── Load (create-on-read) ──────────────────────────────────────── */
+  useDEffect(() => {
+    if (!brandId) return;
+    let alive = true;
+    setLoading(true);
+    hydratedRef.current = false;
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/discovery/session/${brandId}`);
+        const j = await res.json().catch(() => ({}));
+        if (!alive) return;
+        const s = j.session || {};
+        setDraft(s.draft_payload || live.bio?.payload || {});
+        setAttested(s.attested || {});
+        setChapterStatus(s.chapter_status || {});
+        const cur = typeof s.cursor === "string" && s.cursor ? s.cursor : "hub";
+        setCursor(cur);
+        if (cur.startsWith("chapter:")) { setActiveChapter(cur.slice("chapter:".length)); setView("chapter"); }
+        else if (cur === "attest") setView("attest");
+        else setView("hub");
+      } catch (e) {
+        /* Fall back to the live BIO payload so the user still sees real data. */
+        if (alive) setDraft(live.bio?.payload || {});
+      } finally {
+        if (alive) { hydratedRef.current = true; setLoading(false); }
+      }
+    })();
+    return () => { alive = false; };
+  }, [brandId]);
+
+  /* ── Debounced autosave ─────────────────────────────────────────── */
+  const saveSession = React.useCallback(async () => {
+    if (!brandId || !hydratedRef.current) return;
+    setSaveState("saving");
+    try {
+      const res = await apiFetch(`/api/discovery/session/${brandId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          draft_payload: draftRef.current,
+          attested: attestedRef.current,
+          chapter_status: chapterStatusRef.current,
+          cursor: cursorRef.current,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSaveState("saved");
+    } catch (e) {
+      setSaveState("error");
+    }
+  }, [brandId]);
+
+  useDEffect(() => {
+    if (rev === 0 || !hydratedRef.current) return;
+    const t = setTimeout(saveSession, 800);
+    return () => clearTimeout(t);
+  }, [rev, saveSession]);
+
+  /* ── Field mutations (each bump schedules an autosave) ───────────── */
+  const setFieldValue = (section, fkey, value) => {
+    setDraft(d => ({ ...d, [section]: { ...(d[section] || {}), [fkey]: value } }));
+    bump();
+  };
+  const setMark = (section, fkey, mark) => {
+    const akey = `${section}.${fkey}`;
+    setAttested(a => { const n = { ...a }; if (mark == null) delete n[akey]; else n[akey] = mark; return n; });
+    bump();
+  };
+  const leaveBlank = (section, fkey) => {
+    const cur = draft?.[section]?.[fkey];
+    setFieldValue(section, fkey, Array.isArray(cur) ? [] : "");
+    setMark(section, fkey, null);
+  };
+
+  /* ── Navigation (persists cursor + chapter progress) ────────────── */
+  const openChapter = (key) => { setActiveChapter(key); setView("chapter"); setCursor(`chapter:${key}`); bump(); };
+  const backToHub = (reviewedKey) => {
+    if (reviewedKey) setChapterStatus(cs => ({ ...cs, [reviewedKey]: "reviewed" }));
+    setView("hub"); setCursor("hub"); bump();
+  };
+  const openAttest = () => { setView("attest"); setCursor("attest"); bump(); };
+  const saveAndExit = async () => { await saveSession(); flash("Saved — pick up right here anytime."); setTimeout(() => { window.location.hash = "#/home"; }, 700); };
+
+  /* ── Attest → promote draft to a certified BIO version ──────────── */
+  const submitAttest = async () => {
+    if (attestBusy || !brandId) return;
+    setAttestBusy(true); setAttestErr(null);
+    await saveSession();                          // flush latest draft + marks first
+    try {
+      const res = await apiFetch(`/api/discovery/session/${brandId}/attest`, {
+        method: "POST",
+        body: JSON.stringify({ statements, fieldMarks: attestedRef.current, statementVersion: "1" }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setAttestErr(discoAttestError(j)); return; }
+      flash("BIO signed — briefing unlocked.");
+      onConfirm && onConfirm();                   // advance to the live S13 step
+    } catch (e) { setAttestErr(e?.message || String(e)); }
+    finally { setAttestBusy(false); }
+  };
+
+  /* ── Derived: per-section + overall roll-ups ────────────────────── */
+  const analyses = DISCO_CHAPTERS.map(ch => ({ ch, a: discoAnalyzeSection(ch, draft, confMap, attested) }));
+  const totals = analyses.reduce((acc, { a }) => ({
+    confirmed: acc.confirmed + a.confirmed,
+    toConfirm: acc.toConfirm + a.toConfirm,
+    gaps: acc.gaps + a.gaps,
+    total: acc.total + a.total,
+  }), { confirmed:0, toConfirm:0, gaps:0, total:0 });
+
+  const score = live.bio?.score ?? (totals.total ? Math.round(100 * totals.confirmed / totals.total) : 0);
+  const tone = score >= 85
+    ? { color:"var(--green-600)", word:"well sourced" }
+    : score >= 65
+    ? { color:"var(--orange-600)", word:"filling in" }
+    : { color:"var(--pink-500)", word:"needs more sources" };
+
+  const chapter = DISCO_CHAPTERS.find(c => c.key === activeChapter);
+  const chapterAnalysis = chapter ? discoAnalyzeSection(chapter, draft, confMap, attested) : null;
+
+  /* Still-open fields for the attest summary (missing or inferred). */
+  const flaggedFields = [];
+  analyses.forEach(({ ch }) => {
+    ch.fields.forEach(f => {
+      const st = discoFieldStatus({
+        value: draft?.[ch.key]?.[f.key],
+        meta: confMap[`${ch.key}.${f.key}`],
+        mark: attested[`${ch.key}.${f.key}`],
+      });
+      if (st.kind === "missing" || st.kind === "inferred") flaggedFields.push({ ch, f, st });
+    });
+  });
+  const allChecked = statements.authority && statements.reflects && statements.aspirationalMarked;
+
+  const noBrand = !brandId && !live.loading;
+  const showLoader = (!brandId && live.loading) || (brandId && loading);
+
   return (
     <div style={{maxWidth: 1080, margin:"24px auto 0"}}>
-      {/* Brand Steward notice — the moat-defining trust signal per rev-2 §17 */}
-      <Reveal>
-        <div style={{
-          background: live.cert ? "var(--green-50, rgba(127,163,122,0.10))" : "var(--yellow-50, rgba(252,211,77,0.10))",
-          border: `1px solid ${live.cert ? "var(--green-300, rgba(127,163,122,0.4))" : "var(--yellow-300, rgba(252,211,77,0.4))"}`,
-          borderRadius: 14, padding: "16px 22px", marginBottom: 16,
-          display:"flex", alignItems:"center", gap: 16,
-        }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: "50%",
-            background: live.cert ? "var(--green-500)" : "var(--yellow-500)",
-            color:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
-            fontFamily:"Georgia, serif", fontStyle:"italic", fontWeight: 500, fontSize: 18,
-            flexShrink: 0,
-          }}>{live.cert ? "✓" : (live.cert?.byName?.[0] || "S")}</div>
-          <div style={{flex: 1}}>
-            <div style={{fontSize: 14, fontWeight: 500, color:"var(--c-ink)", marginBottom: 2}}>
-              {live.cert
-                ? <>Your BIO is certified by <span style={{color:"var(--green-600)"}}>{live.cert.byName}</span></>
-                : <>A senior human will certify your BIO within 24h</>}
-            </div>
-            <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5}}>
-              {live.cert
-                ? <>Every output your Specialists produce will ship <em>"certified by {live.cert.byName}"</em>. <button onClick={() => onConfirm && onConfirm()} className="btn btn--link" style={{fontSize: 12.5, padding: 0}}>Continue to your workspace →</button></>
-                : <>Your Brand Steward — a senior La&nbsp;Mesa designer — reads what Brandolph extracted, refines anything that's not quite right, and signs the BIO. From that moment, every output your Specialists produce ships <em>"certified by [their name]"</em>.</>}
-            </div>
-          </div>
-        </div>
-      </Reveal>
+      {/* Utility row — save state + resume-anytime exit (on every screen) */}
+      <div style={{display:"flex", justifyContent:"flex-end", alignItems:"center", gap:14, marginBottom:10}}>
+        <span style={{color:"var(--c-faint)", fontFamily:"var(--font-mono)", fontSize:11}}>
+          {saveState === "saving" ? "Saving…" : saveState === "saved" ? "All changes saved" : saveState === "error" ? "Save failed — retries on next edit" : ""}
+        </span>
+        <button className="btn btn--link" style={{fontSize:12}} onClick={saveAndExit}>Save &amp; finish later</button>
+      </div>
 
-      <Reveal>
-        <div style={{
-          background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius: 14,
-          padding: "22px 26px",
-          display:"grid", gridTemplateColumns:"1fr auto", gap: 20, alignItems:"center", marginBottom: 18,
-        }}>
-          <div>
-            <div style={{display:"flex", alignItems:"center", gap:12, marginBottom: 6}}>
-              <span style={{width:36, height: 36, borderRadius: 8, background:"var(--neutral-900)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"var(--font-mono)", fontWeight:600, fontSize: 18}}>V</span>
-              <h2 style={{margin:0, fontSize: 22, letterSpacing:"-0.01em"}}>{d.brand}</h2>
-            </div>
-            <p style={{margin: 0, color:"var(--c-dim)", fontSize: 14}}>Specialty coffee for slow Tuesdays. · <a href={"https://" + d.url} style={{color:"var(--purple-500)"}}>{d.url}</a></p>
-            <div style={{marginTop: 12, display:"flex", gap: 14, alignItems:"center", fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)", letterSpacing:"0.06em"}}>
-              <span><span className="dot-state dot-state--ok" /> EXTRACTION COMPLETE</span>
-              <span>· {d.duration}</span>
-              <span>· {d.signals} signals</span>
-              <span style={{color:"var(--orange-600)"}}>· {d.flags} flag</span>
-            </div>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <div className="eyebrow eyebrow--yellow" style={{marginBottom: 4}}>Overall confidence</div>
-            <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 56, lineHeight: 1, color:"var(--green-600)", fontWeight: 500}}>
-              <Counter to={d.confidence} format={n => Math.round(n)} />
-            </div>
-            <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginTop: 2}}>OF 100</div>
-          </div>
+      {noBrand ? (
+        <div className="card" style={{padding:"48px 24px", textAlign:"center", color:"var(--c-dim)", fontSize:14}}>
+          Couldn't find a brand to review. <a href="#/discovery" style={{color:"var(--purple-500)"}}>Start discovery</a>.
         </div>
-      </Reveal>
-
-      {/* Flag banner */}
-      <Reveal>
-        <div style={{
-          marginBottom: 14,
-          background:"var(--yellow-50)", border:"1px solid var(--yellow-200)", borderRadius: 10,
-          padding:"12px 16px",
-          display:"flex", justifyContent:"space-between", alignItems:"center", gap: 14,
-        }}>
-          <div style={{display:"flex", alignItems:"center", gap: 10}}>
-            <Icon name="flag" size={14} />
-            <span style={{fontSize: 13, color:"var(--c-ink)"}}>
-              <strong style={{fontWeight: 600}}>1 flag to resolve.</strong> Display typeface (Söhne Breit) requires a paid license. Suggested substitute: Söhne.
-            </span>
-          </div>
-          <div style={{display:"flex", gap: 8}}>
-            <button className="btn btn--ghost btn--sm">Upload license</button>
-            <button className="btn btn--primary btn--sm">Accept substitute</button>
-          </div>
+      ) : showLoader ? (
+        <div className="card" style={{padding:"48px 24px", textAlign:"center", color:"var(--c-faint)", display:"flex", alignItems:"center", justifyContent:"center", gap:10}}>
+          <BrandolphDot state="thinking" /> Loading your draft…
         </div>
-      </Reveal>
+      ) : (
+        <>
+          {/* Steward / cert chip — flips live if certification lands. */}
+          <Reveal>
+            <div style={{
+              background: live.cert ? "var(--green-50, rgba(127,163,122,0.10))" : "var(--yellow-50, rgba(252,211,77,0.10))",
+              border: `1px solid ${live.cert ? "var(--green-300, rgba(127,163,122,0.4))" : "var(--yellow-300, rgba(252,211,77,0.4))"}`,
+              borderRadius: 12, padding:"12px 18px", marginBottom:16, display:"flex", alignItems:"center", gap:12,
+            }}>
+              <span style={{width:8, height:8, borderRadius:"50%", background: live.cert ? "var(--green-500)" : "var(--yellow-500)", animation: live.cert ? "none" : "pulse 1.4s ease-in-out infinite", flexShrink:0}} />
+              <div style={{fontSize:13, color:"var(--c-ink)", lineHeight:1.5}}>
+                {live.cert
+                  ? <>Certified by <span style={{color:"var(--green-600)", fontWeight:500}}>{live.cert.byName}</span>.</>
+                  : <>A senior Brand Steward certifies this BIO within 24h. Confirm the draft below to unlock briefing now.</>}
+              </div>
+            </div>
+          </Reveal>
 
-      <Reveal>
-        <div className="card" style={{padding: 0, overflow:"hidden"}}>
-          <div className="tabs">
-            {[
-              ["identity","Identity", 4],
-              ["palette","Palette", 5],
-              ["type","Typography", 2],
-              ["voice","Voice", 4],
-              ["imagery","Imagery", 4],
-              ["audience","Audience", 3],
-            ].map(([k, l, count]) => (
-              <button key={k} className={"tab" + (tab === k ? " tab--active" : "")} onClick={() => setTab(k)}>
-                {l} <span className="tab__count">{count}</span>
-              </button>
-            ))}
-          </div>
-          <div style={{padding: 24}}>
-            {tab === "identity" && (
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 28}}>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Facts captured</div>
-                  <table style={{width:"100%", borderCollapse:"collapse", fontSize: 14}}>
-                    <tbody>
-                      {d.identity.map((r, i) => (
-                        <tr key={i} style={{borderBottom: i < d.identity.length - 1 ? "1px solid var(--c-line)" : "none"}}>
-                          <td style={{padding:"10px 0", color:"var(--c-faint)", width: 140, fontSize: 12}}>{r.key}</td>
-                          <td style={{padding:"10px 0", color:"var(--c-ink)"}}>{r.val}</td>
-                          <td style={{padding:"10px 0", textAlign:"right"}}><Confidence value={r.conf} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          {/* Brand row + completion meter */}
+          <Reveal>
+            <div style={{display:"grid", gridTemplateColumns:"1fr auto", gap:20, alignItems:"center", marginBottom:20}}>
+              <div>
+                <div className="eyebrow" style={{marginBottom:6}}>Draft BIO · review before you sign</div>
+                <h2 style={{margin:0, fontSize:24, letterSpacing:"-0.01em"}}>{live.brandName || "Your brand"}</h2>
+                {live.brandUrl && <p style={{margin:"4px 0 0", color:"var(--c-dim)", fontSize:13}}>{live.brandUrl}</p>}
+              </div>
+              <div style={{textAlign:"right", minWidth:180}}>
+                <div className="eyebrow eyebrow--yellow" style={{marginBottom:2}}>Completion</div>
+                <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:44, lineHeight:1, color:tone.color, fontWeight:500}}>
+                  <Counter to={score} format={n => Math.round(n)} />
                 </div>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Logo lockups captured · 3</div>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 10}}>
-                    {["#1F1A14", "#F4ECDD", "#C97B3F"].map((bg, i) => (
-                      <div key={i} style={{
-                        aspectRatio: "1.3 / 1", background: bg,
-                        borderRadius: 10, display:"flex", alignItems:"center", justifyContent:"center",
-                        color: bg === "#F4ECDD" ? "#1F1A14" : "#F4ECDD",
-                        fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 24, letterSpacing:"-0.02em",
-                        border:"1px solid var(--c-line)",
-                      }}>vinilo</div>
+                <div style={{height:6, background:"var(--neutral-50)", borderRadius:999, overflow:"hidden", marginTop:8, width:180, marginLeft:"auto"}}>
+                  <div style={{height:"100%", width: Math.max(0, Math.min(100, score)) + "%", background: tone.color, borderRadius:999, transition:"width 700ms ease"}} />
+                </div>
+                <div style={{fontFamily:"var(--font-mono)", fontSize:10, color:"var(--c-faint)", marginTop:4, textTransform:"uppercase", letterSpacing:"0.06em"}}>{tone.word}</div>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* ── DRAFT HUB — chapter map ─────────────────────────────── */}
+          {view === "hub" && (
+            <>
+              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(320px, 1fr))", gap:14}}>
+                {analyses.map(({ ch, a }) => {
+                  const reviewed = chapterStatus[ch.key] === "reviewed";
+                  return (
+                    <button key={ch.key} onClick={() => openChapter(ch.key)} className="card"
+                      style={{textAlign:"left", cursor:"pointer", padding:18, display:"flex", flexDirection:"column", gap:12, borderLeft:`3px solid ${a.status.color}`}}>
+                      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", gap:8}}>
+                        <div style={{display:"flex", alignItems:"center", gap:8}}>
+                          <h3 style={{margin:0, fontSize:16, letterSpacing:"-0.01em"}}>{ch.label}</h3>
+                          {reviewed && <span style={{color:"var(--green-600)", display:"inline-flex"}} title="Reviewed"><Icon name="check" size={13} /></span>}
+                        </div>
+                        <span className="pill" style={{background:a.status.bg, color:a.status.color, border:"none", fontSize:10.5, whiteSpace:"nowrap"}}>{a.status.word}</span>
+                      </div>
+                      <p style={{margin:0, fontSize:12.5, color:"var(--c-faint)", lineHeight:1.45}}>{ch.blurb}</p>
+                      <div style={{display:"flex", gap:14, fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-dim)"}}>
+                        <span>{a.gaps} gap{a.gaps === 1 ? "" : "s"}</span>
+                        <span style={{color: a.toConfirm ? "var(--orange-600)" : "var(--c-faint)"}}>{a.toConfirm} to confirm</span>
+                        <span style={{color:"var(--green-600)"}}>{a.confirmed} ✓</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{marginTop:22, padding:"18px 20px", background:"var(--c-card)", border:"1px solid var(--c-line)", borderRadius:12, display:"flex", justifyContent:"space-between", alignItems:"center", gap:14, flexWrap:"wrap"}}>
+                <div style={{fontSize:13.5, color:"var(--c-ink)"}}>
+                  <strong>{totals.confirmed}/{totals.total}</strong> fields confirmed · {totals.toConfirm} inferred to confirm · {totals.gaps} gaps
+                </div>
+                <button className="btn btn--primary btn--lg" onClick={openAttest}>Confirm &amp; attest <Icon name="arrow" size={14} /></button>
+              </div>
+            </>
+          )}
+
+          {/* ── CHAPTER — field-level review ────────────────────────── */}
+          {view === "chapter" && chapter && (
+            <>
+              <button className="btn btn--link" style={{marginBottom:10, fontSize:13}} onClick={() => backToHub(chapter.key)}>← All chapters</button>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:12, marginBottom:4}}>
+                <h2 style={{margin:0, fontSize:22, letterSpacing:"-0.01em"}}>{chapter.label}</h2>
+                {chapterAnalysis && <span className="pill" style={{background:chapterAnalysis.status.bg, color:chapterAnalysis.status.color, border:"none"}}>{chapterAnalysis.status.word}</span>}
+              </div>
+              <p style={{margin:"0 0 16px", fontSize:13, color:"var(--c-faint)"}}>{chapter.blurb} Confirm what's right, fix what's not, leave blank what you don't know.</p>
+
+              <div className="card" style={{padding:"4px 20px"}}>
+                {chapter.fields.map(field => (
+                  <DiscoFieldRow
+                    key={field.key}
+                    field={field}
+                    value={draft?.[chapter.key]?.[field.key]}
+                    meta={confMap[`${chapter.key}.${field.key}`]}
+                    mark={attested[`${chapter.key}.${field.key}`]}
+                    onChange={(v) => setFieldValue(chapter.key, field.key, v)}
+                    onMark={(m) => setMark(chapter.key, field.key, m)}
+                    onLeaveBlank={() => leaveBlank(chapter.key, field.key)}
+                  />
+                ))}
+              </div>
+
+              <DiscoDelegatePanel brandId={brandId} chapter={chapter} />
+
+              <div style={{display:"flex", gap:10, marginTop:18}}>
+                <button className="btn btn--primary" onClick={() => backToHub(chapter.key)}><Icon name="check" size={14} /> Done — back to chapters</button>
+              </div>
+            </>
+          )}
+
+          {/* ── S12 — CONFIRM & ATTEST ──────────────────────────────── */}
+          {view === "attest" && (
+            <>
+              <button className="btn btn--link" style={{marginBottom:10, fontSize:13}} onClick={() => backToHub()}>← Back to chapters</button>
+              <h2 style={{margin:"0 0 4px", fontSize:24, letterSpacing:"-0.01em"}}>Confirm &amp; sign your BIO</h2>
+              <p style={{margin:"0 0 20px", fontSize:14, color:"var(--c-dim)", lineHeight:1.55}}>
+                Signing promotes this draft to a certified BIO version and unlocks briefing. A senior Brand Steward still reviews it before production.
+              </p>
+
+              {/* Summary tiles */}
+              <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:12, marginBottom:18}}>
+                {[
+                  ["Confirmed", totals.confirmed, "var(--green-600)"],
+                  ["Inferred to confirm", totals.toConfirm, "var(--orange-600)"],
+                  ["Gaps", totals.gaps, "var(--pink-500)"],
+                ].map(([label, n, color]) => (
+                  <div key={label} className="card" style={{padding:"14px 16px"}}>
+                    <div style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize:32, lineHeight:1, color, fontWeight:500}}>{n}</div>
+                    <div className="eyebrow" style={{marginTop:6}}>{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Still-open fields */}
+              {flaggedFields.length > 0 && (
+                <div className="card" style={{padding:"14px 18px", marginBottom:18, borderLeft:"3px solid var(--yellow-500)"}}>
+                  <div className="eyebrow eyebrow--yellow" style={{marginBottom:8}}>Still open ({flaggedFields.length})</div>
+                  <div style={{display:"flex", flexDirection:"column", gap:6}}>
+                    {flaggedFields.map(({ ch, f, st }, i) => (
+                      <button key={i} className="btn btn--link" style={{fontSize:12.5, textAlign:"left", padding:0, color:"var(--c-dim)"}} onClick={() => openChapter(ch.key)}>
+                        <span style={{color:st.color, marginRight:6}}>●</span> {ch.label} · {f.label} — {st.word}
+                      </button>
                     ))}
                   </div>
                 </div>
-              </div>
-            )}
-            {tab === "palette" && (
-              <div>
-                <div style={{display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap: 14}}>
-                  {d.palette.map((c, i) => (
-                    <div key={i} className="card" style={{padding: 0, overflow:"hidden"}}>
-                      <div style={{aspectRatio:"1.4/1", background: c.hex}}></div>
-                      <div style={{padding:"10px 12px"}}>
-                        <div style={{fontSize: 13, fontWeight: 500, color:"var(--c-ink)"}}>{c.name}</div>
-                        <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginTop: 2}}>{c.hex}</div>
-                        <div style={{marginTop: 10, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                          <Confidence value={c.conf} />
-                          <span style={{fontFamily:"var(--font-mono)", fontSize:10, color: c.wcag === "—" ? "var(--c-faint)" : "var(--green-600)", letterSpacing:"0.06em"}}>WCAG {c.wcag}</span>
-                        </div>
-                      </div>
-                    </div>
+              )}
+
+              {/* Three attestation statements */}
+              <div className="card" style={{padding:"18px 20px", marginBottom:16}}>
+                <div className="eyebrow" style={{marginBottom:12}}>Attestation</div>
+                <div style={{display:"flex", flexDirection:"column", gap:12}}>
+                  {[
+                    ["authority", "I'm authorized to represent this brand."],
+                    ["reflects", "This BIO reflects the brand as it actually is."],
+                    ["aspirationalMarked", "I've separated what's factual from what's aspirational."],
+                  ].map(([k, label]) => (
+                    <label key={k} style={{display:"flex", gap:10, alignItems:"flex-start", fontSize:13.5, color:"var(--c-ink)", cursor:"pointer", lineHeight:1.5}}>
+                      <input type="checkbox" checked={statements[k]} onChange={(e) => setStatements(s => ({ ...s, [k]: e.target.checked }))} style={{marginTop:3}} />
+                      <span>{label}</span>
+                    </label>
                   ))}
                 </div>
-                <div style={{marginTop: 18}}>
-                  <div className="eyebrow" style={{marginBottom: 8}}>Distribution across 47 scraped pages</div>
-                  <div style={{display:"flex", height: 18, borderRadius: 4, overflow:"hidden", border:"1px solid var(--c-line)"}}>
-                    {d.palette.map((c, i) => (
-                      <div key={i} style={{flex: [38, 22, 28, 8, 4][i], background: c.hex}} title={`${c.name} ${[38,22,28,8,4][i]}%`} />
-                    ))}
-                  </div>
-                </div>
               </div>
-            )}
-            {tab === "type" && (
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 16}}>
-                {d.type.map((t, i) => (
-                  <div key={i} className="card" style={{padding: 20}}>
-                    <div style={{display:"flex", justifyContent:"space-between", marginBottom: 10}}>
-                      <span className="eyebrow">{t.kind}</span>
-                      {t.license === "paid" && <span className="pill" style={{background:"var(--orange-100)", color:"var(--orange-600)", border:"1px solid #FFE0B0"}}>Paid license</span>}
-                    </div>
-                    <div style={{
-                      fontFamily: t.kind === "Display" ? "Georgia, serif" : "var(--font-sans)",
-                      fontWeight: 700, fontSize: t.kind === "Display" ? 38 : 22,
-                      letterSpacing: "-0.01em", marginBottom: 6, color:"var(--c-ink)",
-                    }}>
-                      {t.kind === "Display" ? "Slow Tuesdays." : "Cup-by-cup, named after the person who grew it."}
-                    </div>
-                    <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", marginBottom: 14}}>
-                      {t.family} · {t.size}
-                    </div>
-                    <div style={{paddingTop: 14, borderTop:"1px dashed var(--c-line-2)", fontSize:12, color:"var(--c-dim)"}}>
-                      Substitute: <strong style={{color:"var(--c-ink)", fontWeight: 500}}>{t.suggest}</strong>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {tab === "voice" && (
-              <div style={{display:"grid", gridTemplateColumns:"260px 1fr", gap: 28}}>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 14}}>Voice dimensions</div>
-                  <div style={{display:"flex", flexDirection:"column", gap: 16}}>
-                    {d.voice.map((v, i) => (
-                      <div key={i}>
-                        <div style={{display:"flex", justifyContent:"space-between", marginBottom: 4}}>
-                          <span style={{fontSize: 13, color:"var(--c-ink)"}}>{v.dim}</span>
-                          <span style={{fontFamily:"var(--font-mono)", fontSize:11, color:"var(--c-faint)"}}>{Math.round(v.val * 100)}</span>
-                        </div>
-                        <div style={{height: 6, background:"var(--neutral-50)", borderRadius: 999, position:"relative"}}>
-                          <div style={{position:"absolute", left: 0, top: 0, height:"100%", width: `${v.val * 100}%`, background: "var(--yellow-500)", borderRadius:999}} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 14}}>Sampled from the site</div>
-                  <div style={{display:"flex", flexDirection:"column", gap: 12}}>
-                    {d.voice.map((v, i) => (
-                      <div key={i} style={{
-                        padding: 14, borderLeft:"3px solid var(--yellow-500)",
-                        background:"var(--yellow-50)", borderRadius:"0 8px 8px 0",
-                      }}>
-                        <div className="eyebrow eyebrow--yellow" style={{marginBottom: 4}}>{v.dim}</div>
-                        <p style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 15, color:"var(--c-ink)", margin: 0, lineHeight: 1.5}}>"{v.sample}"</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-            {tab === "imagery" && (
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 28}}>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Style categories</div>
-                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap: 10}}>
-                    {[1,2,4,5].map((n, i) => (
-                      <div key={n} style={{
-                        aspectRatio:"1/1", borderRadius: 10, overflow:"hidden",
-                        position:"relative", border:"1px solid var(--c-line)",
-                      }}>
-                        <img src={`caastor/assets/profile-${n}.jpg`} alt="" style={{width:"100%", height:"100%", objectFit:"cover", filter:"sepia(0.05) saturate(0.9)"}} />
-                        <div style={{position:"absolute", bottom:8, left:8, right:8, background:"rgba(0,0,0,0.66)", color:"#fff", padding:"4px 8px", borderRadius: 4, fontSize: 10, fontFamily:"var(--font-mono)", letterSpacing:"0.06em", textTransform:"uppercase"}}>
-                          {d.imagery[i]}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="eyebrow" style={{marginBottom: 12}}>Style qualities</div>
-                  <ul style={{margin:0, padding: 0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8, marginBottom: 22}}>
-                    {["Warm, slightly sunny color cast","Editorial framing — never staged","Hands + craft tools","Low light café interiors","Producer portraits with name"].map((q, i) => (
-                      <li key={i} style={{display:"flex", gap: 8, fontSize: 13, color:"var(--c-ink)"}}>
-                        <span style={{color:"var(--green-600)"}}>✓</span> {q}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="eyebrow eyebrow--pink" style={{marginBottom: 8}}>Avoid</div>
-                  <ul style={{margin:0, padding: 0, listStyle:"none", display:"flex", flexDirection:"column", gap: 8}}>
-                    {d.avoid.map((q, i) => (
-                      <li key={i} style={{display:"flex", gap: 8, fontSize: 13, color:"var(--c-faint)", textDecoration:"line-through"}}>
-                        <span style={{color:"var(--pink-500)", textDecoration:"none"}}>✕</span> {q}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-            {tab === "audience" && (
-              <div style={{display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap: 22}}>
-                {[
-                  ["Segments", d.audience.segments],
-                  ["Channels", d.audience.channels],
-                  ["Languages", d.audience.languages],
-                ].map(([title, items], i) => (
-                  <div key={i}>
-                    <div className="eyebrow" style={{marginBottom: 12}}>{title}</div>
-                    <div style={{display:"flex", flexDirection:"column", gap: 8}}>
-                      {items.map((it, j) => (
-                        <div key={j} style={{
-                          padding:"10px 14px", border:"1px solid var(--c-line)",
-                          borderRadius: 8, fontSize: 13, color:"var(--c-ink)",
-                          display:"flex", justifyContent:"space-between", alignItems:"center",
-                        }}>
-                          {it} <Confidence value={[88, 75, 92][j] || 80} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </Reveal>
 
-      {/* Sticky confirm bar */}
-      <div style={{
-        position:"sticky", bottom: 0, marginTop: 22, marginLeft: -36, marginRight: -36,
-        padding:"16px 36px",
-        background:"linear-gradient(180deg, rgba(249,249,249,0), var(--c-bg) 30%)",
-        display:"flex", justifyContent:"space-between", alignItems:"center", gap: 12,
-      }}>
-        <div style={{display:"flex", alignItems:"center", gap: 12}}>
-          <Icon name="check" size={18} />
-          <span style={{fontSize: 14, color:"var(--c-ink)"}}>Looks right? Confirm to activate your Brand Space.</span>
+              {attestErr && (
+                <div className="card" style={{padding:"12px 16px", marginBottom:16, borderLeft:"3px solid var(--pink-500)", fontSize:13, color:"var(--c-ink)"}}>{attestErr}</div>
+              )}
+
+              <div style={{display:"flex", gap:12, alignItems:"center", flexWrap:"wrap"}}>
+                <button className="btn btn--primary btn--lg" disabled={!allChecked || attestBusy} onClick={submitAttest}>
+                  {attestBusy ? "Signing…" : <>Sign &amp; activate brand space <Icon name="arrow" size={14} /></>}
+                </button>
+                {!allChecked && <span style={{fontSize:12, color:"var(--c-faint)"}}>Confirm all three statements to continue.</span>}
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* Learning toast */}
+      {toast && (
+        <div style={{position:"fixed", bottom:28, left:"50%", transform:"translateX(-50%)", zIndex:60, background:"var(--c-inverse)", color:"#fff", borderRadius:10, padding:"11px 18px", fontSize:13.5, boxShadow:"var(--shadow-lg)", display:"flex", alignItems:"center", gap:9, maxWidth:560}}>
+          <BrandolphDot /> {toast}
         </div>
-        <div style={{display:"flex", gap: 10}}>
-          <button className="btn btn--ghost">Save & review later</button>
-          <button className="btn btn--primary btn--lg" onClick={onConfirm}>
-            Activate brand space <Icon name="arrow" size={14} />
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
