@@ -279,6 +279,43 @@ app.patch("/jobs/:id", requireAuth, requireSteward, async (c) => {
 
   if (finalCertified) await notifyCertified(job.brand_id);
 
+  /* Steward ↔ client review loop — surface the reviewer's verdict for the
+     decisions that never reached the client before. Skip the calibration
+     interim (pending_lead_review): an approve_with_conditions isn't final
+     until a Lead signs off, and the client is notified from that path then.
+     return_changes / reject are never lead-gated, so they always fire. */
+  if (!needsLeadApproval && ["return_changes", "reject", "approve_with_conditions"].includes(decision)) {
+    const recipientUserId = await brandOwnerUserId(job.brand_id);
+    if (decision === "return_changes") {
+      await notify({
+        recipientUserId,
+        kind: "steward.changes_requested",
+        title: "Your Steward requested changes",
+        body: "A senior reviewer returned your brand BIO with required changes. Open your BIO to see what to address.",
+        link: "#/bio",
+        brandId: job.brand_id,
+      });
+    } else if (decision === "reject") {
+      await notify({
+        recipientUserId,
+        kind: "steward.rejected",
+        title: "Your brand BIO could not be certified",
+        body: "A senior reviewer could not certify this version. Open your BIO to see why and what to change.",
+        link: "#/bio",
+        brandId: job.brand_id,
+      });
+    } else {
+      await notify({
+        recipientUserId,
+        kind: "steward.conditions",
+        title: "Your brand BIO is certified with conditions",
+        body: "A senior reviewer certified your BIO with conditions to address. Open your BIO to see them.",
+        link: "#/bio",
+        brandId: job.brand_id,
+      });
+    }
+  }
+
   return c.json({
     ok: true,
     status: newStatus,

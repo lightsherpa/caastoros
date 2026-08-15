@@ -6,6 +6,7 @@ import { scoreBio } from "../lib/score-bio.js";
 import { validateUpload } from "../lib/ingest-guards.js";
 import { computeFocus } from "../lib/bio-focus.js";
 import { selfCertifyBio } from "../lib/self-certify.js";
+import { diffBio } from "../lib/bio-diff.js";
 
 const app = new Hono();
 
@@ -199,7 +200,7 @@ app.get("/:brandId", requireAuth, async (c) => {
 
   const { data: bio } = await supabaseAdmin
     .from("bios")
-    .select("id, version, payload, score, certified, certified_by, certified_at, cert_kind, steward_notes, self_certified, self_certified_at, created_at")
+    .select("id, version, payload, score, certified, certified_by, certified_at, cert_kind, steward_notes, self_certified, self_certified_at, created_at, created_by")
     .eq("brand_id", brandId)
     .order("version", { ascending: false })
     .limit(1)
@@ -225,7 +226,60 @@ app.get("/:brandId", requireAuth, async (c) => {
      served by the Steward route, not here. */
   const focusCount = bio?.payload ? computeFocus(bio.payload).length : 0;
 
-  return c.json({ brand, bio, reviewPending, focusCount });
+  /* Steward ↔ client review loop. `review` surfaces the latest reviewer verdict
+     ("From your Steward"); `diff` shows what the Steward changed when THEY
+     authored the latest version. Both null/[] when there's nothing to show. */
+  let review = null;
+  let diff = [];
+  if (bio?.id) {
+    // Most recent decision recorded against THIS (latest) BIO version.
+    const { data: job } = await supabaseAdmin
+      .from("steward_jobs")
+      .select("decision, required_changes, conditions, reject_reason_code, completed_at, assigned_to, lead_reviewed_by")
+      .eq("bio_id", bio.id)
+      .not("decision", "is", null)
+      .order("queued_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (job) {
+      // Reviewer's given name: the scoring Steward, else the finalizing Lead.
+      let stewardFirstName = null;
+      const reviewerId = job.assigned_to || job.lead_reviewed_by;
+      if (reviewerId) {
+        const { data: tm } = await supabaseAdmin
+          .from("team_members").select("first_name").eq("id", reviewerId).maybeSingle();
+        stewardFirstName = tm?.first_name || null;
+      }
+      review = {
+        decision: job.decision,
+        required_changes: job.required_changes ?? null,
+        conditions: job.conditions ?? null,
+        reject_reason_code: job.reject_reason_code ?? null,
+        steward_notes: bio.steward_notes ?? null,
+        decided_at: job.completed_at ?? null,
+        steward_first_name: stewardFirstName,
+      };
+    }
+
+    /* Diff only when the Steward AUTHORED the latest version. A client edit
+       stamps created_by; the Steward's in-review bioPatch leaves it null, so
+       a null author + a recorded review = a Steward edit. Needs a prior
+       version to compare against. */
+    if (review && bio.created_by == null) {
+      const { data: versions } = await supabaseAdmin
+        .from("bios")
+        .select("payload")
+        .eq("brand_id", brandId)
+        .order("version", { ascending: false })
+        .limit(2);
+      if (Array.isArray(versions) && versions.length === 2) {
+        diff = diffBio(versions[1].payload, versions[0].payload);
+      }
+    }
+  }
+
+  return c.json({ brand, bio, reviewPending, focusCount, review, diff });
 });
 
 /* POST /api/bios/:brandId/self-certify

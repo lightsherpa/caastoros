@@ -9,7 +9,7 @@ const { useState: useDState, useEffect: useDEffect } = React;
    Polls every `pollMs` while `pendingCert` is true (BIO not yet certified
    by Steward, or no BIO at all yet). Returns { brandId, bio, cert, refresh }. */
 function useLiveBio({ pollMs = 6000 } = {}) {
-  const [state, setState] = useDState({ brandId: null, brandName: null, brandUrl: null, bio: null, cert: null, reviewPending: false, focusCount: 0, error: null, loading: true });
+  const [state, setState] = useDState({ brandId: null, brandName: null, brandUrl: null, bio: null, cert: null, review: null, diff: [], reviewPending: false, focusCount: 0, error: null, loading: true });
 
   const tick = React.useCallback(async () => {
     try {
@@ -32,10 +32,10 @@ function useLiveBio({ pollMs = 6000 } = {}) {
       const res = await apiFetch(`/api/bios/${brand.id}`);
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        setState({ brandId: brand.id, brandName: brand.name, brandUrl: brand.url, bio: null, cert: null, focusCount: 0, loading: false, error: j.error || `HTTP ${res.status}` });
+        setState({ brandId: brand.id, brandName: brand.name, brandUrl: brand.url, bio: null, cert: null, review: null, diff: [], focusCount: 0, loading: false, error: j.error || `HTTP ${res.status}` });
         return;
       }
-      const { bio, reviewPending, focusCount } = await res.json();
+      const { bio, reviewPending, focusCount, review, diff } = await res.json();
       let certInfo = null;
       if (bio?.certified) {
         let certName = "your Brand Steward";
@@ -45,7 +45,7 @@ function useLiveBio({ pollMs = 6000 } = {}) {
         }
         certInfo = { byName: certName, at: bio.certified_at, notes: bio.steward_notes || null };
       }
-      setState({ brandId: brand.id, brandName: brand.name, brandUrl: brand.url, bio, cert: certInfo, reviewPending: !!reviewPending, focusCount: Number(focusCount) || 0, loading: false, error: null });
+      setState({ brandId: brand.id, brandName: brand.name, brandUrl: brand.url, bio, cert: certInfo, review: review || null, diff: Array.isArray(diff) ? diff : [], reviewPending: !!reviewPending, focusCount: Number(focusCount) || 0, loading: false, error: null });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: e?.message || String(e) }));
     }
@@ -1365,6 +1365,145 @@ function SelfCertPanel({ brandId, bio, onDone }) {
   );
 }
 
+/* humanizeReasonCode — turn a Steward `reject_reason_code` (snake_case enum)
+   into human-readable copy. Known codes get curated phrasing; anything else
+   falls back to Title Case so the client never sees a raw enum value. */
+function humanizeReasonCode(code) {
+  if (!code) return "";
+  const map = {
+    insufficient_evidence: "Not enough evidence to certify",
+    out_of_scope: "Out of scope for this brand",
+    brand_mismatch: "Doesn't match the brand as we understand it",
+    inaccurate: "Contains inaccuracies",
+    incomplete: "Too incomplete to certify",
+    low_quality: "Not yet at certification quality",
+    aspirational_unmarked: "Aspirational claims not separated from fact",
+    needs_sources: "Needs more sources",
+    duplicate: "Duplicate of an existing BIO",
+  };
+  return map[code] || String(code).replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/* diffText — render a before/after value that may be a string, array, or
+   object. Empty/missing values show as an em dash so a "→ —" reads cleanly. */
+function diffText(v) {
+  if (v === null || v === undefined || v === "") return "—";
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
+  if (typeof v === "object") { try { return JSON.stringify(v); } catch { return String(v); } }
+  return String(v);
+}
+
+/* StewardReviewPanel — "From your Steward". Surfaces the Steward's decision
+   when it needs the client's attention: requested changes, a returned BIO, or
+   conditions attached to certification. Styled to match the cert chip (card +
+   left accent + eyebrow). `approve` / null render nothing. */
+function StewardReviewPanel({ review, onEdit }) {
+  const decision = review?.decision;
+  if (!decision || !["return_changes", "reject", "approve_with_conditions"].includes(decision)) return null;
+
+  const by = review.steward_first_name || "your Brand Steward";
+  const when = formatCertDate(review.decided_at);
+  const notes = review.steward_notes;
+
+  /* Per-decision presentation. All colors come from tokens, never literals. */
+  const cfg = {
+    return_changes: {
+      accent: "var(--yellow-500)", eyebrowCls: "eyebrow--yellow",
+      heading: "Your Steward needs a few changes",
+      items: review.required_changes || [], marker: "→", markerColor: "var(--orange-600)",
+      cta: "Make these changes",
+    },
+    reject: {
+      accent: "var(--pink-500)", eyebrowCls: "eyebrow--pink",
+      heading: "Your Steward returned this BIO",
+      items: [], marker: null, markerColor: null,
+      cta: "Edit & resubmit",
+    },
+    approve_with_conditions: {
+      accent: "var(--green-500)", eyebrowCls: "eyebrow--green",
+      heading: "Certified with conditions",
+      items: review.conditions || [], marker: "✓", markerColor: "var(--green-600)",
+      cta: null,
+    },
+  }[decision];
+
+  const reason = decision === "reject" ? humanizeReasonCode(review.reject_reason_code) : "";
+  const hasBody = !!reason || cfg.items.length > 0 || !!notes;
+
+  return (
+    <div className="card" style={{padding:"14px 16px", marginBottom: 18, borderLeft:`3px solid ${cfg.accent}`}}>
+      <div className={"eyebrow " + cfg.eyebrowCls} style={{marginBottom: 6}}>From your Steward</div>
+      <div style={{fontSize: 14.5, fontWeight: 600, color:"var(--c-ink)", marginBottom: 4}}>{cfg.heading}</div>
+      <div style={{fontSize: 12, color:"var(--c-faint)", marginBottom: hasBody ? 10 : (cfg.cta ? 12 : 0)}}>
+        {by}{when ? ` · ${when}` : ""}
+      </div>
+
+      {reason && (
+        <div style={{marginBottom: (cfg.items.length || notes) ? 10 : (cfg.cta ? 12 : 0)}}>
+          <span className="pill" style={{color:"var(--pink-500)", fontSize: 11.5}}>{reason}</span>
+        </div>
+      )}
+
+      {cfg.items.length > 0 && (
+        <ul style={{margin:"0 0 " + (notes || cfg.cta ? "10px" : "0"), padding: 0, listStyle:"none", display:"flex", flexDirection:"column", gap: 7}}>
+          {cfg.items.map((it, i) => (
+            <li key={i} style={{display:"flex", gap: 8, alignItems:"flex-start", fontSize: 13, color:"var(--c-ink)", lineHeight: 1.5}}>
+              {cfg.marker && <span style={{color: cfg.markerColor}}>{cfg.marker}</span>}
+              <span>{it}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {notes && (
+        <div style={{fontSize: 12.5, color:"var(--c-dim)", lineHeight: 1.5, fontStyle:"italic", borderLeft:`2px solid ${cfg.accent}`, paddingLeft: 10, marginBottom: cfg.cta ? 12 : 0}}>
+          “{notes}” <span style={{fontStyle:"normal", color:"var(--c-faint)"}}>— {by}</span>
+        </div>
+      )}
+
+      {cfg.cta && (
+        <button className="btn btn--primary btn--sm" onClick={onEdit}>
+          <Icon name="edit" size={14} /> {cfg.cta}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* StewardDiffPanel — collapsible "What your Steward changed". Lists each edit
+   the Steward made vs. the prior version as before → after (muted/struck
+   "before", emphasized "after"). Hidden when the Steward changed nothing. */
+function StewardDiffPanel({ diff }) {
+  const [open, setOpen] = useDState(false);
+  if (!Array.isArray(diff) || diff.length === 0) return null;
+  return (
+    <div className="card" style={{padding:"12px 16px", marginBottom: 18, borderLeft:"3px solid var(--green-500)"}}>
+      <button onClick={() => setOpen((o) => !o)}
+        style={{display:"flex", alignItems:"center", gap: 8, width:"100%", background:"transparent", border:"none", cursor:"pointer", padding: 0, textAlign:"left"}}>
+        <Icon name="check" size={14} />
+        <span style={{fontSize: 13.5, fontWeight: 500, color:"var(--c-ink)"}}>
+          What your Steward changed · {diff.length} field{diff.length === 1 ? "" : "s"}
+        </span>
+        <span style={{marginLeft:"auto", fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)"}}>{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div style={{marginTop: 12, display:"flex", flexDirection:"column", gap: 10}}>
+          {diff.map((d, i) => (
+            <div key={i} style={{display:"grid", gridTemplateColumns:"140px 1fr", gap: 12, alignItems:"start", paddingBottom: i < diff.length - 1 ? 10 : 0, borderBottom: i < diff.length - 1 ? "1px solid var(--c-line)" : "none"}}>
+              <div style={{fontFamily:"var(--font-mono)", fontSize: 11, color:"var(--c-faint)", letterSpacing:"0.04em", textTransform:"uppercase"}}>{d.label || d.field}</div>
+              <div style={{fontSize: 13, lineHeight: 1.55}}>
+                <span style={{color:"var(--c-faint)", textDecoration:"line-through"}}>{diffText(d.before)}</span>
+                <span style={{color:"var(--c-faint)", margin:"0 6px"}}>→</span>
+                <span style={{color:"var(--c-ink)", fontWeight: 500}}>{diffText(d.after)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BioViewer({ go, bioScore = 91 }) {
   const [tab, setTab] = useDState("identity");
   const [feed, setFeed] = useDState("");
@@ -1535,6 +1674,13 @@ function BioViewer({ go, bioScore = 91 }) {
           )}
         </div>
       )}
+
+      {/* From your Steward — change requests / returned BIO / conditions.
+          CTA drops the BIO into the existing edit flow (Save → re-certify). */}
+      {live.brandId && <StewardReviewPanel review={live.review} onEdit={() => setEditing(true)} />}
+
+      {/* What your Steward changed — before → after diff of the Steward's edits */}
+      {live.brandId && <StewardDiffPanel diff={live.diff} />}
 
       {/* Stage-1 self-certification — unlocks briefing (shown until human cert lands) */}
       {live.brandId && live.bio && !live.cert && (
