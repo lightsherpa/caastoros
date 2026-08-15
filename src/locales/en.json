@@ -265,7 +265,7 @@
     "bioScore": "BIO {score}%",
     "seniorDesigner": "Senior designer",
     "active": "Active",
-    "brandolphReading": "Reading your BIO. Watching the pricing relaunch through review.",
+    "brandolphReading": "Reading your BIO. Watching your latest brief through review.",
     "viewLedger": "View ledger →",
     "thisWeek": "This week",
     "jobsDelivered": "Jobs delivered",
@@ -350,7 +350,7 @@
     "heroWord": "create",
     "subcopy": "Describe the change you want made — not the deliverable. Brandolph reads the BIO, sharpens the brief, assembles the team, and shows you the cost before anything runs.",
     "scope": "Scope",
-    "promptPlaceholder": "e.g. Make the Summer Tuesdays campaign earn the slow afternoon back — café-first, no discount, lift Tuesday footfall by 18%.",
+    "promptPlaceholder": "e.g. Make our spring launch feel unmissable — lead with the new range, no discounts, lift week-one signups.",
     "modeFlow": "Full flow",
     "modeWords": "Words only",
     "modeVisual": "Visual only",
@@ -410,7 +410,23 @@
     "library": "Library",
     "open": "Open",
     "inFlightHeading": "In flight · {count}",
-    "viewAll": "View all"
+    "viewAll": "View all",
+    "statsLoadError": "Couldn't load your workspace stats — {error}",
+    "libraryEmpty": "Nothing yet — your first brief fills this.",
+    "couldntLoad": "Couldn't load.",
+    "daysLeft": "{days}d left",
+    "briefKind": "Brief",
+    "untitledBrief": "Untitled brief",
+    "composerPlaceholder": "e.g. Make the summer campaign earn the slow afternoon back — retail-first, no discount, lift weekday footfall by 18%.",
+    "composerAria": "Describe the brief you want Brandolph to sharpen",
+    "checkingBrand": "Checking the selected brand and BIO…",
+    "bioStatusUnavailable": "BIO status unavailable · {error}",
+    "brandBioReady": "{name} · BIO {score}/100 · v{version} · ready to sharpen",
+    "brandNoBio": "{name} · No certified BIO yet · finish Discovery before briefing",
+    "selectBrand": "Select a brand before creating a brief",
+    "brandChangedError": "The active brand changed. Start again so this brief uses the correct BIO.",
+    "balanceLoading": "balance loading…",
+    "bioVersion": "BIO v{version}"
   },
   "briefs": {
     "runsCount": {
@@ -866,7 +882,7 @@
       "titlePointRest": "Brandolph will read the rest.",
       "lead": "A URL is enough. If you have guidelines, hand them over. If you don't — we'll work from what's already public, and tell you what we couldn't find.",
       "brandNameLabel": "Brand name",
-      "brandNamePlaceholder": "e.g. Vinilo Coffee",
+      "brandNamePlaceholder": "e.g. Your Brand",
       "urlLabel": "Primary website URL",
       "urlPlaceholder": "brand.com",
       "igLabel": "Instagram handle",
@@ -1240,7 +1256,7 @@
     "strategic": {
       "watchouts": "Strategic watchouts",
       "gaps": "Gaps",
-      "whatNot": "What Vinilo is NOT",
+      "whatNot": "What the brand is NOT",
       "diagnosis": "Brandolph's diagnosis · this week"
     },
     "sources": {

@@ -275,7 +275,7 @@
     "bioScore": "BIO {score}٪",
     "seniorDesigner": "مصمِّمة أولى",
     "active": "نشط",
-    "brandolphReading": "يقرأ BIO الخاص بك، ويتابع إعادة إطلاق التسعير خلال المراجعة.",
+    "brandolphReading": "يقرأ BIO الخاص بك، ويتابع أحدث موجز لك خلال المراجعة.",
     "viewLedger": "عرض السجل ←",
     "thisWeek": "هذا الأسبوع",
     "jobsDelivered": "المهام المُسلَّمة",
@@ -368,7 +368,7 @@
     "heroWord": "تُنشئ",
     "subcopy": "صِف التغيير الذي تريد إحداثه، لا المُنتَج النهائي. يقرأ Brandolph الـ BIO، ويصقل الموجز، ويجمع الفريق، ويعرض لك التكلفة قبل تشغيل أي شيء.",
     "scope": "النطاق",
-    "promptPlaceholder": "مثال: اجعل حملة Summer Tuesdays تستعيد الظهيرة الهادئة — الأولوية للمقهى، دون خصومات، وارفع إقبال أيام الثلاثاء بنسبة 18٪.",
+    "promptPlaceholder": "مثال: اجعل إطلاق الربيع لا يُفوَّت — ابدأ بالتشكيلة الجديدة، دون خصومات، وارفع تسجيلات الأسبوع الأول.",
     "modeFlow": "التدفق الكامل",
     "modeWords": "النص فقط",
     "modeVisual": "المرئيات فقط",
@@ -440,7 +440,23 @@
     "library": "المكتبة",
     "open": "فتح",
     "inFlightHeading": "قيد التنفيذ · {count}",
-    "viewAll": "عرض الكل"
+    "viewAll": "عرض الكل",
+    "statsLoadError": "تعذّر تحميل إحصائيات مساحة عملك — {error}",
+    "libraryEmpty": "لا شيء بعد — أول موجز لك سيملأ هذا.",
+    "couldntLoad": "تعذّر التحميل.",
+    "daysLeft": "متبقٍّ {days} يوم",
+    "briefKind": "موجز",
+    "untitledBrief": "موجز بلا عنوان",
+    "composerPlaceholder": "مثال: اجعل حملة الصيف تستعيد فترات الظهيرة الهادئة — التجزئة أولاً، دون خصومات، وارفع الإقبال في أيام الأسبوع بنسبة 18٪.",
+    "composerAria": "صِف الموجز الذي تريد أن يصقله Brandolph",
+    "checkingBrand": "جارٍ التحقق من العلامة المحددة وBIO…",
+    "bioStatusUnavailable": "حالة BIO غير متاحة · {error}",
+    "brandBioReady": "{name} · BIO {score}/100 · الإصدار {version} · جاهز للصقل",
+    "brandNoBio": "{name} · لا يوجد BIO معتمد بعد · أكمِل Discovery قبل إعداد الموجز",
+    "selectBrand": "اختر علامة قبل إنشاء موجز",
+    "brandChangedError": "تغيّرت العلامة النشطة. ابدأ من جديد حتى يستخدم هذا الموجز BIO الصحيح.",
+    "balanceLoading": "جارٍ تحميل الرصيد…",
+    "bioVersion": "BIO الإصدار {version}"
   },
   "briefs": {
     "runsCount": {
@@ -940,7 +956,7 @@
       "titlePointRest": "سيقرأ Brandolph الباقي.",
       "lead": "رابط واحد يكفي. إن كانت لديك إرشادات فسلّمها لنا. وإن لم تكن لديك، فسنعمل مما هو متاح للعموم ونخبرك بما لم نستطع إيجاده.",
       "brandNameLabel": "اسم العلامة",
-      "brandNamePlaceholder": "مثال: Vinilo Coffee",
+      "brandNamePlaceholder": "مثال: علامتك التجارية",
       "urlLabel": "رابط الموقع الرئيسي",
       "urlPlaceholder": "brand.com",
       "igLabel": "معرّف إنستغرام",
@@ -1330,7 +1346,7 @@
     "strategic": {
       "watchouts": "نقاط انتباه استراتيجية",
       "gaps": "فجوات",
-      "whatNot": "ما ليست عليه Vinilo",
+      "whatNot": "ما ليست عليه العلامة التجارية",
       "diagnosis": "تشخيص Brandolph · هذا الأسبوع"
     },
     "sources": {

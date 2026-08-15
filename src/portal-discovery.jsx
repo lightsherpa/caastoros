@@ -183,7 +183,7 @@ function DiscoveryStep1({ onNext, newBrand = false }) {
      /api/discovery/start; the SPA can then poll bios for the result. */
   const [uploadsByBucket, setUploadsByBucket] = useDState({ foundations: [], visual: [], voice: [] });
   const [brandName, setBrandName] = useDState("");
-  const [url, setUrl] = useDState("vinilo.coffee");
+  const [url, setUrl] = useDState("");
   const [instagram, setInstagram] = useDState("");
   const [busy, setBusy] = useDState(false);
   const [error, setError] = useDState(null);
@@ -1159,67 +1159,6 @@ function Discovery({ go, newBrand = false }) {
 /* ════════════════════════════════════════════════════════════════ */
 /* BIO VIEWER                                                        */
 
-const BIO_SEED_SOURCES = [
-  { src: "vinilo.coffee · homepage", date: "scraped 14 May 09:31", n: 18 },
-  { src: "vinilo.coffee · about", date: "scraped 14 May 09:31", n: 12 },
-  { src: "vinilo.coffee · pricing", date: "scraped 14 May 09:31", n: 7 },
-  { src: "Instagram · @vinilo.coffee · 90 posts", date: "scraped 14 May 09:34", n: 22 },
-  { src: "Founder intake answers", date: "14 May 09:42", n: 14 },
-  { src: "Brand book v1.pdf · uploaded", date: "14 May 09:42", n: 9 },
-  { src: "Competitor map · 9 in-category", date: "Brandolph 14 May 09:50", n: 12 },
-];
-
-const BIO_IDENTITY = [
-  { label:"Name",        value:"Vinilo Coffee",                       conf:99, source:"intake answer" },
-  { label:"Positioning", value:"Specialty coffee for slow Tuesdays.", conf:88, source:"extracted from homepage hero + about page", italic:true },
-  { label:"Category",    value:"Specialty coffee · subscription + café", conf:94, source:"scrape + competitor map" },
-  { label:"Founded",     value:"2021 · Barcelona",                    conf:96, source:"about page" },
-  { label:"Ownership",   value:"Founder-led · 2 co-founders · 8 FTEs", conf:72, source:"intake answer + LinkedIn" },
-  { label:"Pillars",     multi:true, value:["Provenance","Routine","Patience","Café-as-rest"], conf:84, source:"Brandolph synthesis from 47 scraped pages" },
-];
-const BIO_AUDIENCE = [
-  { label:"Primary",   value:"Subscribers, 28–48, urban, recurring purchase behaviour. Value routine over discovery.", conf:86, source:"IG + Klaviyo intake" },
-  { label:"Secondary", value:"Café-warm locals. Walks-in within 2.5km. Tuesday afternoon over Saturday morning.", conf:78, source:"café footfall + observation" },
-  { label:"Tertiary",  value:"Wholesale buyers. Specialty hotels + co-working spaces.", conf:62, source:"intake answer" },
-  { label:"JTBD",      multi:true, value:["The decision to slow down","The ritual that holds the week together","A weekly bag arriving on time"], conf:80, source:"Brandolph synthesis" },
-];
-const BIO_COMPETITIVE = [
-  { label:"Direct",   multi:true, value:["Café Granell","Nomad Coffee","Three Marks","Caravelle"], conf:92, source:"competitor map · 9 in-category" },
-  { label:"Adjacent", multi:true, value:["The Slow Café (UK)","Onyx (US)","La Marzocco Home"], conf:78, source:"competitor map" },
-  { label:"The table you sit at", value:"Specialty roasters who lead with provenance + ritual. NOT the 'limited drop' microlot table.", conf:84, source:"Brandolph diagnosis" },
-  { label:"Where you don't fit",  value:"High-energy 'third wave' branding. Aesthetic-led without infrastructure.", conf:80, source:"Brandolph diagnosis" },
-];
-const BIO_VOICE = [
-  { label:"Register",        value:"Editorial, low-urgency, second person. Funny only when it's earned.", conf:88, source:"50 paragraphs sampled from site + IG" },
-  { label:"Forbidden",       multi:true, value:["unlock","limited time","FOMO","drop","exclusive","kit","journey"], conf:94, source:"rules + Brandolph QA" },
-  { label:"Sentence rhythm", value:"Short. Then longer, with a slight ramp. Periods over commas. No dashes-for-pace.", conf:82, source:"rhythm analysis (Opus)" },
-  { label:"Signature moves", multi:true, value:["The phrase 'on purpose'","'It isn't X — it's Y'","First-person plural only in brand voice"], conf:86, source:"Brandolph synthesis" },
-];
-const BIO_GOALS = [
-  { label:"2026 north star", value:"Be the coffee that earns the Tuesday back, for 10,000 households.", conf:70, source:"intake" },
-  { label:"Q2 priority",     value:"Pricing relaunch + summer Tuesdays campaign.", conf:90, source:"founder calendar" },
-  { label:"Q3 priority",     value:"Honduras + Aug microlot. Brand book v2.", conf:62, source:"intake" },
-];
-const BIO_STRATEGIC = {
-  watchouts: [
-    "The \"slow Tuesday\" line is doing a lot of work. If you outgrow it without retiring it cleanly, the brand reads contradictory.",
-    "The café revenue is half the business. The site reads like it's only the subscription. There's a tension to resolve, not hide.",
-    "Wholesale audience is on the BIO but invisible everywhere else. Decide if it stays.",
-  ],
-  gaps: [
-    "No documented behaviour around producer relationships. Critical for the microlot cadence.",
-    "No declared price ceiling. The annual conversation needs one.",
-  ],
-  notList: [
-    "A discount-led subscription.",
-    "A \"drop\" culture roaster.",
-    "An aesthetic-led brand. The taste is the brand.",
-    "A coffee-cult evangelism brand. Quiet conviction over loud taste.",
-  ],
-  diagnosis: "Vinilo's writing is consistently better than its visual system. The site reads with conviction; the system around it doesn't earn that conviction yet. The Q3 priority should be the book — not new campaigns. The summer campaign is fine, but a brand book is the unlock you've been compounding the cost of for two years.",
-};
-const BIO_GRADE = "Warm, slightly sunny. Editorial framing. Hands + craft + low-light interiors.";
-
 /* ─── API payload ↔ BioFieldList shape mappers ─────────────────────
    The BIO viewer's tabs render flat arrays of `{ label, value, multi? }`.
    The API payload is nested per-section. These functions translate
@@ -1722,7 +1661,7 @@ function BioViewer({ go, bioScore = 91 }) {
       {/* Hero */}
       <div style={{display:"grid", gridTemplateColumns:"1fr 320px", gap: 28, marginBottom: 28, alignItems:"end"}}>
         <div>
-          <div className="eyebrow" style={{marginBottom: 6}}>{t("discovery.bio.eyebrow")} · {live.brandName || "Vinilo Coffee"}</div>
+          <div className="eyebrow" style={{marginBottom: 6}}>{t("discovery.bio.eyebrow")} · {live.brandName || "Your Brand"}</div>
           <div style={{display:"flex", alignItems:"baseline", gap: 14}}>
             <span style={{fontFamily:"Georgia, serif", fontStyle:"italic", fontSize: 88, lineHeight: 1, color: tone.color, fontWeight: 500}}>
               <Counter to={conf} />
@@ -2162,8 +2101,8 @@ function BioSources({ sources, setSources, feed, setFeed, reading, addReference,
         </div>
         <div style={{display:"flex", gap:8, marginTop:12, flexWrap:"wrap"}}>
           <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Document upload · brand-deck.pdf", "doc")}><Icon name="files" size={13} /> {t("discovery.sources.uploadDoc")}</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Instagram · @vinilo.coffee · latest 30 posts")}><Icon name="refresh" size={13} /> {t("discovery.sources.repullSocial")}</button>
-          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Competitor · blue-bottle.com")}><Icon name="plus" size={13} /> {t("discovery.sources.addCompetitor")}</button>
+          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Instagram · latest 30 posts")}><Icon name="refresh" size={13} /> {t("discovery.sources.repullSocial")}</button>
+          <button className="btn btn--ghost btn--sm" disabled={reading} onClick={() => addReference("Competitor · example.com")}><Icon name="plus" size={13} /> {t("discovery.sources.addCompetitor")}</button>
         </div>
       </div>
 

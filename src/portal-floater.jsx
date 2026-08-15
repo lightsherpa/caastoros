@@ -194,19 +194,19 @@ async function streamBrandolph({ history, routeId, onToken, signal }) {
 function fakeReply(msg) {
   const m = msg.toLowerCase();
   if (/status|going on|in flight|what'?s up|running/.test(m))
-    return "*Two things alive.* Pricing relaunch is in production — Email 2 reads dutiful and needs one more pass before it ships. Honduras essay is with Lia for a finishing pass. Everything else is on you to push.";
+    return "*Two things are in flight.* One brief is in production and needs one more pass before it ships. Another is with a teammate for a finishing pass. Everything else is on you to push.";
   if (/next|brief.*next|what.*ship|new brief/.test(m))
-    return "*Summer Tuesdays.* You sketched it on Friday. I have two sharpening questions before we assemble: in or out for wholesale, and is this an organic-only push or do we have paid?";
+    return "*A new brief.* You sketched it recently. I have two sharpening questions before we assemble: who's in scope, and is this an organic-only push or do we have paid?";
   if (/bio|read.*me|positioning|brand/.test(m))
-    return "*Vinilo is a coffee for the Tuesday you decide to slow down on purpose.* The writing earns the conviction. The visual system doesn't yet. If you ask me what to do in Q3, it's the brand book — not new campaigns.";
+    return "*Your positioning is the promise the brand keeps.* The writing earns the conviction. The visual system doesn't yet. If you ask me what to do next, it's the brand book — not new campaigns.";
   if (/block|stuck|wait/.test(m))
-    return "*One thing is actively stuck.* The annual price — 10× or 11.4× — gates five outputs in flight. Until you decide, I'm holding Email 2 and the pricing hero.";
+    return "*One thing is actively stuck.* A pricing decision gates five outputs in flight. Until you decide, I'm holding the outputs that depend on it.";
   if (/cost|credit|spend|budget/.test(m))
-    return "*337 cr spent this cycle. 563 left, 14 days to reset.* The split: 41% AI work, 33% human craft, 8% QA. If you're heavy on craft this cycle it's because the Hero KV and the Honduras essay both landed with Aitana and Lia.";
+    return "*337 cr spent this cycle. 563 left, 14 days to reset.* The split: 41% AI work, 33% human craft, 8% QA. If you're heavy on craft this cycle it's because a couple of high-touch outputs both landed with the team.";
   if (/team|aitana|marc|lia|diego/.test(m))
-    return "*The team has two of your jobs.* Aitana on the Hero KV — delivered v3, you commented this morning. Lia on the Honduras essay — finishing pass. Both on track.";
+    return "*The team has two of your jobs.* One teammate on the Hero KV — delivered v3, you commented this morning. Another on a finishing pass. Both on track.";
   if (/refuse|not doing|kill/.test(m))
-    return "*I'd kill the brewing-kit page.* It converts at 0.4% and dilutes the subscription story. Doing that frees a Sonnet pass for the wholesale flow you've been deferring.";
+    return "*I'd kill the lowest-converting page.* It converts at 0.4% and dilutes the core story. Doing that frees a Sonnet pass for the flow you've been deferring.";
   if (/who|specialist|agent/.test(m))
     return "*For your next brief I'd assemble The Sharpener, The Strategist, Conversion Copy, Email Sequence, and Brand Consistency QA.* That's 36 cr and the smallest crew that earns the brief.";
   return "*Heard.* Give me a beat — I'd rather come back with a brief or a question than an answer. Probably a question.";

@@ -270,7 +270,7 @@
     "bioScore": "BIO {score}%",
     "seniorDesigner": "Diseñadora sénior",
     "active": "Activo",
-    "brandolphReading": "Leyendo tu BIO. Siguiendo el relanzamiento de precios durante la revisión.",
+    "brandolphReading": "Leyendo tu BIO. Siguiendo tu último brief durante la revisión.",
     "viewLedger": "Ver el registro →",
     "thisWeek": "Esta semana",
     "jobsDelivered": "Trabajos entregados",
@@ -355,7 +355,7 @@
     "heroWord": "crear",
     "subcopy": "Describe el cambio que quieres lograr, no el entregable. Brandolph lee el BIO, afina el brief, reúne al equipo y te muestra el costo antes de que algo se ejecute.",
     "scope": "Alcance",
-    "promptPlaceholder": "p. ej. Haz que la campaña Summer Tuesdays recupere la tarde tranquila — prioridad al café, sin descuentos, sube el tráfico de los martes un 18 %.",
+    "promptPlaceholder": "p. ej. Haz que nuestro lanzamiento de primavera sea imperdible — destaca la nueva gama, sin descuentos, sube los registros de la primera semana.",
     "modeFlow": "Flujo completo",
     "modeWords": "Solo texto",
     "modeVisual": "Solo visual",
@@ -415,7 +415,23 @@
     "library": "Biblioteca",
     "open": "Abrir",
     "inFlightHeading": "En curso · {count}",
-    "viewAll": "Ver todo"
+    "viewAll": "Ver todo",
+    "statsLoadError": "No se pudieron cargar las estadísticas de tu espacio — {error}",
+    "libraryEmpty": "Nada aún — tu primer brief lo llenará.",
+    "couldntLoad": "No se pudo cargar.",
+    "daysLeft": "{days} d restantes",
+    "briefKind": "Brief",
+    "untitledBrief": "Brief sin título",
+    "composerPlaceholder": "p. ej. Haz que la campaña de verano recupere las tardes tranquilas — primero el retail, sin descuentos, sube el tráfico entre semana un 18 %.",
+    "composerAria": "Describe el brief que quieres que Brandolph afine",
+    "checkingBrand": "Comprobando la marca seleccionada y el BIO…",
+    "bioStatusUnavailable": "Estado del BIO no disponible · {error}",
+    "brandBioReady": "{name} · BIO {score}/100 · v{version} · listo para afinar",
+    "brandNoBio": "{name} · Aún sin BIO certificado · completa Discovery antes de redactar el brief",
+    "selectBrand": "Selecciona una marca antes de crear un brief",
+    "brandChangedError": "La marca activa cambió. Empieza de nuevo para que este brief use el BIO correcto.",
+    "balanceLoading": "cargando saldo…",
+    "bioVersion": "BIO v{version}"
   },
   "briefs": {
     "runsCount": {
@@ -871,7 +887,7 @@
       "titlePointRest": "Brandolph leerá el resto.",
       "lead": "Con una URL basta. Si tienes guías, compártelas. Y si no las tienes, trabajaremos con lo que ya es público y te diremos qué no pudimos encontrar.",
       "brandNameLabel": "Nombre de la marca",
-      "brandNamePlaceholder": "p. ej. Vinilo Coffee",
+      "brandNamePlaceholder": "p. ej. Tu marca",
       "urlLabel": "URL del sitio web principal",
       "urlPlaceholder": "marca.com",
       "igLabel": "Usuario de Instagram",
@@ -1245,7 +1261,7 @@
     "strategic": {
       "watchouts": "Puntos de atención estratégicos",
       "gaps": "Vacíos",
-      "whatNot": "Lo que Vinilo NO es",
+      "whatNot": "Lo que la marca NO es",
       "diagnosis": "Diagnóstico de Brandolph · esta semana"
     },
     "sources": {
