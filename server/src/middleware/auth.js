@@ -4,6 +4,13 @@
 // 401s if the header is missing or invalid.
 
 import { supabaseAdmin } from "../lib/supabase.js";
+import {
+  decodeJwtClaims,
+  hasPermission,
+  loadAuthorizationContext,
+  roleRequiresMfa,
+} from "../lib/permissions.js";
+import { requestIdFrom, writeAuthorizationAudit } from "../lib/audit.js";
 
 export async function requireAuth(c, next) {
   const authz = c.req.header("authorization") || c.req.header("Authorization");
@@ -22,32 +29,55 @@ export async function requireAuth(c, next) {
     .maybeSingle();
   if (rowErr || !row) return c.json({ error: "User profile missing — sign up via the SPA first" }, 401);
 
+  const authorization = await loadAuthorizationContext({
+    userId: user.id,
+    legacyRole: row.role,
+    legacyWorkspaceId: row.workspace_id,
+  });
+  const claims = decodeJwtClaims(jwt);
   c.set("auth", {
     userId:      user.id,
     email:       row.email,
     workspaceId: row.workspace_id,
     role:        row.role,
     jwt,
+    aal: claims.aal || "aal1",
+    mfaRequired: roleRequiresMfa(authorization.persona),
+    ...authorization,
   });
   await next();
 }
 
 /* Stricter gate — requires the user to carry role:'admin' in the
    `users` table. Use after requireAuth on any admin-only route. */
+export function requirePermission(permission, options = {}) {
+  return async (c, next) => {
+    const auth = c.get("auth");
+    const workspaceId = typeof options.workspaceId === "function" ? await options.workspaceId(c) : null;
+    if (!hasPermission(auth, permission, workspaceId)) {
+      await writeAuthorizationAudit({ auth, permission, action: c.req.method + " " + c.req.path, targetType: "route", workspaceId, outcome: "denied", requestId: requestIdFrom(c), reason: "permission_required" });
+      return c.json({ error: "Forbidden", code: "PERMISSION_REQUIRED", permission }, 403);
+    }
+    if (options.mfa && auth.aal !== "aal2") {
+      await writeAuthorizationAudit({ auth, permission, action: c.req.method + " " + c.req.path, targetType: "route", workspaceId, outcome: "denied", requestId: requestIdFrom(c), reason: "aal2_required" });
+      return c.json({ error: "Multi-factor authentication required", code: "MFA_REQUIRED" }, 403);
+    }
+    await next();
+  };
+}
+
 export async function requireAdmin(c, next) {
-  const auth = c.get("auth");
-  if (!auth || auth.role !== "admin") {
-    return c.json({ error: "Admin only" }, 403);
-  }
-  await next();
+  return requirePermission("platform.specs.manage")(c, next);
 }
 
 /* Review-hierarchy authority above admin: decertification, reviewer-of-
    reviewers, cross-tenant ops. Powers are wired to routes in M2. */
 export async function requireSuperAdmin(c, next) {
+  return requirePermission("portal.super_admin.access", { mfa: true })(c, next);
+}
+
+export async function requireMfa(c, next) {
   const auth = c.get("auth");
-  if (!auth || auth.role !== "super_admin") {
-    return c.json({ error: "Super admin only" }, 403);
-  }
+  if (!auth || auth.aal !== "aal2") return c.json({ error: "Multi-factor authentication required", code: "MFA_REQUIRED" }, 403);
   await next();
 }

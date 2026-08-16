@@ -34,6 +34,32 @@ export function monthlyDebitedFromRows(rows = [], now = new Date()) {
   }, 0);
 }
 
+export function creditUsageCategory(kind = "") {
+  const value = String(kind).toLowerCase();
+  if (value.includes("refund") || value.includes("release")) return "Refunds";
+  if (value.includes("craft")) return "Human craft";
+  if (value.includes("steward") || value.includes("bio") || value.includes("extract") || value.includes("discovery")) return "Brand intelligence";
+  if (value.includes("run") || value.includes("specialist")) return "Specialist work";
+  if (value.includes("monthly_pool") || value.includes("topup") || value.includes("grant")) return "Credits added";
+  return "Other usage";
+}
+
+export function summarizeCreditUsage(rows = [], now = new Date()) {
+  const start = Date.parse(monthStartIso(now));
+  const totals = new Map();
+  for (const row of rows || []) {
+    if (Date.parse(row.created_at || 0) < start) continue;
+    const credits = Number(row.credits) || 0;
+    if (credits === 0) continue;
+    const category = creditUsageCategory(row.kind);
+    totals.set(category, (totals.get(category) || 0) + credits);
+  }
+  const order = ["Specialist work", "Human craft", "Brand intelligence", "Other usage", "Refunds", "Credits added"];
+  return order
+    .filter((category) => totals.has(category))
+    .map((category) => ({ category, credits: totals.get(category) }));
+}
+
 export function estimateRunCredits({ specPayload, deliverableSpec, isDeliverableText = false }) {
   const base = Math.max(1, Math.ceil(Number(specPayload?.cr_estimate) || 8));
   if (!isDeliverableText) return base;

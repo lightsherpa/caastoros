@@ -1,7 +1,7 @@
 import React from "react";
 import { supabase, apiFetch } from "./lib/supabase-browser.js";
 import { useLocale, t, fmtNumber, applyOverrides } from "./lib/i18n.js";
-const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory, AdminLanguages } = window;
+const { BrandolphAvatar, BrandolphDot, Icon, TweaksPanel, TweakSection, TweakSelect, TweakSlider, TweakRadio, BrandolphHome, Discovery, BioViewer, BriefsLibrary, BriefDetail, SpecialistsDirectory, SpecialistAuthor, CanvasView, Library, BriefBoard, CraftMarketplace, CreditsLedger, SettingsView, FloatingBrandolph, TeamQueue, TeamJob, TeamReview, TeamCapacity, TeamClients, TeamMe, CraftQueue, Login, useSession, getCurrentBrandId, setCurrentBrandId, useCurrentBrandId, AdminSpecs, AdminBrandolphMemory, AdminLanguages, AdminAccess, AdminOpex } = window;
 /* Caastor Intelligence — app shell + router + sidebar + topbar.    */
 /* Internal hash router; supports client + team portals.            */
 
@@ -39,24 +39,40 @@ const CLIENT_ROUTES = [
   { id:"specialists", labelKey:"nav.specialists", icon:"team",     sectionKey:"section.specialistsHumans" },
   { id:"craft",       labelKey:"nav.humans",      icon:"craft",    sectionKey:"section.specialistsHumans" },
   { id:"credits",     labelKey:"nav.credits",     icon:"credit",   sectionKey:"section.creditsAccount" },
-  { id:"settings",    labelKey:"nav.account",     icon:"settings", sectionKey:"section.creditsAccount" },
+  { id:"settings",    labelKey:"nav.account",     icon:"settings", sectionKey:null },
 ];
 
 const TEAM_ROUTES = [
+  { id:"team-review",   labelKey:"Review desk",      icon:"check",  sectionKey:"section.team" },
   { id:"team",          labelKey:"team.jobQueue",    icon:"brief",  sectionKey:"section.team" },
   { id:"team-craft",    labelKey:"team.craftPolish", icon:"brief",  sectionKey:"section.team" },
   { id:"team-capacity", labelKey:"team.capacity",    icon:"timer",  sectionKey:"section.team" },
   { id:"team-clients",  labelKey:"team.clients",     icon:"team",   sectionKey:"section.team" },
   { id:"team-me",       labelKey:"team.myEarnings",  icon:"credit", sectionKey:"section.team" },
 ];
+const TEAM_ACCOUNT_ROUTE = { id:"team-account", labelKey:"nav.account", icon:"settings", sectionKey:null };
 
 /* Admin-only routes appended below the client nav for users with
    role:'admin'. Keeps the admin's client view intact; adds tools. */
 const ADMIN_ROUTES = [
+  { id:"admin-access",    labelKey:"People & access",       icon:"team",     sectionKey:"section.admin" },
   { id:"admin-specs",     labelKey:"admin.specs",           icon:"settings", sectionKey:"section.admin" },
   { id:"admin-languages", labelKey:"admin.languages",       icon:"settings", sectionKey:"section.admin" },
   { id:"admin-brandolph", labelKey:"admin.brandolphMemory", icon:"sparkles", sectionKey:"section.admin" },
 ];
+const SUPER_ADMIN_ROUTES = [
+  { id:"admin-opex", labelKey:"Usage & OPEX", icon:"credit", sectionKey:"section.admin" },
+];
+const ROUTE_PERMISSION = { "admin-access":"platform.people.manage", "admin-specs":"platform.specs.manage", "admin-languages":"platform.languages.manage", "admin-brandolph":"platform.memory.read", "admin-opex":"opex.read" };
+const ADMIN_ACCOUNT_ROUTE = { id:"admin-account", labelKey:"nav.account", icon:"settings", sectionKey:null };
+const ADMIN_ACCOUNT_SECTIONS = [
+  { id:"access", routeId:"admin-access", label:"People & access", icon:"team" },
+  { id:"specs", routeId:"admin-specs", labelKey:"admin.specs", icon:"settings" },
+  { id:"languages", routeId:"admin-languages", labelKey:"admin.languages", icon:"settings" },
+  { id:"brandolph", routeId:"admin-brandolph", labelKey:"admin.brandolphMemory", icon:"sparkles" },
+  { id:"opex", routeId:"admin-opex", label:"Usage & OPEX", icon:"credit", superAdminOnly:true },
+];
+const LEGACY_ADMIN_SECTION = Object.fromEntries(ADMIN_ACCOUNT_SECTIONS.map((section) => [section.routeId, section.id]));
 
 /* useTweaks-style hook (copied to keep app self-contained from the panel) */
 function useShellTweaks() {
@@ -294,7 +310,7 @@ function Brandmark() {
 /* Sidebar --------------------------------------------------------- */
 function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bioScore }) {
   const { t } = useLocale();
-  const routes = portal === "team" ? TEAM_ROUTES : CLIENT_ROUTES;
+  const routes = portal === "team" ? TEAM_ROUTES : (portal === "super_admin" || portal === "admin") ? [ADMIN_ACCOUNT_ROUTE] : CLIENT_ROUTES;
   const isClient = portal === "client";
   const credits = useLiveCredits();
   return (
@@ -348,7 +364,7 @@ function Sidebar({ portal, currentRoute, onNav, onLogout, tweaks, brandName, bio
               || (r.id === "team" && currentRoute === "team-job");
             return (
               <React.Fragment key={r.id}>
-                {showSection && (
+                {showSection && r.sectionKey && (
                   <div className="eyebrow" style={{padding: i === 0 ? "4px 12px 8px" : "16px 12px 8px"}}>
                     {t(r.sectionKey)}
                   </div>
@@ -557,7 +573,7 @@ function NotificationBell() {
 
 function TopBar({ portal, route, brandName, go }) {
   const { t } = useLocale();
-  const isClient = portal === "client";
+  const isClient = portal === "client" || CLIENT_ROUTES.some((item) => item.id === route) || ["home","brief-detail","discovery","specialist-new","canvas","board","upgrade"].includes(route);
   /* TopBar titles — eyebrows now match the rev-2 §2 section structure
      (slash-joined section eyebrows that ARE the contents). Built from
      i18n keys at render time via t(); the specialists title interpolates
@@ -579,15 +595,18 @@ function TopBar({ portal, route, brandName, go }) {
     credits:     [t("nav.credits"),     t("section.creditsAccount")],
     settings:    [t("nav.account"),     t("section.creditsAccount")],
     upgrade:     [t("title.plans"),     t("section.creditsAccount")],
+    "team-review":["Review desk",      t("section.teamPortal")],
     team:        [t("team.jobQueue"),   t("section.teamPortal")],
     "team-craft":[t("team.craftPolish"), t("section.teamPortal")],
     "team-job":  [t("title.activeJob"), t("section.teamPortal")],
     "team-capacity":[t("title.capacitySla"), t("section.teamPortal")],
     "team-clients":[t("title.clientRoster"), t("section.teamPortal")],
     "team-me":   [t("team.myEarnings"), t("section.teamPortal")],
+    "team-account":[t("nav.account"), t("section.teamPortal")],
     "admin-specs":     [t("admin.specs"),           t("section.admin")],
     "admin-languages": [t("admin.languages"),       t("section.admin")],
     "admin-brandolph": [t("admin.brandolphMemory"), t("section.admin")],
+    "admin-account":   [t("nav.account"),           t("section.admin")],
   };
   const [title, crumb] = titles[route] || [route, ""];
   /* Breadcrumb workspace segment: the team portal is the only surface that
@@ -627,17 +646,23 @@ function TopBar({ portal, route, brandName, go }) {
 
 /* App-wide menu — a persistent, always-open sidebar with a prominent
    brand logo at the top. No collapse. */
-function AppDock({ portal, currentRoute, onNav, onLogout }) {
+function AppDock({ portal, currentRoute, onNav }) {
   const { t } = useLocale();
+  const session = useSession();
   /* Admins see the client nav + the admin extras. Team users see their
      own nav unchanged. This keeps the admin's everyday surfaces intact
      and just adds operator tooling at the bottom of the dock. */
-  const routes = portal === "team"
-    ? TEAM_ROUTES
-    : portal === "admin"
-      ? [...CLIENT_ROUTES, ...ADMIN_ROUTES]
-      : CLIENT_ROUTES;
+  const candidateRoutes = portal === "team"
+    ? [...TEAM_ROUTES.filter((item) => item.id !== "team-me"), TEAM_ACCOUNT_ROUTE]
+    : (portal === "super_admin" || portal === "admin")
+      ? [...CLIENT_ROUTES.filter((item) => !["credits", "settings"].includes(item.id)), ADMIN_ACCOUNT_ROUTE]
+      : CLIENT_ROUTES.filter((item) => item.id !== "credits");
+  const allowed = new Set(session?.permissions || []);
+  const routes = candidateRoutes.filter(r => !ROUTE_PERMISSION[r.id] || allowed.has(ROUTE_PERMISSION[r.id]));
   const isActive = (id) => currentRoute === id
+    || (id === "settings" && currentRoute === "credits")
+    || (id === "admin-account" && currentRoute === "credits")
+    || (id === "team-account" && currentRoute === "team-me")
     || (id === "briefs" && currentRoute === "brief-detail")
     || (id === "bio" && currentRoute === "discovery")
     || (id === "specialists" && currentRoute === "specialist-new")
@@ -647,7 +672,7 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
      whenever the user is anywhere except home. A back-arrow chip
      appears next to the logo on non-home routes so the action is
      visible, not hidden behind a tooltip. */
-  const homeRoute = portal === "team" ? "team" : "home";
+  const homeRoute = portal === "team" ? "team-review" : "home";
   const isHome = currentRoute === homeRoute;
   const goHome = () => onNav(homeRoute);
   return (
@@ -672,17 +697,13 @@ function AppDock({ portal, currentRoute, onNav, onLogout }) {
             {(i === 0 || r.sectionKey !== routes[i - 1].sectionKey) && r.sectionKey && (
               <div className="app-dock__section">{t(r.sectionKey)}</div>
             )}
-            <button className={"app-dock__item" + (isActive(r.id) ? " app-dock__item--active" : "")} onClick={() => onNav(r.id)}>
+            <button className={"app-dock__item" + (["settings", "admin-account", "team-account"].includes(r.id) ? " app-dock__item--account" : "") + (isActive(r.id) ? " app-dock__item--active" : "")} onClick={() => onNav(r.id)}>
               <span className="app-dock__icon"><Icon name={r.icon} size={18} /></span>
               <span>{t(r.labelKey)}</span>
             </button>
           </React.Fragment>
         ))}
       </div>
-      <button className="app-dock__item app-dock__logout" onClick={onLogout}>
-        <span className="app-dock__icon"><Icon name="arrowLeft" size={18} /></span>
-        <span>{t("common.logOut")}</span>
-      </button>
     </nav>
   );
 }
@@ -712,7 +733,7 @@ function App() {
   const shellMode = useShellMode(route.id);
 
   const onLoginRoute = route.id === "login" || (route.id === "team" && route.param === "login");
-  const portal = session ? session.role : "client";
+  const portal = session ? (session.portal || session.role) : "client";
 
   /* Resolve the real brand name so the TopBar crumb reflects the
      workspace switcher, not the mock CI_BRAND. The palette-shift
@@ -734,14 +755,19 @@ function App() {
     if (!session) return;
     if (session._recovery) return;                            // stay on the recovery form until new password set
     if (session._pending) return;                             // bootstrap profile lacks real role — wait for async resolve
-    if (onLoginRoute) { go(session.role === "team" ? "team" : "home"); return; }
+    if (onLoginRoute) { go(portal === "team" ? "team-review" : "home"); return; }
+    if (route.id === "credits") { go(`${portal === "admin" || portal === "super_admin" ? "admin-account" : "settings"}/usage`); return; }
+    if ((portal === "admin" || portal === "super_admin") && route.id === "settings") { go(`admin-account/${route.param || "workspace"}`); return; }
+    if (portal === "team" && route.id === "team-me") { go("team-account/profile"); return; }
     const isClientRoute = CLIENT_ROUTES.some(r => r.id === route.id) || route.id === "brief-detail" || route.id === "home" || route.id === "discovery" || route.id === "specialist-new" || route.id === "canvas" || route.id === "board" || route.id === "upgrade";
-    const isTeamRoute  = TEAM_ROUTES.some(r => r.id === route.id) || route.id === "team-job";
-    const isAdminRoute = ADMIN_ROUTES.some(r => r.id === route.id);
-    if (session.role === "client" && !isClientRoute) go("home");
-    if (session.role === "team"   && !isTeamRoute  ) go("team");
-    if (session.role === "admin"  && !isClientRoute && !isAdminRoute) go("home");
-  }, [session, route.id, route.param, onLoginRoute]);
+    const isTeamRoute  = TEAM_ROUTES.some(r => r.id === route.id) || route.id === "team-job" || route.id === "team-account";
+    const isAdminRoute = route.id === "admin-account" || [...ADMIN_ROUTES,...SUPER_ADMIN_ROUTES].some(r => r.id === route.id);
+    const legacySection = LEGACY_ADMIN_SECTION[route.id];
+    if (legacySection) { go(`admin-account/${legacySection}`); return; }
+    if (portal === "client" && !isClientRoute) { go("home"); return; }
+    if (portal === "team" && !isTeamRoute) { go("team-review"); return; }
+    if ((portal === "admin" || portal === "super_admin") && !isAdminRoute && !isClientRoute) { go("admin-account"); return; }
+  }, [session, portal, route.id, route.param, onLoginRoute]);
 
   /* Load DB translation overrides once, after auth resolves. Non-blocking:
      any failure leaves the static JSON catalogs in place. applyOverrides()
@@ -769,7 +795,6 @@ function App() {
     const initialMode = session?._recovery ? "recovery" : "signin";
     return <Login key={role + "-" + initialMode} role={role} go={go} initialMode={initialMode} />;
   }
-
   const logout = async () => {
     /* Await sign-out so the session is null BEFORE we navigate to /login —
        otherwise the route guard sees a still-truthy session on the login
@@ -781,12 +806,12 @@ function App() {
   return (
     <div className="app" data-screen-label={portal === "client" ? "Client portal" : "Team portal"}>
       <WorkspaceLogo shellMode={shellMode} />
-      <AppDock portal={portal} currentRoute={route.id} onNav={go} onLogout={logout} />
+      <AppDock portal={portal} currentRoute={route.id} onNav={go} />
       <div style={{display:"flex", flexDirection:"column", minWidth:0}}>
         <TopBar portal={portal} route={route.id} brandName={currentBrandName} go={go} />
         <main className="scroll" style={{flex:1, overflowY:"auto"}}>
           <div className="route-view" key={route.id + "/" + (route.param || "")}>
-            <ScreenRouter route={route} go={go} tweaks={tweaks} setTweak={setTweak} />
+            <ScreenRouter route={route} go={go} tweaks={tweaks} setTweak={setTweak} onLogout={logout} />
           </div>
         </main>
       </div>
@@ -800,8 +825,16 @@ function App() {
   );
 }
 
+/* Admin account --------------------------------------------------- */
+/* Operator tools live inside Account instead of competing with primary
+   destinations in the app dock. Permissions still determine which account
+   sections exist for each admin session. */
+function AdminAccount({ section, go, onLogout }) {
+  return <SettingsView section={section} go={go} accountBase="admin-account" onLogout={onLogout} includeAdministration />;
+}
+
 /* Screen router — dispatches to the right page component ------- */
-function ScreenRouter({ route, go, tweaks, setTweak }) {
+function ScreenRouter({ route, go, tweaks, setTweak, onLogout }) {
   switch(route.id) {
     case "home":         return <BrandolphHome tweaks={tweaks} setTweak={setTweak} go={go} />;
     case "discovery":    return <Discovery go={go} newBrand={route.param === "new"} />;
@@ -814,18 +847,23 @@ function ScreenRouter({ route, go, tweaks, setTweak }) {
     case "specialist-new": return <SpecialistAuthor go={go} />;
     case "canvas":       return <CanvasView go={go} />;
     case "craft":        return <CraftMarketplace go={go} tier={tweaks.tier} />;
-    case "credits":      return <CreditsLedger />;
-    case "settings":     return <SettingsView />;
+    case "credits":      return <SettingsView section="usage" go={go} onLogout={onLogout} />;
+    case "settings":     return <SettingsView section={route.param} go={go} onLogout={onLogout} />;
     case "upgrade":      return <UpgradeView go={go} param={route.param} />;
     case "team":         return <TeamQueue go={go} />;
+    case "team-review":  return <TeamReview />;
     case "team-craft":   return <CraftQueue />;
     case "team-job":     return <TeamJob id={route.param} go={go} />;
     case "team-capacity":return <TeamCapacity />;
     case "team-clients": return <TeamClients />;
     case "team-me":      return <TeamMe />;
+    case "team-account": return <SettingsView section={route.param} go={go} accountBase="team-account" onLogout={onLogout} />;
+    case "admin-account":   return <AdminAccount section={route.param} go={go} onLogout={onLogout} />;
     case "admin-specs":     return <AdminSpecs />;
     case "admin-languages": return <AdminLanguages />;
     case "admin-brandolph": return <AdminBrandolphMemory />;
+    case "admin-access":    return <AdminAccess />;
+    case "admin-opex":      return <AdminOpex />;
     default:             return <BrandolphHome tweaks={tweaks} setTweak={setTweak} go={go} />;
   }
 }

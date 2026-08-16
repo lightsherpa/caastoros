@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { creditBalanceFromRows, creditCheck, estimateRunCredits, monthStartIso, monthlyDebitedFromRows } from "./credits.js";
+import { creditBalanceFromRows, creditCheck, creditUsageCategory, estimateRunCredits, monthStartIso, monthlyDebitedFromRows, summarizeCreditUsage } from "./credits.js";
 
 test("creditBalanceFromRows treats positive ledger rows as debits and negative rows as grants", () => {
   assert.equal(creditBalanceFromRows([
@@ -56,4 +56,23 @@ test("monthlyDebitedFromRows excludes reservations that were refunded", () => {
     { credits: 10, kind: "craft", run_id: null, created_at: "2026-08-12T00:00:00Z" },
   ];
   assert.equal(monthlyDebitedFromRows(rows, now), 35);
+});
+
+test("credit usage groups ledger kinds into customer-facing categories", () => {
+  assert.equal(creditUsageCategory("run_reserved"), "Specialist work");
+  assert.equal(creditUsageCategory("craft"), "Human craft");
+  assert.equal(creditUsageCategory("steward_cert"), "Brand intelligence");
+  assert.equal(creditUsageCategory("run_refund"), "Refunds");
+});
+
+test("summarizeCreditUsage totals only the current month", () => {
+  const rows = [
+    { credits: 25, kind: "run_reserved", created_at: "2026-08-11T00:00:00Z" },
+    { credits: 10, kind: "craft", created_at: "2026-08-12T00:00:00Z" },
+    { credits: 99, kind: "run_reserved", created_at: "2026-07-31T23:59:00Z" },
+  ];
+  assert.deepEqual(summarizeCreditUsage(rows, new Date("2026-08-15T12:00:00Z")), [
+    { category: "Specialist work", credits: 25 },
+    { category: "Human craft", credits: 10 },
+  ]);
 });

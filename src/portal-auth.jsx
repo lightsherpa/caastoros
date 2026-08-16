@@ -1,6 +1,7 @@
 import React from "react";
-import { supabase } from "./lib/supabase-browser.js";
+import { supabase, apiFetch } from "./lib/supabase-browser.js";
 import { setLocale } from "./lib/i18n.js";
+import { prepareTotpFactor } from "./lib/mfa.js";
 
 const { Icon, BrandolphAvatar } = window;
 /* Real Supabase auth (P0-004) — replaces the prior localStorage mock.
@@ -69,10 +70,25 @@ async function resolveProfile(authUser) {
   // Apply the user's saved platform language across every surface. setLocale
   // guards absent/invalid values, so a null column is a harmless no-op.
   if (data?.locale) setLocale(data.locale);
+  let normalized = null;
+  try {
+    const response = await apiFetch("/api/me");
+    if (response.ok) normalized = await response.json();
+  } catch (e) { console.warn("[auth] scoped profile lookup failed:", e?.message || e); }
   return {
     id: authUser.id,
     email: authUser.email,
-    role: data?.role || "client",
+    role: normalized?.portal || data?.role || "client",
+    portal: normalized?.portal || data?.role || "client",
+    persona: normalized?.persona || null,
+    scope: normalized?.scope || null,
+    permissions: normalized?.permissions || [],
+    memberships: normalized?.workspaces || [],
+    assignments: normalized?.assignments || [],
+    qualifications: normalized?.qualifications || [],
+    assuranceLevel: normalized?.assuranceLevel || "aal1",
+    mfaRequired: !!normalized?.mfaRequired,
+    mfaSatisfied: !!normalized?.mfaSatisfied,
     workspaceId: data?.workspace_id || null,
     // For UI rendering — name + avatar are decorative; default fallbacks until
     // we add a `users.display_name` column.
@@ -80,6 +96,59 @@ async function resolveProfile(authUser) {
     avatar: authUser.user_metadata?.avatar_url || "caastor/assets/profile-3.jpg",
     at: Date.now(),
   };
+}
+
+function MfaGate({ onCancel = null }) {
+  const [factor, setFactor] = useAuthState(null);
+  const [enrolling, setEnrolling] = useAuthState(false);
+  const [code, setCode] = useAuthState("");
+  const [error, setError] = useAuthState(null);
+  const [busy, setBusy] = useAuthState(false);
+  const setupStarted = React.useRef(false);
+
+  useAuthEffect(() => {
+    if (setupStarted.current) return;
+    setupStarted.current = true;
+    (async () => {
+      try {
+        const prepared = await prepareTotpFactor(supabase.auth.mfa);
+        setFactor(prepared.factor);
+        setEnrolling(prepared.enrolling);
+      } catch (err) { setError(err?.message || String(err)); }
+    })();
+  }, []);
+
+  const verify = async (e) => {
+    e.preventDefault(); setBusy(true); setError(null);
+    try {
+      const challenge = await supabase.auth.mfa.challenge({ factorId: factor.id });
+      if (challenge.error) throw challenge.error;
+      const verified = await supabase.auth.mfa.verify({ factorId: factor.id, challengeId: challenge.data.id, code });
+      if (verified.error) throw verified.error;
+      await supabase.auth.refreshSession();
+      const { data: { user } } = await supabase.auth.getUser();
+      currentProfile = await resolveProfile(user); notify();
+    } catch (err) { setError(err?.message || String(err)); }
+    setBusy(false);
+  };
+
+  return <div className="auth-page"><form className="auth-card" onSubmit={verify}>
+    <div className="eyebrow">Security checkpoint</div>
+    <h1>{enrolling ? "Set up admin security" : "Verify your identity"}</h1>
+    <p>{enrolling ? "Scan this QR code with Apple Passwords, Google Authenticator, 1Password, or another authenticator, then enter its six-digit code." : "Sensitive admin controls require the six-digit code from your authenticator."}</p>
+    {factor?.totp?.qr_code && <img src={factor.totp.qr_code} alt="Authenticator QR code" style={{width:180,height:180,alignSelf:"center"}} />}
+    {factor?.totp?.secret && <code style={{overflowWrap:"anywhere"}}>{factor.totp.secret}</code>}
+    <label>6-digit code<input value={code} inputMode="numeric" autoComplete="one-time-code" onChange={(e)=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} /></label>
+    {error && <div className="auth-error">{error}</div>}
+    <button className="btn btn--primary" disabled={busy || !factor || code.length !== 6}>{busy ? "Verifying…" : "Continue securely"}</button>
+    {onCancel && <button type="button" className="btn btn--ghost" onClick={async () => {
+      if (enrolling && factor?.id) {
+        try { await supabase.auth.mfa.unenroll({ factorId:factor.id }); } catch { /* abandoned factors are cleaned on the next setup */ }
+      }
+      onCancel();
+    }}>Back to workspace</button>}
+    <button type="button" className="btn btn--ghost" onClick={()=>window.CI_AUTH.signOut()}>Sign out</button>
+  </form></div>;
 }
 
 /* Public API mirrors the prior mock shape (so window.CI_AUTH consumers work). */
@@ -162,12 +231,23 @@ function getSession() {
 }
 
 /* Hydrate session on module load (handles page refresh + magic-link callback).
-   Bootstrap above already fills currentProfile synchronously from localStorage
-   so the first render isn't blank; this just refines it with the DB-derived
-   role + workspace, or clears it if the stored token turns out invalid. */
+   Do not let this initial async read overwrite a newer sign-in that completed
+   while getSession()/resolveProfile was still in flight. That race produced
+   the visible "workspace loads, then disappears" failure. */
+const profileAtHydrationStart = currentProfile;
 (async () => {
   const { data: { session } } = await supabase.auth.getSession();
-  currentProfile = session?.user ? await resolveProfile(session.user) : null;
+  if (!session?.user) {
+    if (currentProfile === profileAtHydrationStart) {
+      currentProfile = null;
+      notify();
+    }
+    return;
+  }
+  const profile = await resolveProfile(session.user);
+  if (!profile) return;
+  if (currentProfile && currentProfile.id !== session.user.id) return;
+  currentProfile = profile;
   notify();
 })();
 
@@ -180,17 +260,34 @@ function getSession() {
    work via .then() so it executes outside the lock. */
 supabase.auth.onAuthStateChange((event, session) => {
   if (!session?.user) {
-    currentProfile = null;
-    notify();
+    /* Explicit sign-out must clear immediately. A sessionless bootstrap event
+       may arrive behind a newer SIGNED_IN event, so only let it clear the
+       unresolved initial profile—not a resolved, active workspace. */
+    if (event === "SIGNED_OUT" || event === "USER_DELETED" || !currentProfile || currentProfile._pending) {
+      currentProfile = null;
+      notify();
+    }
     return;
   }
-  /* Flip the UI immediately with a partial profile so the user isn't
-     waiting on a DB roundtrip to see they're signed in. _pending=true
-     tells the route guard to wait before applying redirects. */
-  currentProfile = {
+  /* Keep an already-resolved profile stable across TOKEN_REFRESHED and
+     other same-user auth events. Replacing it with the generic pending
+     client profile made the workspace/admin navigation flash, disappear,
+     and then reappear while /api/me resolved again. Only first boot needs
+     the pending fallback. */
+  const canReuseResolvedProfile = currentProfile?.id === session.user.id
+    && !currentProfile?._pending
+    && !!currentProfile?.portal;
+  currentProfile = canReuseResolvedProfile ? {
+    ...currentProfile,
+    email: session.user.email,
+    name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || currentProfile.name || "User",
+    avatar: session.user.user_metadata?.avatar_url || currentProfile.avatar || "caastor/assets/profile-3.jpg",
+    at: Date.now(),
+  } : {
     id: session.user.id,
     email: session.user.email,
     role: "client",
+    portal: "client",
     workspaceId: null,
     name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "User",
     avatar: session.user.user_metadata?.avatar_url || "caastor/assets/profile-3.jpg",
@@ -225,17 +322,14 @@ window.CI_AUTH = {
 
 /* React hook — same name + shape as the prior mock so consumers don't change. */
 function useSession() {
-  const [session, setSession] = useAuthState(getSession);
-  useAuthEffect(() => {
-    const onChange = () => setSession(getSession());
-    listeners.add(onChange);
-    window.addEventListener("ci_auth_change", onChange);
-    return () => {
-      listeners.delete(onChange);
-      window.removeEventListener("ci_auth_change", onChange);
-    };
-  }, []);
-  return session;
+  return React.useSyncExternalStore(
+    (onStoreChange) => {
+      listeners.add(onStoreChange);
+      return () => listeners.delete(onStoreChange);
+    },
+    getSession,
+    getSession,
+  );
 }
 
 /* Role-specific login screen — handles four modes:
@@ -464,3 +558,4 @@ function Login({ role = "client", go, initialMode = "signin" }) {
 
 window.useSession = useSession;
 window.Login = Login;
+window.MfaGate = MfaGate;

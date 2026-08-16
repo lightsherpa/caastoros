@@ -20,6 +20,7 @@ import "./portal-craft.jsx";
 import "./portal-team.jsx";
 import "./portal-floater.jsx";
 import "./portal-admin.jsx";       // admin-only screens (spec editor, future memory)
+import "./portal-ops.jsx";         // interactive access governance + Super Admin FinOps
 import "./portal-auth.jsx";        // mock auth + login screens
 
 import { App } from "./portal-shell.jsx"; // router + sidebar + topbar
@@ -63,7 +64,13 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-ReactDOM.createRoot(document.getElementById("app")).render(
+/* Reuse one React root across Vite module invalidations. Re-running
+   createRoot() during HMR leaves an older tree mounted with stale auth and
+   produces an impossible split state (visible workspace, null session). */
+const reactRoot = window.__CI_REACT_ROOT__ || ReactDOM.createRoot(document.getElementById("app"));
+window.__CI_REACT_ROOT__ = reactRoot;
+
+reactRoot.render(
   <AppErrorBoundary>
     <App />
   </AppErrorBoundary>

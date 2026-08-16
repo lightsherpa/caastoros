@@ -20,13 +20,20 @@ import notifications from "./routes/notifications.js";
 import billing from "./routes/billing.js";
 import admin from "./routes/admin.js";
 import languages from "./routes/languages.js";
+import me from "./routes/me.js";
+import access from "./routes/access.js";
+import opex from "./routes/opex.js";
+import teamPortal from "./routes/team-portal.js";
 import { inngestHandler } from "./routes/inngest.js";
 
 const PORT = Number(process.env.PORT) || 8787;
-const ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:4173")
+const CONFIGURED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:4173")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+const ORIGINS = [...new Set(CONFIGURED_ORIGINS.flatMap((origin) =>
+  origin.includes("localhost") ? [origin, origin.replace("localhost", "127.0.0.1")] : [origin]
+))];
 
 const app = new Hono();
 app.use("*", logger());
@@ -67,6 +74,10 @@ app.route("/api/notifications", notifications);
 app.route("/api/billing", billing);
 app.route("/api/admin", admin);
 app.route("/api/i18n", languages);
+app.route("/api/me", me);
+app.route("/api/access", access);
+app.route("/api/opex", opex);
+app.route("/api/team", teamPortal);
 // Inngest serve — local dev server auto-discovers this endpoint
 // (GET introspection + POST function invocations + PUT registration).
 app.on(["GET", "POST", "PUT"], "/api/inngest", inngestHandler);

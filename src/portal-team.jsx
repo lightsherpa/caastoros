@@ -829,6 +829,9 @@ function TeamJob({ id, go }) {
                       </div>
                       {s.signals?.title && <div style={{fontSize: 11, color:"var(--c-dim)", marginTop: 2}}>{s.signals.title}</div>}
                       {s.signals?.size && <div style={{fontSize: 10.5, color:"var(--c-faint)", marginTop: 2, fontFamily:"var(--font-mono)"}}>{Math.round(s.signals.size/1024).toLocaleString()} KB · {s.signals.mime || s.signals.ext}</div>}
+                      {s.signals?.asset_role && <div style={{fontSize:10.5, color:"var(--c-dim)", marginTop:3}}>Role · {String(s.signals.asset_role).replace(/_/g, " ")}</div>}
+                      {s.signals?.font_family && <div style={{fontSize:10.5, color:"var(--c-dim)", marginTop:3}}>{s.signals.font_usage || "Typeface"} · {s.signals.font_family} · {String(s.signals.license_type || "licence pending").replace(/_/g, " ")}</div>}
+                      {s.signals?.rights_confirmed && <div style={{fontSize:10.5, color:"var(--green-600)", marginTop:3}}>Usage rights confirmed{s.signals.rights_confirmed_at ? ` · ${new Date(s.signals.rights_confirmed_at).toLocaleDateString()}` : ""}</div>}
                       {s.signals?.markdown_chars && <div style={{fontSize: 10.5, color:"var(--c-faint)", marginTop: 2, fontFamily:"var(--font-mono)"}}>{t("team.charsScraped", { chars: s.signals.markdown_chars.toLocaleString() })}</div>}
                     </div>
                   ))}
@@ -1283,4 +1286,165 @@ function CraftQueue() {
   );
 }
 
-Object.assign(window, { TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue });
+/* ════════════════════════════════════════════════════════════════ */
+/* OUTPUT REVIEW DESK                                                */
+
+const REVIEW_LABELS = {
+  draft: "Draft",
+  submitted_internal: "Ready for internal review",
+  internally_approved: "Internally approved",
+  changes_requested_internal: "Internal changes requested",
+  client_review: "With client",
+  client_approved: "Client approved",
+  changes_requested_client: "Client changes requested",
+};
+
+function reviewText(output) {
+  const body = output?.body || {};
+  return body.edited_text || body.text || body.visual_direction || (typeof output?.body === "string" ? output.body : "");
+}
+
+function ReviewState({ value }) {
+  const color = value === "client_approved" ? "var(--green-600)"
+    : value?.startsWith("changes_requested") ? "var(--pink-500)"
+    : value === "submitted_internal" ? "var(--yellow-700)"
+    : "var(--c-dim)";
+  return <span className="pill" style={{height:24, color, background:"var(--c-bg)", border:"1px solid var(--c-line)"}}>{REVIEW_LABELS[value] || value}</span>;
+}
+
+function TeamReview() {
+  const session = window.useSession?.();
+  const [compact, setCompact] = useTState(() => window.innerWidth < 900);
+  const [state, setState] = useTState({ outputs: [], permissions: [], loading: true, error: null });
+  const [filter, setFilter] = useTState("attention");
+  const [selectedId, setSelectedId] = useTState(null);
+  const [draft, setDraft] = useTState("");
+  const [reason, setReason] = useTState("");
+  const [busy, setBusy] = useTState(null);
+  const [notice, setNotice] = useTState(null);
+  useTEffect(() => {
+    const resize = () => setCompact(window.innerWidth < 900);
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+
+  const load = async () => {
+    setState((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const response = await apiFetch("/api/team/outputs");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      setState({ outputs: data.outputs || [], permissions: data.permissions || [], loading: false, error: null });
+      const reviewer = (data.permissions || []).includes("output.internal_approve");
+      const attentionStates = new Set(reviewer ? ["submitted_internal", "internally_approved"] : ["draft", "changes_requested_internal", "changes_requested_client"]);
+      setSelectedId((current) => current && (data.outputs || []).some((item) => item.id === current)
+        ? current
+        : (data.outputs || []).find((item) => attentionStates.has(item.workflow_status))?.id || data.outputs?.[0]?.id || null);
+    } catch (error) {
+      setState({ outputs: [], permissions: [], loading: false, error: error?.message || String(error) });
+    }
+  };
+  useTEffect(() => { load(); }, []);
+
+  const selected = state.outputs.find((item) => item.id === selectedId) || null;
+  useTEffect(() => { setDraft(reviewText(selected)); setReason(""); setNotice(null); }, [selectedId, selected?.workflow_status]);
+
+  const canSubmit = state.permissions.includes("output.internal_submit");
+  const canApprove = state.permissions.includes("output.internal_approve");
+  const selfSubmitted = !!selected?.submitted_by && selected.submitted_by === session?.id;
+  const needsAttention = new Set(canApprove
+    ? ["submitted_internal", "internally_approved"]
+    : ["draft", "changes_requested_internal", "changes_requested_client"]);
+  const attentionCount = state.outputs.filter((item) => needsAttention.has(item.workflow_status)).length;
+  const shown = state.outputs.filter((item) => filter === "all" || (filter === "attention" && needsAttention.has(item.workflow_status)) || item.workflow_status === filter);
+
+  const saveDraft = async () => {
+    if (!selected || busy) return false;
+    setBusy("save"); setNotice(null);
+    try {
+      const response = await apiFetch(`/api/outputs/${selected.id}`, { method:"PATCH", body:JSON.stringify({ text:draft }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "The revision could not be saved.");
+      setNotice("Revision saved");
+      await load();
+      return true;
+    } catch (error) { setNotice(error?.message || String(error)); return false; }
+    finally { setBusy(null); }
+  };
+
+  const transition = async (action) => {
+    if (!selected || busy) return;
+    if ((action === "internal_changes") && reason.trim().length < 3) { setNotice("Add a clear review note before returning the work."); return; }
+    setBusy(action); setNotice(null);
+    try {
+      /* Submitting a changed draft always persists the editor first. */
+      if (action === "submit_internal" && draft !== reviewText(selected)) {
+        const saved = await apiFetch(`/api/outputs/${selected.id}`, { method:"PATCH", body:JSON.stringify({ text:draft }) });
+        if (!saved.ok) throw new Error((await saved.json().catch(() => ({}))).error || "The revision could not be saved.");
+      }
+      const response = await apiFetch(`/api/outputs/${selected.id}/workflow`, { method:"POST", body:JSON.stringify({ action, reason:reason.trim() || null }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "The workflow state could not be changed.");
+      setNotice(action === "internal_approve" ? "Approved internally" : action === "send_client" ? "Sent to client review" : action === "internal_changes" ? "Returned with a review note" : "Submitted for internal review");
+      await load();
+    } catch (error) { setNotice(error?.message || String(error)); }
+    finally { setBusy(null); }
+  };
+
+  const counts = state.outputs.reduce((result, item) => ({ ...result, [item.workflow_status]:(result[item.workflow_status] || 0) + 1 }), {});
+  return <div style={{padding:"24px 32px 60px", maxWidth:1440, margin:"0 auto"}}>
+    <PageHeader eyebrow="Internal delivery" title="Review desk" sub="Designers prepare and submit work; Creative Directors provide an independent internal decision before anything reaches the client." right={<button className="btn btn--ghost btn--sm" onClick={load} disabled={state.loading}><Icon name="refresh" size={13} /> Refresh</button>} />
+    <div style={{display:"grid", gridTemplateColumns:compact ? "minmax(0, 1fr)" : "minmax(280px, 0.78fr) minmax(0, 1.45fr)", gap:18, alignItems:"start"}}>
+      <section className="card" style={{padding:0, overflow:"hidden"}} aria-label="Review queue">
+        <div style={{padding:"14px 16px", borderBottom:"1px solid var(--c-line)", display:"flex", gap:6, flexWrap:"wrap"}}>
+          {[["attention",`Needs attention · ${attentionCount}`],["submitted_internal",`Review · ${counts.submitted_internal || 0}`],["client_review",`With client · ${counts.client_review || 0}`],["all",`All · ${state.outputs.length}`]].map(([key,label]) => <button key={key} className={"pill" + (filter === key ? " pill--dark" : "")} style={{cursor:"pointer",height:28}} onClick={() => setFilter(key)}>{label}</button>)}
+        </div>
+        {state.error && <div role="alert" style={{padding:16,color:"var(--pink-500)",fontSize:13}}>{state.error}</div>}
+        {!state.loading && shown.length === 0 && <div style={{padding:"36px 22px",textAlign:"center",color:"var(--c-faint)",fontSize:13}}>Nothing is waiting in this lane.</div>}
+        <div style={{maxHeight:"calc(100vh - 250px)",overflowY:"auto"}}>
+          {shown.map((output) => {
+            const title = output.brief?.title || output.brief?.payload?.title || "Untitled brief";
+            const active = output.id === selectedId;
+            return <button key={output.id} onClick={() => setSelectedId(output.id)} style={{display:"block",width:"100%",padding:"14px 16px",textAlign:"left",border:0,borderBottom:"1px solid var(--c-line)",background:active ? "var(--c-yellow-tint)" : "transparent",cursor:"pointer",color:"inherit"}}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"flex-start",marginBottom:7}}><strong style={{fontSize:13.5,lineHeight:1.35}}>{title}</strong><span style={{fontFamily:"var(--font-mono)",fontSize:10,color:"var(--c-faint)"}}>{relativeTime(output.created_at)}</span></div>
+              <div style={{fontSize:11.5,color:"var(--c-dim)",marginBottom:9}}>{output.brief?.brand?.name} · {specialistNameForReview(output.run?.specialist_id)}</div>
+              <ReviewState value={output.workflow_status} />
+            </button>;
+          })}
+        </div>
+      </section>
+
+      <section className="card" style={{padding:0,overflow:"hidden",minHeight:420}} aria-label="Selected output">
+        {!selected ? <div style={{padding:48,textAlign:"center",color:"var(--c-faint)"}}>{state.loading ? "Loading review queue…" : "Select an output to review."}</div> : <>
+          <header style={{padding:"18px 20px",borderBottom:"1px solid var(--c-line)",display:"flex",justifyContent:"space-between",gap:16,alignItems:"flex-start"}}>
+            <div><div className="eyebrow eyebrow--yellow" style={{marginBottom:5}}>{selected.brief?.brand?.name} · {selected.kind}</div><h2 style={{margin:0,fontSize:21,color:"var(--c-ink)"}}>{selected.brief?.title || selected.brief?.payload?.title || "Untitled brief"}</h2></div>
+            <ReviewState value={selected.workflow_status} />
+          </header>
+          <div style={{padding:20}}>
+            {selected.body?.workflow_notes?.length > 0 && (() => {
+              const note = selected.body.workflow_notes[selected.body.workflow_notes.length - 1];
+              return <div style={{marginBottom:14,padding:"11px 13px",borderRadius:8,background:"var(--c-yellow-tint)",border:"1px solid var(--yellow-200)",fontSize:13,lineHeight:1.5}}><div className="eyebrow eyebrow--yellow" style={{marginBottom:4}}>{note.stage === "client" ? "Client feedback" : "Internal review note"}</div>{note.reason}</div>;
+            })()}
+            {selected.body?.asset_url ? <img src={selected.body.asset_url} alt="Generated output" style={{display:"block",maxWidth:"100%",maxHeight:"52vh",objectFit:"contain",margin:"0 auto 18px",borderRadius:8}} /> : <textarea value={draft} onChange={(event) => setDraft(event.target.value)} disabled={["client_review","client_approved"].includes(selected.workflow_status)} rows={16} style={{width:"100%",boxSizing:"border-box",resize:"vertical",padding:"18px 20px",borderRadius:8,border:"1px solid var(--c-line)",background:"#fff",color:"var(--c-ink)",fontFamily:"var(--font-serif)",fontSize:16,lineHeight:1.65,outline:"none"}} />}
+            {selfSubmitted && selected.workflow_status === "submitted_internal" && <div style={{marginTop:12,padding:"10px 12px",borderRadius:8,background:"var(--c-yellow-tint)",fontSize:12.5,color:"var(--c-dim)"}}><strong style={{color:"var(--c-ink)"}}>Independent review required.</strong> You submitted this version, so another Creative Director must approve it.</div>}
+            {canApprove && selected.workflow_status === "submitted_internal" && <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} placeholder="Review note (required when requesting changes)" style={{width:"100%",boxSizing:"border-box",resize:"vertical",marginTop:12,padding:"9px 11px",borderRadius:8,border:"1px solid var(--c-line)",background:"var(--c-bg)",font:"inherit",fontSize:13}} />}
+            {notice && <div role="status" style={{marginTop:10,fontSize:12.5,color:notice.toLowerCase().includes("could") || notice.toLowerCase().includes("add a") ? "var(--pink-500)" : "var(--green-600)"}}>{notice}</div>}
+          </div>
+          <footer style={{padding:"14px 20px",borderTop:"1px solid var(--c-line)",background:"var(--c-bg)",display:"flex",gap:8,justifyContent:"flex-end",flexWrap:"wrap"}}>
+            {canSubmit && ["draft","changes_requested_internal","changes_requested_client"].includes(selected.workflow_status) && <><button className="btn btn--ghost btn--sm" disabled={!!busy || draft === reviewText(selected)} onClick={saveDraft}>{busy === "save" ? "Saving…" : "Save revision"}</button><button className="btn btn--primary btn--sm" disabled={!!busy} onClick={() => transition("submit_internal")}><Icon name="check" size={13} /> {busy === "submit_internal" ? "Submitting…" : "Submit for internal review"}</button></>}
+            {canApprove && selected.workflow_status === "submitted_internal" && <><button className="btn btn--danger btn--sm" disabled={!!busy || reason.trim().length < 3} onClick={() => transition("internal_changes")}>{busy === "internal_changes" ? "Returning…" : "Request changes"}</button><button className="btn btn--primary btn--sm" disabled={!!busy || selfSubmitted} title={selfSubmitted ? "You cannot approve your own submission" : "Approve this output internally"} onClick={() => transition("internal_approve")}><Icon name="check" size={13} /> {busy === "internal_approve" ? "Approving…" : "Approve internally"}</button></>}
+            {canApprove && selected.workflow_status === "internally_approved" && <button className="btn btn--primary btn--sm" disabled={!!busy} onClick={() => transition("send_client")}>{busy === "send_client" ? "Sending…" : "Send to client review"} <Icon name="arrow" size={13} /></button>}
+            {selected.workflow_status === "client_review" && <span style={{fontSize:12.5,color:"var(--c-dim)"}}>Waiting for the client’s decision.</span>}
+            {selected.workflow_status === "client_approved" && <span style={{fontSize:12.5,color:"var(--green-600)"}}>Delivery accepted by the client.</span>}
+          </footer>
+        </>}
+      </section>
+    </div>
+  </div>;
+}
+
+function specialistNameForReview(id) {
+  return window.CI_AGENTS?.find((agent) => agent.id === id)?.name || id || "Specialist";
+}
+
+Object.assign(window, { TeamQueue, TeamJob, TeamCapacity, TeamClients, TeamMe, CraftQueue, TeamReview });
