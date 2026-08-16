@@ -4,7 +4,7 @@ import { apiFetch } from "./lib/supabase-browser.js";
 const { Icon, PageHeader } = window;
 const { useCallback, useEffect, useState } = React;
 
-const pretty = (value) => String(value || "—").replaceAll("_", " ");
+const pretty = (value) => ({ user: "Member", workspace_admin: "Workspace Admin", platform_admin: "Admin", super_admin: "Super Admin", creative_director: "Creative Director", designer: "Designer" }[value] || String(value || "—").replaceAll("_", " "));
 const money = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 async function request(path, options = {}) {
@@ -136,9 +136,9 @@ function AdminAccess() {
           <div className="ops-panel__head"><div><h2>Invite someone</h2><p>Existing accounts are added immediately. New accounts receive a secure invitation email.</p></div></div>
           <label>Email<input className="input" type="email" required value={invite.email} onChange={(event) => setInvite((current) => ({ ...current, email: event.target.value }))} placeholder="name@company.com" /></label>
           <label>Access scope<select className="input" value={invite.scope} onChange={(event) => setInvite((current) => ({ ...current, scope: event.target.value }))}><option value="platform">Internal team</option><option value="workspace">Client workspace</option></select></label>
-          {invite.scope === "platform" ? <label>Persona<select className="input" value={invite.platformRole} onChange={(event) => setInvite((current) => ({ ...current, platformRole: event.target.value }))}><option value="platform_admin">Admin</option><option value="creative_director">Creative Director</option><option value="designer">Designer</option></select></label> : <>
+          {invite.scope === "platform" ? <label>Persona<select className="input" value={invite.platformRole} onChange={(event) => setInvite((current) => ({ ...current, platformRole: event.target.value }))}><option value="super_admin">Super Admin</option><option value="platform_admin">Admin</option><option value="creative_director">Creative Director</option><option value="designer">Designer</option></select></label> : <>
             <label>Workspace<select className="input" value={invite.workspaceId} onChange={(event) => setInvite((current) => ({ ...current, workspaceId: event.target.value }))}>{data.workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}</select></label>
-            <label>Client role<select className="input" value={invite.workspaceRole} onChange={(event) => setInvite((current) => ({ ...current, workspaceRole: event.target.value }))}><option value="user">User</option><option value="workspace_admin">Workspace Admin</option></select></label>
+            <label>Client role<select className="input" value={invite.workspaceRole} onChange={(event) => setInvite((current) => ({ ...current, workspaceRole: event.target.value }))}><option value="user">Member</option><option value="workspace_admin">Workspace Admin</option></select></label>
           </>}
           <button className="btn btn--primary" disabled={busy === "invite"}>{busy === "invite" ? "Sending…" : "Send invitation"}</button>
         </form>
@@ -248,7 +248,6 @@ function WorkspaceMembers() {
   const [busy, setBusy] = useState(null);
   const [loading, setLoading] = useState(Boolean(canManage));
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("user");
   const [transfer, setTransfer] = useState({ userId: "", reason: "" });
   const load = useCallback(async () => {
     if (!workspace?.id || !canManage) return;
@@ -269,7 +268,7 @@ function WorkspaceMembers() {
   if (!canManage) return <div className="ops-empty">Only Workspace Admins can manage members. Your current role can collaborate on briefs and reviews.</div>;
   const invite = (event) => {
     event.preventDefault();
-    perform("invite", () => request("/api/access/invitations", { method: "POST", body: { email, workspaceId: workspace.id, workspaceRole: role } }), "Invitation sent.").then((ok) => { if (ok) setEmail(""); });
+    perform("invite", () => request("/api/access/invitations", { method: "POST", body: { email, workspaceId: workspace.id, workspaceRole: "user" } }), "Member invitation sent.").then((ok) => { if (ok) setEmail(""); });
   };
   const update = (member, patch) => perform(`member:${member.user_id}`, () => request(`/api/access/workspace/${workspace.id}/members/${member.user_id}`, { method: "PATCH", body: patch }), "Membership updated.");
   const transferOwnership = (event) => {
@@ -281,13 +280,13 @@ function WorkspaceMembers() {
     <div className="ops-panel__head"><div><h3>Members · {members.length}</h3><p>{workspace?.name || "Workspace"} · roles and access update immediately.</p></div></div>
     <form className="workspace-access__invite" onSubmit={invite}>
       <label className="sr-only" htmlFor="workspace-invite-email">Email address</label><input id="workspace-invite-email" className="input" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="colleague@company.com" />
-      <label className="sr-only" htmlFor="workspace-invite-role">Workspace role</label><select id="workspace-invite-role" className="input" value={role} onChange={(event) => setRole(event.target.value)}><option value="user">User</option><option value="workspace_admin">Workspace Admin</option></select>
+      <span className="workspace-access__invite-role" aria-label="Role for this invitation">Member</span>
       <button className="btn btn--primary" disabled={busy === "invite"}>{busy === "invite" ? "Sending…" : "Invite member"}</button>
     </form>
     {loading ? <div className="ops-empty ops-empty--loading" role="status"><span className="ops-spinner" aria-hidden="true" />Loading workspace members…</div> : members.length ? <div className="workspace-access__list">{members.map((member) => <div className="workspace-access__member" key={member.user_id}>
       <div className="workspace-access__avatar" aria-hidden="true">{(member.user?.email || "?")[0].toUpperCase()}</div>
       <div><strong>{member.user?.email || member.user_id}</strong><small>{member.is_owner ? "Billing and workspace owner" : "Workspace collaborator"}</small></div>
-      <select aria-label={`Role for ${member.user?.email || member.user_id}`} className="ops-select" value={member.role} disabled={member.is_owner || busy === `member:${member.user_id}`} onChange={(event) => update(member, { role: event.target.value })}><option value="workspace_admin">Workspace Admin</option><option value="user">User</option></select>
+      <select aria-label={`Role for ${member.user?.email || member.user_id}`} className="ops-select" value={member.role} disabled={member.is_owner || busy === `member:${member.user_id}`} onChange={(event) => update(member, { role: event.target.value })}><option value="workspace_admin">Workspace Admin</option><option value="user">Member</option></select>
       {member.is_owner ? <span className="pill pill--yellow">Owner</span> : <button type="button" className={`ops-state ${member.status === "active" ? "is-on" : "is-off"}`} aria-pressed={member.status === "active"} disabled={busy === `member:${member.user_id}`} onClick={() => update(member, { status: member.status === "active" ? "suspended" : "active" })}>{member.status === "active" ? "Active" : "Suspended"}</button>}
     </div>)}</div> : <div className="ops-empty">No workspace members were found.</div>}
     <form className="workspace-access__transfer" onSubmit={transferOwnership}>
@@ -299,4 +298,22 @@ function WorkspaceMembers() {
   </div>;
 }
 
-Object.assign(window, { AdminAccess, AdminOpex, WorkspaceMembers });
+function DesignerInvites() {
+  const [email, setEmail] = useState("");
+  const [notice, setNotice] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const invite = async (event) => {
+    event.preventDefault(); setBusy(true); setNotice(null);
+    try {
+      await request("/api/access/invitations", { method: "POST", body: { email, platformRole: "designer" } });
+      setEmail(""); setNotice({ kind: "success", text: "Designer invitation sent." });
+    } catch (error) { setNotice({ kind: "error", text: error.message }); }
+    finally { setBusy(false); }
+  };
+  return <section className="workspace-access"><Notice value={notice} clear={() => setNotice(null)} />
+    <div className="ops-panel__head"><div><h3>Invite a designer</h3><p>Creative Directors can add Designers to the internal team. Designer access remains scoped to assigned clients.</p></div></div>
+    <form className="workspace-access__invite" onSubmit={invite}><label className="sr-only" htmlFor="designer-invite-email">Designer email address</label><input id="designer-invite-email" className="input" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="designer@company.com" /><span className="workspace-access__invite-role" aria-label="Role for this invitation">Designer</span><button className="btn btn--primary" disabled={busy}>{busy ? "Sending…" : "Invite designer"}</button></form>
+  </section>;
+}
+
+Object.assign(window, { AdminAccess, AdminOpex, WorkspaceMembers, DesignerInvites });

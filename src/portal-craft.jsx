@@ -652,7 +652,7 @@ function SettingsView({ section = null, go = null, accountBase = "settings", onL
     ...(portal === "super_admin" ? [["opex","Usage & OPEX","credit"]] : []),
   ];
   const groups = teamAccount ? [
-    { label:"My account", items:[["profile","Profile","settings"],["assignments","Assigned clients","team"]] },
+    { label:"My account", items:[["profile","Profile","settings"],["assignments","Assigned clients","team"],...(persona === "creative_director" ? [["invite-designers","Invite designers","team"]] : [])] },
     { label:"Credits", items:[["usage",persona === "creative_director" ? "Team usage" : "Workspace usage","timer"]] },
     { label:"Preferences", items:[["notifications","Notifications","bell"],["language",t("settings.language.nav"),"settings"]] },
     { label:"Security", items:[["sessions","Sessions","check"]] },
@@ -695,6 +695,7 @@ function SettingsView({ section = null, go = null, accountBase = "settings", onL
     : tab === "opex" ? React.createElement(window.AdminOpex)
     : tab === "profile" ? <PersonalAccountSettings session={session} />
     : tab === "assignments" ? <AssignedClientsSettings session={session} />
+    : tab === "invite-designers" ? React.createElement(window.DesignerInvites)
     : tab === "sessions" ? <SessionSettings session={session} />
     : <SecurityDataSettings />;
 

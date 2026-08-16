@@ -39,6 +39,17 @@ test("every account has a personal profile with a saved name and avatar upload",
   assert.match(meRoute, /app\.post\("\/avatar"/);
 });
 
+test("Creative Directors and Workspace Admins see only their permitted invite role", async () => {
+  const [craft, ops] = await Promise.all([
+    read("../portal-craft.jsx"),
+    read("../portal-ops.jsx"),
+  ]);
+  assert.match(craft, /invite-designers/);
+  assert.match(ops, /Invite a designer/);
+  assert.match(ops, /workspaceRole: "user"/);
+  assert.match(ops, />Member<\/span>/);
+});
+
 test("internal credit reads require access to the selected workspace", async () => {
   const creditsRoute = await read("../../server/src/routes/credits.js");
   assert.match(creditsRoute, /canAccessWorkspace\(auth, workspaceId\)/);

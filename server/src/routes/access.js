@@ -3,6 +3,7 @@ import { requireAuth, requirePermission } from "../middleware/auth.js";
 import { supabaseAdmin } from "../lib/supabase.js";
 import { writeAuthorizationAudit } from "../lib/audit.js";
 import { hasPermission } from "../lib/permissions.js";
+import { canInviteRole, invitationPolicyFor } from "../lib/invitation-policy.js";
 
 const app = new Hono();
 app.use("*", requireAuth);
@@ -90,14 +91,11 @@ app.post("/invitations", async (c) => {
   if (auth.aal !== "aal2") return c.json({ error: "Multi-factor authentication required", code: "MFA_REQUIRED" }, 403);
   const body = await c.req.json().catch(() => ({}));
   const platform = !!body.platformRole;
-  const permission = platform ? "platform.people.manage" : "workspace.members.manage";
-  if (!hasPermission(auth, permission, body.workspaceId || null)) return c.json({error:"Forbidden"},403);
-  const allowedPlatformRoles = auth.persona === "super_admin"
-    ? ["platform_admin", "creative_director", "designer"]
-    : ["creative_director", "designer"];
-  if (platform && !allowedPlatformRoles.includes(body.platformRole)) return c.json({error:"This platform role cannot be invited by your persona"},403);
+  const policy = invitationPolicyFor(auth.persona);
+  const permission = policy.permission;
+  if (!permission || !hasPermission(auth, permission, platform ? null : body.workspaceId || null)) return c.json({error:"Forbidden"},403);
+  if (!canInviteRole(auth, body)) return c.json({ error: "This role cannot be invited by your account." }, 403);
   if (!platform && !body.workspaceId) return c.json({ error: "workspaceId is required" }, 400);
-  if (!platform && !["workspace_admin", "user"].includes(body.workspaceRole || "user")) return c.json({ error: "Invalid workspace role" }, 400);
   const row = { email:String(body.email||"").trim().toLowerCase(), invited_by:auth.userId,
     workspace_id:platform?null:body.workspaceId, workspace_role:platform?null:(body.workspaceRole||"user"),
     platform_role:platform?body.platformRole:null };
@@ -110,7 +108,8 @@ app.post("/invitations", async (c) => {
         if (platform) {
           const { data: clientMembership } = await supabaseAdmin.from("workspace_memberships").select("user_id").eq("user_id", existing.id).limit(1);
           if (clientMembership?.length) throw new Error("This account already belongs to a client workspace");
-          const { error: userError } = await supabaseAdmin.from("users").update({ workspace_id:null, role:body.platformRole === "platform_admin" ? "admin" : "team" }).eq("id",existing.id);
+          const legacyRole = body.platformRole === "super_admin" ? "super_admin" : body.platformRole === "platform_admin" ? "admin" : "team";
+          const { error: userError } = await supabaseAdmin.from("users").update({ workspace_id:null, role:legacyRole }).eq("id",existing.id);
           if (userError) throw userError;
           const { error: membershipError } = await supabaseAdmin.from("platform_memberships").upsert({user_id:existing.id,role:body.platformRole,active:true,created_by:auth.userId,updated_at:new Date().toISOString()},{onConflict:"user_id"});
           if (membershipError) throw membershipError;
