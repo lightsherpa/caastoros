@@ -27,6 +27,18 @@ test("credits are consolidated into permission-aware Account views", async () =>
   assert.match(craft, /Credit usage/);
 });
 
+test("every account has a personal profile with a saved name and avatar upload", async () => {
+  const [craft, meRoute] = await Promise.all([
+    read("../portal-craft.jsx"),
+    read("../../server/src/routes/me.js"),
+  ]);
+  assert.match(craft, /Your profile/);
+  assert.match(craft, /apiFetch\("\/api\/me\/profile"/);
+  assert.match(craft, /apiFetch\("\/api\/me\/avatar"/);
+  assert.match(meRoute, /app\.patch\("\/profile"/);
+  assert.match(meRoute, /app\.post\("\/avatar"/);
+});
+
 test("internal credit reads require access to the selected workspace", async () => {
   const creditsRoute = await read("../../server/src/routes/credits.js");
   assert.match(creditsRoute, /canAccessWorkspace\(auth, workspaceId\)/);

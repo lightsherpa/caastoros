@@ -574,8 +574,51 @@ function SecurityDataSettings() {
 }
 
 function PersonalAccountSettings({ session }) {
-  return <div><SettingsPanelHeader title="Profile" description="Your personal CaastorOS identity and the role that determines your working view." />
+  const [name, setName] = useCState(session?.name || "");
+  const [avatarUrl, setAvatarUrl] = useCState(session?.avatar || "");
+  const [status, setStatus] = useCState("");
+  const [saving, setSaving] = useCState(false);
+  const initial = (name || session?.email || "A").trim().slice(0, 1).toUpperCase();
+
+  useCEffect(() => { setName(session?.name || ""); setAvatarUrl(session?.avatar || ""); }, [session?.name, session?.avatar]);
+
+  const saveName = async () => {
+    setSaving(true); setStatus("");
+    try {
+      const response = await apiFetch("/api/me/profile", { method: "PATCH", body: JSON.stringify({ name }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not save your name.");
+      setName(result.name); setStatus("Name saved");
+    } catch (error) { setStatus(error.message || "Could not save your name."); }
+    finally { setSaving(false); }
+  };
+
+  const uploadAvatar = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setSaving(true); setStatus("");
+    try {
+      const form = new FormData(); form.append("avatar", file);
+      const response = await apiFetch("/api/me/avatar", { method: "POST", body: form });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not upload your avatar.");
+      setAvatarUrl(result.avatarUrl); setStatus("Avatar updated");
+    } catch (error) { setStatus(error.message || "Could not upload your avatar."); }
+    finally { setSaving(false); }
+  };
+
+  return <div><SettingsPanelHeader title="Your profile" description="The identity people see when you collaborate in CaastorOS." />
+    <section className="settings-profile" aria-label="Your profile details">
+      <div className="settings-profile__avatar">
+        {avatarUrl ? <img src={avatarUrl} alt="Your avatar" /> : <span aria-hidden="true">{initial}</span>}
+        <div><strong>Profile photo</strong><small>JPG, PNG, or WebP. Up to 2 MB.</small><label className="btn btn--ghost btn--sm" htmlFor="personal-avatar">{avatarUrl ? "Replace photo" : "Upload photo"}</label><input id="personal-avatar" className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadAvatar} disabled={saving} /></div>
+      </div>
+      <div className="settings-profile__field"><label htmlFor="personal-name">Name</label><div><input id="personal-name" value={name} maxLength="80" onChange={(event) => setName(event.target.value)} autoComplete="name" /><button className="btn btn--primary btn--sm" onClick={saveName} disabled={saving || name.trim().length < 2}>{saving ? "Saving…" : "Save"}</button></div></div>
+      {status && <p className="settings-profile__status" role="status">{status}</p>}
+    </section>
     <dl className="settings-facts"><div><dt>Email</dt><dd>{session?.email || "—"}</dd></div><div><dt>Role</dt><dd>{String(session?.persona || session?.role || "member").replaceAll("_", " ")}</dd></div><div><dt>Portal</dt><dd>{session?.portal || session?.role || "client"}</dd></div><div><dt>Account status</dt><dd>Active</dd></div></dl>
+    <p className="settings-note">Email changes require verification and are kept out of this quick profile flow.</p>
   </div>;
 }
 
@@ -614,7 +657,7 @@ function SettingsView({ section = null, go = null, accountBase = "settings", onL
     { label:"Preferences", items:[["notifications","Notifications","bell"],["language",t("settings.language.nav"),"settings"]] },
     { label:"Security", items:[["sessions","Sessions","check"]] },
   ] : [
-    { label:"Account", items:[["workspace","Workspace","settings"],...(permissions.has("workspace.members.manage") || includeAdministration ? [["members","Members","team"]] : []),["brands","Brands","files"]] },
+    { label:"Account", items:[["profile","Your profile","settings"],["workspace","Workspace","settings"],...(permissions.has("workspace.members.manage") || includeAdministration ? [["members","Members","team"]] : []),["brands","Brands","files"]] },
     { label:"Billing & usage", items:[...(permissions.has("workspace.billing.manage") || includeAdministration ? [["billing","Plan & billing","credit"]] : []),["usage","Credit usage","timer"]] },
     { label:"Brand & product", items:[["rules","Brand rules","bio"],...(permissions.has("workspace.billing.manage") || includeAdministration ? [["integrations","Integrations","sparkles"]] : [])] },
     { label:"Preferences", items:[["notifications","Notifications","bell"],["language",t("settings.language.nav"),"settings"]] },
