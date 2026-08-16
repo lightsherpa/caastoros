@@ -13,6 +13,9 @@ test("Account is the final dock destination and logout lives inside Account", as
   assert.match(shell, /\["settings", "admin-account", "team-account"\]/);
   assert.doesNotMatch(shell, /app-dock__logout/);
   assert.match(craft, /settings-nav__logout/);
+  assert.match(craft, /placeholder="Search settings"/);
+  assert.match(craft, /settings-dialog__close/);
+  assert.match(craft, /aria-label=\{t\("common\.logOut"\)\}/);
 });
 
 test("credits are consolidated into permission-aware Account views", async () => {

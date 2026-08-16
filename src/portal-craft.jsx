@@ -603,8 +603,8 @@ function SettingsView({ section = null, go = null, accountBase = "settings", onL
   const teamAccount = portal === "team";
   const administration = [
     ["access","People & access","team"],
-    ["specs","Specs","settings"],
-    ["languages","Languages","settings"],
+    ["specs","Agent specs","settings"],
+    ["languages","Platform languages","settings"],
     ["brandolph","Brandolph memory","sparkles"],
     ...(portal === "super_admin" ? [["opex","Usage & OPEX","credit"]] : []),
   ];
@@ -625,8 +625,15 @@ function SettingsView({ section = null, go = null, accountBase = "settings", onL
   const valid = new Set(groups.flatMap((group) => group.items.map(([id]) => id)));
   const defaultTab = teamAccount ? "profile" : "workspace";
   const [localTab, setLocalTab] = useCState(valid.has(section) ? section : defaultTab);
+  const [query, setQuery] = useCState("");
   const tab = valid.has(section) ? section : localTab;
   const open = (id) => { setLocalTab(id); if (go) go(`${accountBase}/${id}`); };
+  const accountItems = groups.flatMap((group) => group.items.map((item) => ({ item, group:group.label })));
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleItems = normalizedQuery
+    ? accountItems.filter(({ item:[,label], group }) => `${label} ${group}`.toLowerCase().includes(normalizedQuery))
+    : accountItems;
+  const closeAccount = () => go?.(teamAccount ? "team-review" : "home");
 
   let content = tab === "workspace" ? <WorkspaceSettings data={data} />
     : tab === "members" ? React.createElement(window.WorkspaceMembers)
@@ -649,13 +656,26 @@ function SettingsView({ section = null, go = null, accountBase = "settings", onL
     : <SecurityDataSettings />;
 
   return <div className="settings-page">
-    <PageHeader eyebrow="Account" title={teamAccount ? "My account" : "Workspace settings"} sub={teamAccount ? "Your profile, assigned clients, credit usage, preferences, and security in one place." : "Manage the workspace, people, brands, plan, credit usage, preferences, and connections from one place."} />
-    <div className="settings-workbench">
-      <nav className="settings-nav" aria-label="Account settings">
-        {groups.map((group) => <div className="settings-nav__group" key={group.label}><div className="settings-nav__label">{group.label}</div>{group.items.map(([id,label,icon]) => <button key={id} className={tab === id ? "is-active" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => open(id)}><Icon name={icon} size={16}/><span>{label}</span></button>)}</div>)}
-        {onLogout && <div className="settings-nav__session"><button type="button" className="settings-nav__logout" onClick={onLogout}><Icon name="arrowLeft" size={16}/><span>{t("common.logOut")}</span></button></div>}
-      </nav>
-      <section className="settings-panel">{content}</section>
+    <div className="settings-dialog" role="region" aria-label={teamAccount ? "My account settings" : "Workspace account settings"}>
+      <aside className="settings-dialog__sidebar">
+        <button type="button" className="settings-dialog__close" onClick={closeAccount} aria-label="Close account settings"><Icon name="close" size={20}/></button>
+        <label className="settings-search">
+          <Icon name="search" size={16}/>
+          <span className="sr-only">Search account settings</span>
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search settings" autoComplete="off" />
+        </label>
+        <nav className="settings-nav" aria-label="Account settings">
+          <div className="settings-nav__items">
+            {visibleItems.map(({ item:[id,label,icon], group }, index) => <React.Fragment key={id}>
+              {group === "Administration" && visibleItems[index - 1]?.group !== group && <div className="settings-nav__divider">Administration</div>}
+              <button className={tab === id ? "is-active" : ""} aria-current={tab === id ? "page" : undefined} onClick={() => open(id)} title={group}><Icon name={icon} size={18}/><span>{label}</span></button>
+            </React.Fragment>)}
+            {!visibleItems.length && <div className="settings-nav__empty">No settings match “{query}”.</div>}
+          </div>
+          {onLogout && <div className="settings-nav__session"><button type="button" className="settings-nav__logout" onClick={onLogout} aria-label={t("common.logOut")}><Icon name="arrowLeft" size={18}/><span>{t("common.logOut")}</span></button></div>}
+        </nav>
+      </aside>
+      <section className="settings-panel" aria-live="polite">{content}</section>
     </div>
   </div>;
 }
