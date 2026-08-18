@@ -88,7 +88,6 @@ app.get("/workspace/:workspaceId", async (c) => {
 
 app.post("/invitations", async (c) => {
   const auth = c.get("auth");
-  if (auth.aal !== "aal2") return c.json({ error: "Multi-factor authentication required", code: "MFA_REQUIRED" }, 403);
   const body = await c.req.json().catch(() => ({}));
   const platform = !!body.platformRole;
   const policy = invitationPolicyFor(auth.persona);

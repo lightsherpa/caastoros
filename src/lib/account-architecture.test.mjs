@@ -50,6 +50,13 @@ test("Creative Directors and Workspace Admins see only their permitted invite ro
   assert.match(ops, />Member<\/span>/);
 });
 
+test("role-allowed invitations do not require a separate MFA step", async () => {
+  const accessRoute = await read("../../server/src/routes/access.js");
+  const inviteRoute = accessRoute.slice(accessRoute.indexOf('app.post("/invitations"'), accessRoute.indexOf('app.post("/invitations/:id/revoke"'));
+  assert.doesNotMatch(inviteRoute, /auth\.aal/);
+  assert.match(inviteRoute, /canInviteRole\(auth, body\)/);
+});
+
 test("internal credit reads require access to the selected workspace", async () => {
   const creditsRoute = await read("../../server/src/routes/credits.js");
   assert.match(creditsRoute, /canAccessWorkspace\(auth, workspaceId\)/);
